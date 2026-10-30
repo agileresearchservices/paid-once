@@ -19,6 +19,7 @@ from temporalio.client import Client
 
 from raccoon import audit, config
 from raccoon.lane2.client import connect
+from raccoon.lane2.payments_side import refund_workflow_id
 from raccoon.lane2.support_side import SupportTicketWorkflow, ticket_workflow_id
 from raccoon.models import ApprovalDecision, Ticket
 from raccoon.show.procs import ProcessManager
@@ -63,6 +64,7 @@ class Engine:
         self.running = False
         self.scene_tickets: dict[str, list[tuple[str, str]]] = {}
         self._temporal: Client | None = None
+        self._payments_temporal: Client | None = None
         self._http: httpx.AsyncClient | None = None
         self.nexus_view: list[dict] = []
         self.lane1_view: dict[str, int] = {}
@@ -90,14 +92,15 @@ class Engine:
             self._temporal = await connect(config.SUPPORT_NAMESPACE)
         return self._temporal
 
+    async def payments_temporal(self) -> Client:
+        if self._payments_temporal is None:
+            self._payments_temporal = await connect(config.PAYMENTS_NAMESPACE)
+        return self._payments_temporal
+
     # -- tickets and approvals --------------------------------------------------
-    def _make_ticket(
-        self, scene: str, i: int, lane: str, amount: int, message: str
-    ) -> Ticket:
+    def _make_ticket(self, scene: str, i: int, lane: str, amount: int, message: str) -> Ticket:
         tid = f"{self.run_id}-{scene}-{i:02d}-{lane}"
-        return Ticket(
-            tid, f"cust-{i:02d}", f"ord-{self.run_id}-{i:02d}", amount, message
-        )
+        return Ticket(tid, f"cust-{i:02d}", f"ord-{self.run_id}-{i:02d}", amount, message)
 
     async def submit_ticket(self, lane: str, scene: str, ticket: Ticket) -> None:
         audit.record_ticket(lane, ticket.ticket_id, scene, ticket.amount_cents)
@@ -127,21 +130,12 @@ class Engine:
                 task_queue=config.SUPPORT_TASK_QUEUE,
             )
 
-    async def submit_cohort(
-        self, scene: str, n: int, lanes=("lane1", "lane2")
-    ) -> list[tuple[int, int, str]]:
-        specs = [
-            (i, self.rng.randrange(1500, 9500, 100), self.rng.choice(MESSAGES))
-            for i in range(n)
-        ]
+    async def submit_cohort(self, scene: str, n: int, lanes=("lane1", "lane2")) -> list[tuple[int, int, str]]:
+        specs = [(i, self.rng.randrange(1500, 9500, 100), self.rng.choice(MESSAGES)) for i in range(n)]
         jobs = []
         for lane in lanes:
             for i, amount, msg in specs:
-                jobs.append(
-                    self.submit_ticket(
-                        lane, scene, self._make_ticket(scene, i, lane, amount, msg)
-                    )
-                )
+                jobs.append(self.submit_ticket(lane, scene, self._make_ticket(scene, i, lane, amount, msg)))
         await asyncio.gather(*jobs)
         self.emit(
             "submit",
@@ -156,25 +150,19 @@ class Engine:
         if lane == "lane1":
             for _ in range(80):
                 try:
-                    r = await self.http.post(
-                        f"{config.LANE1_URL}/tickets/{ticket_id}/approve"
-                    )
+                    r = await self.http.post(f"{config.LANE1_URL}/tickets/{ticket_id}/approve")
                     if r.status_code == 200:
                         audit.record_approval(lane, ticket_id, delivered=True)
                         return
                 except httpx.HTTPError:
                     pass
-                await asyncio.sleep(
-                    0.5
-                )  # 409 = no proposal yet, or the API is down: click again
+                await asyncio.sleep(0.5)  # 409 = no proposal yet, or the API is down: click again
         else:
             for _ in range(80):
                 try:
                     client = await self.temporal()
                     handle = client.get_workflow_handle(ticket_workflow_id(ticket_id))
-                    await handle.signal(
-                        SupportTicketWorkflow.approve, ApprovalDecision(True)
-                    )
+                    await handle.signal(SupportTicketWorkflow.approve, ApprovalDecision(True))
                     audit.record_approval(lane, ticket_id, delivered=True)
                     return
                 except Exception:  # noqa: BLE001
@@ -205,9 +193,9 @@ class Engine:
                     ready += l1.get(tid) == "awaiting_approval"
                 else:
                     try:
-                        st = await client.get_workflow_handle(
-                            ticket_workflow_id(tid)
-                        ).query(SupportTicketWorkflow.status)
+                        st = await client.get_workflow_handle(ticket_workflow_id(tid)).query(
+                            SupportTicketWorkflow.status
+                        )
                         ready += st["state"] == "awaiting_approval"
                     except Exception:  # noqa: BLE001
                         pass
@@ -253,9 +241,7 @@ class Engine:
             handle = client.get_workflow_handle(ticket_workflow_id(tid))
             for _ in range(times):
                 try:
-                    await handle.signal(
-                        SupportTicketWorkflow.approve, ApprovalDecision(True)
-                    )
+                    await handle.signal(SupportTicketWorkflow.approve, ApprovalDecision(True))
                 except Exception:  # noqa: BLE001
                     pass
 
@@ -294,9 +280,7 @@ class Engine:
         await self.clear_faults()
 
     async def scene_double_delivery(self) -> None:
-        self.emit(
-            "scene", "The broker delivers the same work twice", scene="double_delivery"
-        )
+        self.emit("scene", "The broker delivers the same work twice", scene="double_delivery")
         await self.set_fault("all", "none", latency_s=2.5)
         await self.submit_cohort("double_delivery", 5)
         await self.wait_for_proposals("double_delivery")
@@ -329,9 +313,7 @@ class Engine:
         self.procs.kill("lane1_worker", restart_after=3.0)
         self.procs.kill("support_worker", restart_after=3.0)
         await asyncio.sleep(6)
-        self.emit(
-            "human", "The human finally clicks Approve on all 5", scene="deploy_wait"
-        )
+        self.emit("human", "The human finally clicks Approve on all 5", scene="deploy_wait")
         await self.approve_scene("deploy_wait")
         await asyncio.sleep(10)
 
@@ -360,7 +342,7 @@ class Engine:
             "Lane 2 only: the payments team's worker dies in the middle of Nexus operations",
             scene="nexus_kill",
         )
-        await self.set_fault("lane2", "none", latency_s=3.0)
+        await self.set_fault("lane2", "none", latency_s=2.0)
         await self.submit_cohort("nexus_kill", 5, lanes=("lane2",))
         await self.wait_for_proposals("nexus_kill")
         self.emit(
@@ -372,7 +354,7 @@ class Engine:
         await asyncio.sleep(1.2)
         self.emit(
             "raccoon",
-            "🦝 Raccoon kills the payments team's worker for 10 seconds",
+            "🦝 Raccoon kills the payments team's worker for 10 seconds: the support side keeps waiting, the retries happen inside payments",
             scene="nexus_kill",
         )
         self.procs.kill("payments_worker", restart_after=10.0)
@@ -380,9 +362,7 @@ class Engine:
         await self.clear_faults()
 
     async def scene_free_roam(self) -> None:
-        self.emit(
-            "scene", "Free roam: the raccoon picks its own victims", scene="free_roam"
-        )
+        self.emit("scene", "Free roam: the raccoon picks its own victims", scene="free_roam")
         actions: list[Callable[[str], Awaitable[None]]] = [
             self._roam_kill_agents,
             self._roam_stall,
@@ -405,9 +385,7 @@ class Engine:
         self.procs.kill("support_worker", 3.0)
 
     async def _roam_stall(self, scene: str) -> None:
-        self.emit(
-            "raccoon", "🦝 Raccoon: payments goes quiet after committing", scene=scene
-        )
+        self.emit("raccoon", "🦝 Raccoon: payments goes quiet after committing", scene=scene)
         await self.set_fault("all", "commit_then_stall", count=3, delay_s=8.0)
 
     async def _roam_redeliver(self, scene: str) -> None:
@@ -481,11 +459,7 @@ class Engine:
         try:
             client = await self.temporal()
             view, states = [], {}
-            lane2 = [
-                tid
-                for lane, tid in self.scene_tickets.get(self.current or "", [])
-                if lane == "lane2"
-            ]
+            lane2 = [tid for lane, tid in self.scene_tickets.get(self.current or "", []) if lane == "lane2"]
             for tid in lane2:
                 handle = client.get_workflow_handle(ticket_workflow_id(tid))
                 desc = await handle.describe()
@@ -493,9 +467,11 @@ class Engine:
                     states.get(desc.status.name if desc.status else "UNKNOWN", 0) + 1
                 )
                 for op in desc.raw_description.pending_nexus_operations:
+                    handler = await self._handler_view(tid)
                     view.append(
                         {
                             "ticket": tid,
+                            "handler": handler,
                             "endpoint": op.endpoint,
                             "service": op.service,
                             "operation": op.operation,
@@ -503,8 +479,7 @@ class Engine:
                             "attempt": op.attempt,
                             "last_failure": (
                                 op.last_attempt_failure.message[:120]
-                                if op.last_attempt_failure
-                                and op.last_attempt_failure.message
+                                if op.last_attempt_failure and op.last_attempt_failure.message
                                 else ""
                             ),
                         }
@@ -530,13 +505,33 @@ class Engine:
             "faults": self.faults,
         }
 
+    async def _handler_view(self, ticket_id: str) -> dict:
+        """The payments side of one Nexus operation: the refund workflow and its pending activity.
+
+        The caller's operation stays STARTED while the handler retries; this is where the retries show.
+        """
+        try:
+            client = await self.payments_temporal()
+            desc = await client.get_workflow_handle(refund_workflow_id(ticket_id)).describe()
+            acts = desc.raw_description.pending_activities
+            act = acts[0] if acts else None
+            return {
+                "workflow_id": refund_workflow_id(ticket_id),
+                "namespace": config.PAYMENTS_NAMESPACE,
+                "status": desc.status.name if desc.status else "UNKNOWN",
+                "activity_attempt": act.attempt if act else 0,
+                "activity_failure": (
+                    act.last_failure.message[:120] if act and act.last_failure and act.last_failure.message else ""
+                ),
+            }
+        except Exception:  # noqa: BLE001
+            return {}
+
 
 def _enum_name(op) -> str:
     try:
         from temporalio.api.enums.v1 import PendingNexusOperationState  # type: ignore
 
-        return PendingNexusOperationState.Name(op.state).replace(
-            "PENDING_NEXUS_OPERATION_STATE_", ""
-        )
+        return PendingNexusOperationState.Name(op.state).replace("PENDING_NEXUS_OPERATION_STATE_", "")
     except Exception:  # noqa: BLE001
         return str(op.state)

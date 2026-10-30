@@ -1,7 +1,14 @@
 """Run scenes headlessly against the real stack and print the ledger scoreboard after each.
 
-Usage: python scripts/smoke.py intro tip_over ...    (needs the show server NOT already running)
-Set RACCOON_STUB_LLM=1 to avoid real model calls while testing.
+Usage: python scripts/smoke.py [--check] intro tip_over ...    (needs the show server NOT already running)
+Set RACCOON_STUB_LLM=1 to avoid real model calls (`make scenario` does).
+
+The scoreboard is reset first, so each run starts from zero. Chaos is seeded (the engine's seed);
+ticket IDs carry a per-run prefix, so reruns never collide with earlier tickets.
+
+--check exits non-zero if Lane 2 has any ledger violation (duplicate, missing, unapproved, stuck),
+or if the nexus_kill scene never showed the payments-side retry it exists to show.
+Lane 1 is printed for contrast but never gates the result.
 """
 
 import json
@@ -11,7 +18,18 @@ import time
 
 import httpx
 
+from raccoon.show.engine import SETTLE_S
+
 BASE = "http://127.0.0.1:8100"
+MUST_HAVE = [
+    "intro",
+    "tip_over",
+    "double_delivery",
+    "deploy_wait",
+    "payments_timeout",
+    "nexus_kill",
+]
+FIELDS = ("submitted", "approved", "refunded_once", "duplicates", "missing", "in_flight", "unapproved")
 
 
 def wait_api(proc, timeout=90):
@@ -27,48 +45,89 @@ def wait_api(proc, timeout=90):
     raise SystemExit("show server did not come up")
 
 
-def summarize(snap):
-    out = []
-    for lane in ("lane1", "lane2"):
-        a = snap["audit"][lane]
-        out.append(
-            f"  {lane}: submitted={a['submitted']} approved={a['approved']} ok={a['refunded_once']} "
-            f"dup={a['duplicates']} (${a['duplicate_cents'] / 100:.2f}) missing={a['missing']} "
-            f"in_flight={a['in_flight']} unapproved={a['unapproved']}"
-        )
-    return "\n".join(out)
+def line(lane, a, prev):
+    d = {k: a[k] - prev.get(k, 0) for k in FIELDS}
+    return (
+        f"  {lane}: submitted={d['submitted']} approved={d['approved']} ok={d['refunded_once']} "
+        f"dup={d['duplicates']} (${a['duplicate_cents'] / 100:.2f} total) "
+        f"missing={d['missing']} stuck={d['in_flight']} unapproved={d['unapproved']}"
+    )
 
 
-def main(scenes):
+def handler_attempts(snap):
+    """Highest payments-side activity attempt among live Nexus rows; caller rows must stay at attempt 1."""
+    rows = snap["nexus"]
+    return (
+        max((r.get("handler", {}).get("activity_attempt", 0) for r in rows), default=0),
+        max((r["attempt"] for r in rows), default=0),
+    )
+
+
+def main(scenes, check):
     srv = subprocess.Popen([sys.executable, "-m", "raccoon.show"])
+    failures: list[str] = []
     try:
         wait_api(srv)
         time.sleep(1)
+        httpx.post(f"{BASE}/api/reset", timeout=10).raise_for_status()
+        prev = {"lane1": {}, "lane2": {}}
         for scene in scenes:
             httpx.post(f"{BASE}/api/scenes/{scene}/run", timeout=5).raise_for_status()
             t0 = time.time()
+            peak_handler = peak_caller = 0
             while True:
                 time.sleep(1)
                 snap = httpx.get(f"{BASE}/api/state", timeout=5).json()
+                h, c = handler_attempts(snap)
+                peak_handler, peak_caller = max(peak_handler, h), max(peak_caller, c)
                 if not snap["running"]:
                     break
             # let the settle window elapse so "missing" is decided
-            time.sleep(21)
+            time.sleep(SETTLE_S + 1)
             snap = httpx.get(f"{BASE}/api/state", timeout=5).json()
             print(f"== {scene} ({time.time() - t0:.0f}s incl. settle)")
-            print(summarize(snap))
+            for lane in ("lane1", "lane2"):
+                print(line(lane, snap["audit"][lane], prev[lane]))
+                prev[lane] = {k: snap["audit"][lane][k] for k in FIELDS}
+            if scene == "nexus_kill":
+                print(
+                    f"  nexus: payments-side activity attempt peaked at {peak_handler}; "
+                    f"caller operation attempt peaked at {peak_caller}"
+                )
+                if peak_handler < 2:
+                    failures.append("nexus_kill: no payments-side retry observed")
             errs = [e for e in snap["events"] if e["kind"] == "error"]
             if errs:
-                print("  ERRORS:", errs)
-            if snap["nexus"]:
-                print("  nexus:", json.dumps(snap["nexus"][:2]))
+                print("  ERRORS:", json.dumps(errs))
+                failures.append(f"{scene}: error events")
+        a = snap["audit"]["lane2"]
+        print("== final ledger audit (cumulative)")
+        for lane in ("lane1", "lane2"):
+            x = snap["audit"][lane]
+            print(
+                f"  {lane}: submitted={x['submitted']} refunded_once={x['refunded_once']} "
+                f"duplicates={x['duplicates']} missing={x['missing']} stuck={x['in_flight']} "
+                f"unapproved={x['unapproved']}"
+            )
+        if a["duplicates"] or a["missing"] or a["in_flight"] or a["unapproved"]:
+            failures.append("Lane 2 ledger violations")
+        if a["refunded_once"] != a["approved"]:
+            failures.append("Lane 2: refunded_once != approved")
     finally:
         srv.terminate()
         try:
             srv.wait(10)
         except Exception:
             srv.kill()
+    if check:
+        if failures:
+            print("SCENARIO FAILED: " + "; ".join(failures))
+            raise SystemExit(1)
+        print("SCENARIO PASSED: Lane 2 held every invariant")
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:] or ["intro"])
+    args = sys.argv[1:]
+    check = "--check" in args
+    names = [a for a in args if a != "--check"]
+    main(names or (MUST_HAVE if check else ["intro"]), check)

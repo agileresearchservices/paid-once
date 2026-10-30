@@ -1,4 +1,4 @@
-.PHONY: install test test-temporal setup demo lint
+.PHONY: install test test-temporal setup scenario demo lint
 
 install:
 	uv sync
@@ -11,6 +11,9 @@ test-temporal:   ## Lane 2 + Nexus integration tests (needs: temporal server sta
 
 setup:           ## create the two namespaces and the Nexus endpoint (safe to repeat)
 	uv run python -m raccoon.lane2.client
+
+scenario:        ## reproducible migration test: six chaos scenes, exit 1 on any Lane 2 ledger violation (stub model, no API key)
+	RACCOON_STUB_LLM=1 uv run python scripts/smoke.py --check
 
 demo:            ## start everything and serve the show on http://127.0.0.1:8100 (needs ANTHROPIC_API_KEY)
 	uv run python -m raccoon.show
