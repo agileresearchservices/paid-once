@@ -124,9 +124,37 @@ button.danger { border-color: var(--critical); color: #fff; background: #4a1a1a;
 .table-view th { text-align: left; font-weight: 400; color: var(--muted); padding: 2px 12px 2px 0; }
 .table-view td { font-variant-numeric: tabular-nums; }
 
-.nexus { display: grid; grid-template-columns: 420px 1fr; gap: 16px; background: var(--surface); border-radius: 12px; padding: 20px 24px; }
-.contract pre { background: var(--page); border: 1px solid var(--grid); border-radius: 8px; padding: 12px; font-size: 13px; overflow-x: auto; margin: 0 0 8px; white-space: pre-wrap; }
-.contract p { color: var(--ink-2); font-size: 14px; }
+.nexus { display: grid; grid-template-columns: 340px 1fr; gap: 20px; background: var(--surface); border-radius: 12px; padding: 20px 24px; }
+.nexus a { color: var(--accent); text-decoration: none; white-space: nowrap; }
+.nexus a:hover { text-decoration: underline; }
+.nexus code { font-size: 0.92em; }
+
+.boundary { display: grid; gap: 0; align-content: start; }
+.team { display: grid; gap: 2px; border: 1px solid var(--axis); border-radius: 10px; padding: 10px 14px; background: var(--page); font-size: 15px; }
+.team-name { font-weight: 700; }
+/* The endpoint is support's side of the line: the dashed team boundary runs under it, where the arrow crosses. */
+.endpoint { position: relative; display: grid; justify-items: center; padding: 22px 0 34px; }
+.endpoint::before { content: ""; position: absolute; left: 0; right: 0; bottom: 14px; border-top: 2px dashed var(--muted); }
+.boundary-label { position: absolute; right: 0; bottom: 17px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.endpoint-card {
+  position: relative; display: grid; gap: 2px; justify-items: center; text-align: center;
+  border: 1px solid var(--accent); border-radius: 10px; padding: 8px 14px; background: var(--surface); font-size: 14px;
+}
+.endpoint-card::before, .endpoint-card::after { content: "↓"; position: absolute; left: 50%; transform: translateX(-50%); color: var(--muted); }
+.endpoint-card::before { top: -22px; }
+.endpoint-card::after { bottom: -34px; }
+.caption { font-size: 14px; color: var(--ink-2); margin: 10px 0 0; }
+
+.ops { display: grid; gap: 10px; align-content: start; min-width: 0; }
+.headline { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.headline > div { background: var(--page); border: 1px solid var(--axis); border-radius: 10px; padding: 8px 14px; font-size: 16px; }
+.headline b { font-size: 26px; font-variant-numeric: tabular-nums; }
+.headline-label { display: block; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.worker-down { margin: 0; border: 1px solid var(--warning); border-radius: 8px; padding: 6px 12px; background: #3a2a05; }
+.ops-scroll { max-height: 260px; overflow-y: auto; }
+.th-sub { display: block; font-size: 12px; }
+.ops tr.done td { color: var(--muted); }
+.footnote { font-size: 13px; margin: 0; }
 .ops th { text-align: left; font-size: 13px; color: var(--muted); font-weight: 400; padding: 4px 8px; border-bottom: 1px solid var(--grid); }
 .ops td { padding: 6px 8px; border-bottom: 1px solid var(--grid); font-size: 14px; vertical-align: top; }
 .pill { display: inline-block; border: 1px solid var(--axis); border-radius: 6px; padding: 0 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.03em; }

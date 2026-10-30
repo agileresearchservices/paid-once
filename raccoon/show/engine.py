@@ -527,6 +527,7 @@ class Engine:
                     "ticket": tid,
                     "live": True,
                     "caller_workflow_id": ticket_workflow_id(tid),
+                    "caller_run_id": desc.run_id,
                     "caller_namespace": config.SUPPORT_NAMESPACE,
                     "handler": handler,
                     "endpoint": op.endpoint,
@@ -599,6 +600,7 @@ class Engine:
             act = acts[0] if acts else None
             return {
                 "workflow_id": refund_workflow_id(ticket_id),
+                "run_id": desc.run_id,
                 "namespace": config.PAYMENTS_NAMESPACE,
                 "status": desc.status.name if desc.status else "UNKNOWN",
                 "activity_attempt": act.attempt if act else 0,

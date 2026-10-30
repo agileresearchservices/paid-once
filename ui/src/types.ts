@@ -34,6 +34,7 @@ export interface RaccoonEvent {
 // The payments side, read by the dashboard straight from the payments namespace. Support never sees it.
 export interface NexusHandler {
   workflow_id?: string;
+  run_id?: string;
   namespace?: string;
   status?: string;
   activity_attempt?: number;
@@ -46,6 +47,7 @@ export interface NexusRow {
   ticket: string;
   live: boolean;
   caller_workflow_id: string;
+  caller_run_id: string;
   caller_namespace: string;
   handler: NexusHandler;
   endpoint: string;

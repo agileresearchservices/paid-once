@@ -8,7 +8,7 @@ import { post, useSnapshot } from "./useSnapshot";
 
 const LANES = [
   { id: "lane1" as const, name: "Lane 1", subtitle: "Today: job queue, polling loop, plain HTTP", procs: ["lane1_api", "lane1_worker"] },
-  { id: "lane2" as const, name: "Lane 2", subtitle: "Temporal, with the refund exposed over Nexus", procs: ["support_worker", "payments_worker"] },
+  { id: "lane2" as const, name: "Lane 2", subtitle: "Temporal · support calls payments over Nexus", procs: ["support_worker", "payments_worker"] },
 ];
 
 function Chips({ counts, empty }: { counts: Record<string, number>; empty: string }) {
@@ -93,9 +93,9 @@ export function App() {
   const run = step.scene ? snap.scene_runs?.[step.scene] : undefined;
   const finished = !thisRunning && run?.finished_at != null;
   const settling = snap.audit.lane1.in_flight + snap.audit.lane2.in_flight > 0;
+  const elapsed = run ? Math.max(0, Math.round(snap.now - run.started_at)) : 0;
   let status: { text: string; cls: string } | null = null;
-  if (thisRunning && run) status = { text: `Running ${Math.max(0, Math.round(snap.now - run.started_at))}s`, cls: "muted" };
-  else if (finished && run?.ok === false) status = { text: "Scene failed: see the ticker", cls: "fail" };
+  if (finished && run?.ok === false) status = { text: "Scene failed: see the ticker", cls: "fail" };
   else if (finished && settling) status = { text: "Done, settling…", cls: "muted" };
   else if (finished) status = { text: "Done ✓", cls: "ok" };
   const recentRaccoon = [...snap.events].reverse().find((e) => e.kind === "raccoon" && snap.now - e.ts < 6);
@@ -124,7 +124,7 @@ export function App() {
         <div className="controls">
           {step.scene && (
             <button className="primary" disabled={running} onClick={() => void act(`/api/scenes/${step.scene}/run`)}>
-              {thisRunning ? "Running…" : running ? "Another scene is running" : finished ? "Run again (R)" : "Run this scene (R)"}
+              {thisRunning ? `Running ${elapsed}s…` : running ? "Another scene is running" : finished ? "Run again (R)" : "Run this scene (R)"}
             </button>
           )}
           {status && <p className={`scene-status ${status.cls}`} role="status">{status.text}</p>}
@@ -141,7 +141,14 @@ export function App() {
 
       {recentRaccoon && <div className="raccoon-banner" role="status">{recentRaccoon.msg}</div>}
 
-      {step.nexus && <NexusPanel rows={snap.nexus} />}
+      {step.nexus && (
+        <NexusPanel
+          rows={snap.nexus}
+          topology={snap.topology}
+          temporalUi={snap.temporal_ui}
+          paymentsWorker={snap.processes.payments_worker}
+        />
+      )}
 
       <PaymentsStrip proc={snap.processes.payments} faults={snap.faults} />
 
