@@ -111,6 +111,8 @@ export function App() {
 
       {recentRaccoon && <div className="raccoon-banner" role="status">{recentRaccoon.msg}</div>}
 
+      {step.nexus && <NexusPanel rows={snap.nexus} />}
+
       <PaymentsStrip proc={snap.processes.payments} faults={snap.faults} />
 
       <div className="lanes">
@@ -129,8 +131,6 @@ export function App() {
           </article>
         ))}
       </div>
-
-      {step.nexus && <NexusPanel rows={snap.nexus} />}
 
       <Ticker events={snap.events} />
     </main>

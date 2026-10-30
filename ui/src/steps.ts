@@ -78,6 +78,5 @@ export const STEPS: Step[] = [
       "Everything above is scored from the payments ledger, not from either lane's own records. It counts refunds per ticket and compares them with approvals.",
     watch:
       "Three invariants: every approved ticket refunded exactly once, no refund without an approval, no ticket lost or stuck.",
-    nexus: true,
   },
 ];
