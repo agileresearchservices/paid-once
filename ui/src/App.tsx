@@ -152,24 +152,43 @@ export function App() {
 
       <PaymentsStrip proc={snap.processes.payments} faults={snap.faults} />
 
-      <div className="lanes">
-        {LANES.map((l) => (
-          <article key={l.id} className="lane">
-            <h2>{l.name}</h2>
-            <p className="muted">{l.subtitle}</p>
+      {step.nexus ? (
+        // The Nexus scene only runs Lane 2, so the lanes shrink to one strip and the panel keeps the screen.
+        <div className="lanes compact">
+          <article className="lane lane-off">
+            <h2>Lane 1</h2>
+            <span className="muted">not part of this scene</span>
+          </article>
+          <article className="lane lane2">
+            <h2>Lane 2</h2>
             <div className="tiles">
-              {l.procs.map((p) => snap.processes[p] && <ProcTile key={p} p={snap.processes[p]} />)}
+              {LANES[1].procs.map((p) => snap.processes[p] && <ProcTile key={p} p={snap.processes[p]} />)}
             </div>
             <div className="believes">
-              <span className="muted">{l.id === "lane1" ? "Its own job table:" : "Temporal workflow status (this scene):"}</span>{" "}
-              <Chips counts={l.id === "lane1" ? snap.lane1_view : snap.lane2_view} empty="nothing yet" />
+              <span className="muted">Workflows:</span> <Chips counts={snap.lane2_view} empty="nothing yet" />
             </div>
-            <Scoreboard audit={snap.audit[l.id]} name={l.name} />
           </article>
-        ))}
-      </div>
+        </div>
+      ) : (
+        <div className="lanes">
+          {LANES.map((l) => (
+            <article key={l.id} className={`lane ${l.id}`}>
+              <h2>{l.name}</h2>
+              <p className="muted">{l.subtitle}</p>
+              <div className="tiles">
+                {l.procs.map((p) => snap.processes[p] && <ProcTile key={p} p={snap.processes[p]} />)}
+              </div>
+              <div className="believes">
+                <span className="muted">{l.id === "lane1" ? "Its own job table:" : "Temporal workflow status (this scene):"}</span>{" "}
+                <Chips counts={l.id === "lane1" ? snap.lane1_view : snap.lane2_view} empty="nothing yet" />
+              </div>
+              <Scoreboard audit={snap.audit[l.id]} name={l.name} />
+            </article>
+          ))}
+        </div>
+      )}
 
-      <Ticker events={snap.events} />
+      {!step.nexus && <Ticker events={snap.events} />}
     </main>
   );
 }

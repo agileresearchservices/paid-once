@@ -2,7 +2,8 @@ import type { LaneAudit } from "./types";
 
 // Ticket outcomes as one whole split into parts: a tall segmented bar. The four reserved status
 // colours carry state, and every segment also has an icon and a name so colour is never the only cue.
-// "Unapproved" shares the critical colour with "refunded twice", so it gets a striped texture.
+// "Unapproved" shares the critical colour with "refunded twice", so it gets a striped texture, and
+// "never refunded" sits next to red in orange, so it gets dots: no two failure segments differ by hue alone.
 interface Part {
   key: string;
   label: string;
@@ -16,7 +17,7 @@ function parts(a: LaneAudit): Part[] {
     { key: "ok", label: "Refunded once", icon: "✓", value: a.refunded_once, className: "good" },
     { key: "dup", label: "Refunded more than once", icon: "×2", value: a.duplicates, className: "critical" },
     { key: "unapproved", label: "Refunded without approval", icon: "!", value: a.unapproved, className: "critical striped" },
-    { key: "missing", label: "Approved, never refunded", icon: "∅", value: a.missing, className: "serious" },
+    { key: "missing", label: "Approved, never refunded", icon: "∅", value: a.missing, className: "serious dotted" },
     { key: "flight", label: "Still settling", icon: "…", value: a.in_flight, className: "warning" },
   ];
 }
@@ -52,9 +53,10 @@ export function Scoreboard({ audit, name }: { audit: LaneAudit; name: string }) 
         <span className="hero-num">{audit.refunded_once}</span>
         <span className="hero-of">of {audit.approved} approved refunded exactly once</span>
       </div>
-      {audit.duplicate_cents > 0 && (
-        <p className="loss">{dollars(audit.duplicate_cents)} refunded twice</p>
-      )}
+      {/* Always rendered, so the lane doesn't jump when the first duplicate lands. */}
+      <p className="loss" aria-hidden={audit.duplicate_cents === 0}>
+        {audit.duplicate_cents > 0 ? `${dollars(audit.duplicate_cents)} refunded twice` : " "}
+      </p>
 
       {total === 0 ? (
         <div className="bar empty">No tickets yet</div>
