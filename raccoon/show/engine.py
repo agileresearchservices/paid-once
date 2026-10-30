@@ -84,6 +84,7 @@ class Engine:
         self.running = False
         self.scene_tickets: dict[str, list[tuple[str, str]]] = {}
         self.run_no = 0  # bumped per scene run, so a re-run never reuses ticket or workflow IDs
+        self.scene_runs: dict[str, dict] = {}  # last run of each scene: started_at, finished_at, ok
         self._temporal: Client | None = None
         self._payments_temporal: Client | None = None
         self._http: httpx.AsyncClient | None = None
@@ -435,6 +436,8 @@ class Engine:
             del self.scene_tickets[key]
         self.nexus_seen = {}  # a new dict, so a refresh still in flight writes to the old one
         title = next((s.title for s in SCENES if s.id == scene_id), scene_id)
+        run = {"started_at": time.time(), "finished_at": None, "ok": None}
+        self.scene_runs[scene_id] = run
 
         async def go() -> None:
             ok = True
@@ -445,6 +448,7 @@ class Engine:
                 self.emit("error", f"scene {scene_id} failed: {exc!r}", scene=scene_id)
             finally:
                 self.running = False
+                run.update(finished_at=time.time(), ok=ok)
                 self.emit("scene_done", f"{title}: finished", scene=scene_id, ok=ok)
 
         self._task = asyncio.create_task(go())
@@ -468,6 +472,7 @@ class Engine:
         self.rng = random.Random(self.seed)
         self.scene_tickets.clear()
         self.nexus_seen = {}
+        self.scene_runs = {}  # a cancelled scene's finally block then updates a run nobody shows
         self.events.clear()
         self.current = None
         self.emit("reset", "Scoreboard reset")
@@ -568,6 +573,7 @@ class Engine:
             "now": time.time(),
             "running": self.running,
             "current": self.current,
+            "scene_runs": self.scene_runs,
             "scenes": [{"id": s.id, "title": s.title} for s in SCENES],
             "audit": board,
             "processes": self.procs.status(),

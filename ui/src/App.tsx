@@ -23,35 +23,56 @@ function Chips({ counts, empty }: { counts: Record<string, number>; empty: strin
   );
 }
 
+// The step lives in the URL hash (#1..#7), so a refresh mid-demo stays on the same step.
+function stepFromHash(): number {
+  const n = Number(window.location.hash.slice(1));
+  return Number.isInteger(n) && n >= 1 && n <= STEPS.length ? n - 1 : 0;
+}
+
 export function App() {
   const { snap, connected } = useSnapshot();
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(stepFromHash);
   const [confirmReset, setConfirmReset] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const resetTimer = useRef<number | undefined>(undefined);
   const step = STEPS[index];
+  const running = snap?.running ?? true;
 
   const go = useCallback((delta: number) => {
     setIndex((i) => Math.min(STEPS.length - 1, Math.max(0, i + delta)));
   }, []);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "ArrowRight") go(1);
-      if (e.key === "ArrowLeft") go(-1);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [go]);
+    window.history.replaceState(null, "", `#${index + 1}`);
+  }, [index]);
 
-  const act = async (path: string) => {
+  useEffect(() => {
+    const onHash = () => setIndex(stepFromHash());
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+
+  const act = useCallback(async (path: string) => {
     try {
       setError(null);
       await post(path);
     } catch (e) {
       setError(String(e));
     }
-  };
+  }, []);
+
+  // Arrows step, 1-7 jump, R runs this step's scene.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "ArrowRight") go(1);
+      else if (e.key === "ArrowLeft") go(-1);
+      else if (/^[1-9]$/.test(e.key) && Number(e.key) <= STEPS.length) setIndex(Number(e.key) - 1);
+      else if ((e.key === "r" || e.key === "R") && step.scene && !running) void act(`/api/scenes/${step.scene}/run`);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [go, act, step.scene, running]);
 
   const onReset = () => {
     if (!confirmReset) {
@@ -68,8 +89,15 @@ export function App() {
     return <main className="loading">{connected ? "Loading…" : "Waiting for the show server on port 8100…"}</main>;
   }
 
-  const running = snap.running;
   const thisRunning = running && snap.current === step.scene;
+  const run = step.scene ? snap.scene_runs?.[step.scene] : undefined;
+  const finished = !thisRunning && run?.finished_at != null;
+  const settling = snap.audit.lane1.in_flight + snap.audit.lane2.in_flight > 0;
+  let status: { text: string; cls: string } | null = null;
+  if (thisRunning && run) status = { text: `Running ${Math.max(0, Math.round(snap.now - run.started_at))}s`, cls: "muted" };
+  else if (finished && run?.ok === false) status = { text: "Scene failed: see the ticker", cls: "fail" };
+  else if (finished && settling) status = { text: "Done, settling…", cls: "muted" };
+  else if (finished) status = { text: "Done ✓", cls: "ok" };
   const recentRaccoon = [...snap.events].reverse().find((e) => e.kind === "raccoon" && snap.now - e.ts < 6);
 
   return (
@@ -91,13 +119,15 @@ export function App() {
           <h2>{step.title}</h2>
           <p>{step.story}</p>
           <p className="watch"><b>Watch:</b> {step.watch}</p>
+          {finished && step.result && <p className="result"><b>Result:</b> {step.result}</p>}
         </div>
         <div className="controls">
           {step.scene && (
             <button className="primary" disabled={running} onClick={() => void act(`/api/scenes/${step.scene}/run`)}>
-              {thisRunning ? "Running…" : running ? "Another scene is running" : "Run this scene"}
+              {thisRunning ? "Running…" : running ? "Another scene is running" : finished ? "Run again (R)" : "Run this scene (R)"}
             </button>
           )}
+          {status && <p className={`scene-status ${status.cls}`} role="status">{status.text}</p>}
           <div className="nav">
             <button onClick={() => go(-1)} disabled={index === 0}>← Back</button>
             <button onClick={() => go(1)} disabled={index === STEPS.length - 1}>Next →</button>

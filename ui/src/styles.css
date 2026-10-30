@@ -49,7 +49,11 @@ button.danger { border-color: var(--critical); color: #fff; background: #4a1a1a;
 .story { display: grid; grid-template-columns: 1fr auto; gap: 24px; background: var(--surface); border-radius: 12px; padding: 20px 24px; }
 .story-text p { max-width: 80ch; color: var(--ink-2); font-size: 18px; }
 .story-text .watch { color: var(--ink); font-size: 16px; }
+.story-text .result { color: var(--ink); font-size: 16px; border-left: 3px solid var(--accent); padding-left: 10px; }
 .controls { display: grid; gap: 8px; align-content: start; min-width: 200px; }
+.scene-status { margin: 0; font-size: 15px; text-align: center; }
+.scene-status.ok { color: #4cc24c; }
+.scene-status.fail { font-size: 15px; }
 .nav { display: flex; gap: 8px; }
 .nav button { flex: 1; }
 
