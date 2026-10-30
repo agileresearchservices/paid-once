@@ -1,0 +1,121 @@
+import type { LaneAudit } from "./types";
+
+// Ticket outcomes as one whole split into parts: a tall segmented bar. The four reserved status
+// colours carry state, and every segment also has an icon and a name so colour is never the only cue.
+// "Unapproved" shares the critical colour with "refunded twice", so it gets a striped texture.
+interface Part {
+  key: string;
+  label: string;
+  icon: string;
+  value: number;
+  className: string;
+}
+
+function parts(a: LaneAudit): Part[] {
+  return [
+    { key: "ok", label: "Refunded once", icon: "✓", value: a.refunded_once, className: "good" },
+    { key: "dup", label: "Refunded more than once", icon: "×2", value: a.duplicates, className: "critical" },
+    { key: "unapproved", label: "Refunded without approval", icon: "!", value: a.unapproved, className: "critical striped" },
+    { key: "missing", label: "Approved, never refunded", icon: "∅", value: a.missing, className: "serious" },
+    { key: "flight", label: "Still settling", icon: "…", value: a.in_flight, className: "warning" },
+  ];
+}
+
+const dollars = (cents: number) =>
+  (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
+
+type Verdict = "holds" | "violated" | "settling";
+
+function Invariant({ text, verdict, detail }: { text: string; verdict: Verdict; detail: string }) {
+  const icon = verdict === "holds" ? "✓" : verdict === "violated" ? "✕" : "…";
+  const word = verdict === "holds" ? "Holds" : verdict === "violated" ? "Violated" : "Settling";
+  return (
+    <li className={`invariant ${verdict}`}>
+      <span className="inv-icon" aria-hidden="true">{icon}</span>
+      <span className="inv-text">{text}</span>
+      <span className="inv-verdict">{word}</span>
+      <span className="inv-detail">{detail}</span>
+    </li>
+  );
+}
+
+export function Scoreboard({ audit, name }: { audit: LaneAudit; name: string }) {
+  const ps = parts(audit);
+  const total = ps.reduce((n, p) => n + p.value, 0);
+  const exactlyOnce: Verdict =
+    audit.duplicates + audit.missing > 0 ? "violated" : audit.in_flight > 0 ? "settling" : "holds";
+  const lost: Verdict = audit.missing > 0 ? "violated" : audit.in_flight > 0 ? "settling" : "holds";
+
+  return (
+    <section className="scoreboard" aria-label={`${name} scoreboard`}>
+      <div className="hero">
+        <span className="hero-num">{audit.refunded_once}</span>
+        <span className="hero-of">of {audit.approved} approved refunded exactly once</span>
+      </div>
+      {audit.duplicate_cents > 0 && (
+        <p className="loss">{dollars(audit.duplicate_cents)} refunded twice</p>
+      )}
+
+      {total === 0 ? (
+        <div className="bar empty">No tickets yet</div>
+      ) : (
+        <div className="bar" role="img" aria-label={ps.filter((p) => p.value).map((p) => `${p.value} ${p.label}`).join(", ")}>
+          {ps.filter((p) => p.value > 0).map((p) => (
+            <div
+              key={p.key}
+              className={`seg ${p.className}`}
+              style={{ flexGrow: p.value }}
+              tabIndex={0}
+              data-tip={`${p.label}: ${p.value} of ${total}`}
+            >
+              {p.value / total > 0.07 && <span>{p.icon} {p.value}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <ul className="legend">
+        {ps.filter((p) => p.value > 0 || p.key === "ok").map((p) => (
+          <li key={p.key}>
+            <i className={`swatch ${p.className}`} aria-hidden="true" />
+            {p.icon} {p.label} <b>{p.value}</b>
+          </li>
+        ))}
+      </ul>
+
+      <ul className="invariants">
+        <Invariant
+          text="Every approved ticket refunded exactly once"
+          verdict={exactlyOnce}
+          detail={`${audit.duplicates} duplicated, ${audit.missing} missing`}
+        />
+        <Invariant
+          text="No refund without an approval"
+          verdict={audit.unapproved > 0 ? "violated" : "holds"}
+          detail={`${audit.unapproved} unapproved`}
+        />
+        <Invariant
+          text="No ticket lost or stuck"
+          verdict={lost}
+          detail={`${audit.missing} lost, ${audit.in_flight} settling`}
+        />
+      </ul>
+
+      <details className="table-view">
+        <summary>Table view</summary>
+        <table>
+          <tbody>
+            <tr><th>Submitted</th><td>{audit.submitted}</td></tr>
+            <tr><th>Approved</th><td>{audit.approved}</td></tr>
+            <tr><th>Refunded once</th><td>{audit.refunded_once}</td></tr>
+            <tr><th>Tickets refunded more than once</th><td>{audit.duplicates}</td></tr>
+            <tr><th>Extra refunds</th><td>{audit.duplicate_refunds} ({dollars(audit.duplicate_cents)})</td></tr>
+            <tr><th>Approved, never refunded</th><td>{audit.missing}</td></tr>
+            <tr><th>Still settling</th><td>{audit.in_flight}</td></tr>
+            <tr><th>Refunded without approval</th><td>{audit.unapproved}</td></tr>
+          </tbody>
+        </table>
+      </details>
+    </section>
+  );
+}
