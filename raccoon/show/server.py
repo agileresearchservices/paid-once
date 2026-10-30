@@ -22,9 +22,7 @@ state: dict = {}
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     if not agent.have_api_key():
-        raise RuntimeError(
-            "Set ANTHROPIC_API_KEY: both lanes call a real Anthropic model."
-        )
+        raise RuntimeError("Set ANTHROPIC_API_KEY: both lanes call a real Anthropic model.")
     config.ensure_data_dir()
     audit.init()
     procs = ProcessManager()
@@ -35,6 +33,7 @@ async def lifespan(_: FastAPI):
     procs.start_all()
     ready = await asyncio.to_thread(procs.wait_ready)
     await asyncio.sleep(2.0)  # let the workers register their pollers
+    await engine.reset()  # a demo starts from zero, not from the last session's scoreboard
     engine.emit("boot", note)
     for line in setup_notes:
         engine.emit("boot", line)
@@ -68,9 +67,7 @@ async def stream() -> StreamingResponse:
             yield f"data: {json.dumps(state['engine'].snapshot())}\n\n"
             await asyncio.sleep(0.7)
 
-    return StreamingResponse(
-        gen(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"}
-    )
+    return StreamingResponse(gen(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
 
 
 @app.post("/api/scenes/{scene_id}/run")
@@ -103,15 +100,19 @@ if UI_DIST.exists():
     @app.get("/{path:path}")
     def spa(path: str):
         candidate = UI_DIST / path
-        return FileResponse(
-            candidate if path and candidate.is_file() else UI_DIST / "index.html"
-        )
+        return FileResponse(candidate if path and candidate.is_file() else UI_DIST / "index.html")
 
 
 def main() -> None:
     import uvicorn
 
-    uvicorn.run(app, host="127.0.0.1", port=config.SHOW_PORT, log_level="warning")
+    uvicorn.run(
+        app,
+        host="127.0.0.1",
+        port=config.SHOW_PORT,
+        log_level="warning",
+        timeout_graceful_shutdown=2,  # an open SSE tab must not keep the services alive after Ctrl-C
+    )
 
 
 if __name__ == "__main__":
