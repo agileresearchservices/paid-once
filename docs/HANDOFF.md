@@ -34,10 +34,10 @@ whoever changes the code next.
   activity retries. The UI reads retry state from pending-activity data, because retry attempts are not in workflow
   history. `raccoon/show/engine.py` keeps each row (and the peak activity attempt) after the operation completes, so
   the evidence stays on screen when the scene ends.
-- **Ticket IDs carry a scene-run number** (`<boot>-<scene>-r<n>-<i>-<lane>`), so re-running a scene starts new
+- **Ticket IDs carry a scene-run number** (`<reset id>-<scene>-r<n>-<i>-<lane>`), so re-running a scene starts new
   workflows instead of colliding with the last run's IDs. The idempotency key is still `refund-<ticket_id>`.
-- **The show links into the Temporal Web UI** (`TEMPORAL_UI_URL`, default `http://127.0.0.1:8233`; the links are hidden
-  when it doesn't answer at boot). Each Nexus row links the caller's workflow history in `raccoon-support` and the
+- **The show links into the Temporal Web UI** (`TEMPORAL_UI_URL`, default `http://127.0.0.1:8233`; the engine re-checks
+  it every 10 seconds and hides the links while it doesn't answer). Each Nexus row links the caller's workflow history in `raccoon-support` and the
   handler's in `raccoon-payments`.
 - **The UI is a stepper** for a laptop browser, full screen (`#1`..`#7` in the URL, arrow keys, 1-7, R runs the
   scene). Nothing is built for tablet or phone.

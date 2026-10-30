@@ -547,7 +547,6 @@ class Engine:
                 closed_badly = status in ("FAILED", "TIMED_OUT", "TERMINATED", "CANCELED")
                 row.update(live=False, state="FAILED" if closed_badly else "COMPLETED", handler=handler)
         if seen is self.nexus_seen:
-            self.nexus_view = list(seen.values())
             self.lane2_view = states
 
     @staticmethod
@@ -579,7 +578,7 @@ class Engine:
             "audit": board,
             "processes": self.procs.status(),
             "events": self.events[-60:],
-            "nexus": self.nexus_view,
+            "nexus": list(self.nexus_seen.values()),
             "lane1_view": self.lane1_view,
             "lane2_view": self.lane2_view,
             "faults": self.faults,
