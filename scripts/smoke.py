@@ -55,10 +55,10 @@ def line(lane, a, prev):
 
 
 def handler_attempts(snap):
-    """Highest payments-side activity attempt among live Nexus rows; caller rows must stay at attempt 1."""
+    """Highest payments-side activity attempt among the scene's Nexus rows; caller rows must stay at attempt 1."""
     rows = snap["nexus"]
     return (
-        max((r.get("handler", {}).get("activity_attempt", 0) for r in rows), default=0),
+        max((r.get("handler", {}).get("peak_activity_attempt", 0) for r in rows), default=0),
         max((r["attempt"] for r in rows), default=0),
     )
 

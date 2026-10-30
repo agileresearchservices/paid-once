@@ -77,8 +77,7 @@ class ProcessManager:
             [
                 exe,
                 "server",
-                "start-dev",
-                "--headless",
+                "start-dev",  # with its Web UI: the demo links both namespaces from the Nexus panel
                 "--port",
                 port,
                 "--db-filename",

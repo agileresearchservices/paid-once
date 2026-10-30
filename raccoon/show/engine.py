@@ -19,7 +19,8 @@ from temporalio.client import Client
 
 from raccoon import audit, config
 from raccoon.lane2.client import connect
-from raccoon.lane2.payments_side import refund_workflow_id
+from raccoon.lane2.contract import NEXUS_ENDPOINT, PaymentsService
+from raccoon.lane2.payments_side import RefundWorkflow, refund_workflow_id
 from raccoon.lane2.support_side import SupportTicketWorkflow, ticket_workflow_id
 from raccoon.models import ApprovalDecision, Ticket
 from raccoon.show.procs import ProcessManager
@@ -53,6 +54,25 @@ SCENES = [
 ]
 
 
+# Who owns what across the Nexus boundary, from the same config and contract the workers use.
+TOPOLOGY = {
+    "support": {
+        "namespace": config.SUPPORT_NAMESPACE,
+        "task_queue": config.SUPPORT_TASK_QUEUE,
+        "workflow": SupportTicketWorkflow.__name__,
+    },
+    "endpoint": NEXUS_ENDPOINT,
+    "service": PaymentsService.__name__,
+    "operation": "issue_refund",
+    "payments": {
+        "namespace": config.PAYMENTS_NAMESPACE,
+        "task_queue": config.PAYMENTS_TASK_QUEUE,
+        "workflow": RefundWorkflow.__name__,
+        "activity": "post_refund",
+    },
+}
+
+
 class Engine:
     def __init__(self, procs: ProcessManager, seed: int = 7) -> None:
         self.procs = procs
@@ -63,10 +83,14 @@ class Engine:
         self.current: str | None = None
         self.running = False
         self.scene_tickets: dict[str, list[tuple[str, str]]] = {}
+        self.run_no = 0  # bumped per scene run, so a re-run never reuses ticket or workflow IDs
         self._temporal: Client | None = None
         self._payments_temporal: Client | None = None
         self._http: httpx.AsyncClient | None = None
-        self.nexus_view: list[dict] = []
+        # Every Nexus operation seen in the current scene, kept after it completes so the evidence stays on screen.
+        self.nexus_seen: dict[str, dict] = {}
+        self.temporal_ui: str | None = None
+        self._ui_probed_at = 0.0
         self.lane1_view: dict[str, int] = {}
         self.lane2_view: dict[str, int] = {}
         self.faults: dict = {}
@@ -99,8 +123,8 @@ class Engine:
 
     # -- tickets and approvals --------------------------------------------------
     def _make_ticket(self, scene: str, i: int, lane: str, amount: int, message: str) -> Ticket:
-        tid = f"{self.run_id}-{scene}-{i:02d}-{lane}"
-        return Ticket(tid, f"cust-{i:02d}", f"ord-{self.run_id}-{i:02d}", amount, message)
+        tid = f"{self.run_id}-{scene}-r{self.run_no}-{i:02d}-{lane}"
+        return Ticket(tid, f"cust-{i:02d}", f"ord-{self.run_id}-r{self.run_no}-{i:02d}", amount, message)
 
     async def submit_ticket(self, lane: str, scene: str, ticket: Ticket) -> None:
         audit.record_ticket(lane, ticket.ticket_id, scene, ticket.amount_cents)
@@ -406,15 +430,22 @@ class Engine:
             return False
         self.running = True
         self.current = scene_id
+        self.run_no += 1
+        for key in [k for k in self.scene_tickets if k == scene_id or k.startswith(f"{scene_id}_")]:
+            del self.scene_tickets[key]
+        self.nexus_seen = {}  # a new dict, so a refresh still in flight writes to the old one
+        title = next((s.title for s in SCENES if s.id == scene_id), scene_id)
 
         async def go() -> None:
+            ok = True
             try:
                 await fn()
             except Exception as exc:
+                ok = False
                 self.emit("error", f"scene {scene_id} failed: {exc!r}", scene=scene_id)
             finally:
                 self.running = False
-                self.emit("scene_done", f"{scene_id} finished", scene=scene_id)
+                self.emit("scene_done", f"{title}: finished", scene=scene_id, ok=ok)
 
         self._task = asyncio.create_task(go())
         return True
@@ -436,6 +467,7 @@ class Engine:
         self.run_id = uuid.uuid4().hex[:4]
         self.rng = random.Random(self.seed)
         self.scene_tickets.clear()
+        self.nexus_seen = {}
         self.events.clear()
         self.current = None
         self.emit("reset", "Scoreboard reset")
@@ -458,36 +490,77 @@ class Engine:
             pass
         try:
             client = await self.temporal()
-            view, states = [], {}
-            lane2 = [tid for lane, tid in self.scene_tickets.get(self.current or "", []) if lane == "lane2"]
-            for tid in lane2:
-                handle = client.get_workflow_handle(ticket_workflow_id(tid))
-                desc = await handle.describe()
-                states[desc.status.name if desc.status else "UNKNOWN"] = (
-                    states.get(desc.status.name if desc.status else "UNKNOWN", 0) + 1
-                )
-                for op in desc.raw_description.pending_nexus_operations:
-                    handler = await self._handler_view(tid)
-                    view.append(
-                        {
-                            "ticket": tid,
-                            "handler": handler,
-                            "endpoint": op.endpoint,
-                            "service": op.service,
-                            "operation": op.operation,
-                            "state": _enum_name(op),
-                            "attempt": op.attempt,
-                            "last_failure": (
-                                op.last_attempt_failure.message[:120]
-                                if op.last_attempt_failure and op.last_attempt_failure.message
-                                else ""
-                            ),
-                        }
-                    )
-            self.nexus_view = view
-            self.lane2_view = states
         except Exception:
-            pass
+            return
+        await self._probe_temporal_ui()
+        seen = self.nexus_seen  # run_scene swaps in a new dict; never write a stale scene into it
+        states: dict[str, int] = {}
+        lane2 = [tid for lane, tid in self.scene_tickets.get(self.current or "", []) if lane == "lane2"]
+        for tid in lane2:
+            # One ticket's failed describe must not freeze the whole view (the payments worker may be dead).
+            desc = await self._describe(client, ticket_workflow_id(tid))
+            if desc is None:
+                continue
+            status = desc.status.name if desc.status else "UNKNOWN"
+            states[status] = states.get(status, 0) + 1
+            ops = desc.raw_description.pending_nexus_operations
+            row = seen.get(tid)
+            if ops:
+                op = ops[0]
+                failure = (
+                    op.last_attempt_failure.message[:120]
+                    if op.last_attempt_failure and op.last_attempt_failure.message
+                    else ""
+                )
+                handler = await self._handler_view(tid)
+                prev = row or {}
+                handler["peak_activity_attempt"] = max(
+                    handler.get("activity_attempt", 0),
+                    prev.get("handler", {}).get("peak_activity_attempt", 0),
+                )
+                seen[tid] = {
+                    "ticket": tid,
+                    "live": True,
+                    "caller_workflow_id": ticket_workflow_id(tid),
+                    "caller_namespace": config.SUPPORT_NAMESPACE,
+                    "handler": handler,
+                    "endpoint": op.endpoint,
+                    "service": op.service,
+                    "operation": op.operation,
+                    "state": _enum_name(op),
+                    "attempt": op.attempt,
+                    "peak_attempt": max(op.attempt, prev.get("peak_attempt", 0)),
+                    "last_failure": failure,
+                    "caller_saw_failure": bool(failure) or prev.get("caller_saw_failure", False),
+                }
+            elif row is not None and row["live"]:
+                # The operation closed since the last refresh: keep the row, with its final state.
+                handler = await self._handler_view(tid) or dict(row["handler"])
+                handler["peak_activity_attempt"] = row["handler"].get("peak_activity_attempt", 0)
+                handler["activity_attempt"] = 0
+                closed_badly = status in ("FAILED", "TIMED_OUT", "TERMINATED", "CANCELED")
+                row.update(live=False, state="FAILED" if closed_badly else "COMPLETED", handler=handler)
+        if seen is self.nexus_seen:
+            self.nexus_view = list(seen.values())
+            self.lane2_view = states
+
+    @staticmethod
+    async def _describe(client: Client, workflow_id: str):
+        try:
+            return await client.get_workflow_handle(workflow_id).describe()
+        except Exception:
+            return None
+
+    async def _probe_temporal_ui(self) -> None:
+        """Is the Temporal Web UI up? Links to it are shown only if it answers. Re-checked every 10s."""
+        if time.time() - self._ui_probed_at < 10:
+            return
+        self._ui_probed_at = time.time()
+        try:
+            r = await self.http.get(config.TEMPORAL_UI_URL, timeout=1.0)
+            self.temporal_ui = config.TEMPORAL_UI_URL if r.status_code < 500 else None
+        except httpx.HTTPError:
+            self.temporal_ui = None
 
     def snapshot(self) -> dict:
         board = audit.compute_all(SETTLE_S)
@@ -503,12 +576,15 @@ class Engine:
             "lane1_view": self.lane1_view,
             "lane2_view": self.lane2_view,
             "faults": self.faults,
+            "temporal_ui": self.temporal_ui,
+            "topology": TOPOLOGY,
         }
 
     async def _handler_view(self, ticket_id: str) -> dict:
         """The payments side of one Nexus operation: the refund workflow and its pending activity.
 
-        The caller's operation stays STARTED while the handler retries; this is where the retries show.
+        Once payments has accepted the operation, the caller's side shows STARTED while the handler retries,
+        so this is where the retries show. The dashboard reads it directly; the support side never does.
         """
         try:
             client = await self.payments_temporal()
