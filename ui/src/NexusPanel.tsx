@@ -122,7 +122,7 @@ export function NexusPanel({
                         <span className="muted">start attempts {r.peak_attempt}</span>
                         {temporalUi && (
                           <>
-                            {" "}
+                            {" · "}
                             <Ext href={workflowLink(temporalUi, r.caller_namespace, r.caller_workflow_id, r.caller_run_id)}>
                               history ↗
                             </Ext>

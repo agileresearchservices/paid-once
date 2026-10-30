@@ -23,6 +23,14 @@ function Chips({ counts, empty }: { counts: Record<string, number>; empty: strin
   );
 }
 
+// Temporal's wordmark lives in ui/public/brand/, which is gitignored. On a fresh clone it isn't there and the
+// header shows text instead.
+function Wordmark() {
+  const [missing, setMissing] = useState(false);
+  if (missing) return <span className="wordmark-text">Temporal ·</span>;
+  return <img className="wordmark" src="/brand/temporal-wordmark.svg" alt="Temporal" onError={() => setMissing(true)} />;
+}
+
 // The step lives in the URL hash (#1..#7), so a refresh mid-demo stays on the same step.
 function stepFromHash(): number {
   const n = Number(window.location.hash.slice(1));
@@ -103,7 +111,9 @@ export function App() {
   return (
     <main>
       <header>
-        <h1>🦝 refund-raccoon</h1>
+        <h1>
+          <Wordmark /> 🦝 refund-raccoon
+        </h1>
         <nav aria-label="Steps">
           {STEPS.map((s, i) => (
             <button key={s.id} className={i === index ? "step on" : "step"} onClick={() => setIndex(i)} aria-current={i === index}>
