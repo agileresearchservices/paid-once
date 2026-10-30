@@ -19,10 +19,7 @@ LANES = ("lane1", "lane2")
 
 
 def _clear() -> dict:
-    return {
-        lane: {"mode": "none", "remaining": 0, "delay_s": 6.0, "latency_s": 0.0}
-        for lane in LANES
-    }
+    return {lane: {"mode": "none", "remaining": 0, "delay_s": 6.0, "latency_s": 0.0} for lane in LANES}
 
 
 FAULT: dict = _clear()
@@ -66,15 +63,8 @@ async def create_refund(
     fault = FAULT.get(x_lane)
     if fault and fault["latency_s"] > 0:
         await asyncio.sleep(fault["latency_s"])
-    stored = await asyncio.to_thread(
-        ledger.record_refund, body.ticket_id, body.amount_cents, idempotency_key, x_lane
-    )
-    if (
-        fault
-        and fault["mode"] == "commit_then_stall"
-        and fault["remaining"] > 0
-        and not stored["replayed"]
-    ):
+    stored = await asyncio.to_thread(ledger.record_refund, body.ticket_id, body.amount_cents, idempotency_key, x_lane)
+    if fault and fault["mode"] == "commit_then_stall" and fault["remaining"] > 0 and not stored["replayed"]:
         fault["remaining"] -= 1
         # The refund is committed above. The client gives up long before this returns.
         await asyncio.sleep(fault["delay_s"])

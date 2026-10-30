@@ -39,8 +39,7 @@ def record_ticket(lane: str, ticket_id: str, scene: str, amount_cents: int) -> N
     init()
     with connect(config.AUDIT_DB) as conn:
         conn.execute(
-            "INSERT OR IGNORE INTO tickets (lane, ticket_id, scene, amount_cents, submitted_at) "
-            "VALUES (?, ?, ?, ?, ?)",
+            "INSERT OR IGNORE INTO tickets (lane, ticket_id, scene, amount_cents, submitted_at) VALUES (?, ?, ?, ?, ?)",
             (lane, ticket_id, scene, amount_cents, time.time()),
         )
 
@@ -68,14 +67,8 @@ def compute(lane: str, settle_s: float = 25.0, now: float | None = None) -> dict
     init()
     now = time.time() if now is None else now
     with connect(config.AUDIT_DB) as conn:
-        tickets = [
-            dict(r)
-            for r in conn.execute("SELECT * FROM tickets WHERE lane = ?", (lane,))
-        ]
-        approvals = {
-            r["ticket_id"]: dict(r)
-            for r in conn.execute("SELECT * FROM approvals WHERE lane = ?", (lane,))
-        }
+        tickets = [dict(r) for r in conn.execute("SELECT * FROM tickets WHERE lane = ?", (lane,))]
+        approvals = {r["ticket_id"]: dict(r) for r in conn.execute("SELECT * FROM approvals WHERE lane = ?", (lane,))}
     refunds_by_ticket: dict[str, list[dict]] = {}
     for row in ledger.all_refunds(lane):
         refunds_by_ticket.setdefault(row["ticket_id"], []).append(row)

@@ -34,9 +34,7 @@ class Proc:
     restart_at: float | None = None
     starts: int = 0
     kills: int = 0
-    external: bool = (
-        False  # not ours to start or kill (e.g. a Temporal server already running)
-    )
+    external: bool = False  # not ours to start or kill (e.g. a Temporal server already running)
     started_at: float = 0.0
     log: list[str] = field(default_factory=list)
 
@@ -46,15 +44,9 @@ class ProcessManager:
         self.emit = emit
         py = sys.executable
         self.procs: dict[str, Proc] = {
-            "payments": Proc(
-                "payments", "Payments service", [py, "-m", "raccoon.payments"]
-            ),
-            "lane1_api": Proc(
-                "lane1_api", "Lane 1 API", [py, "-m", "raccoon.lane1.api"]
-            ),
-            "lane1_worker": Proc(
-                "lane1_worker", "Lane 1 worker", [py, "-m", "raccoon.lane1.worker"]
-            ),
+            "payments": Proc("payments", "Payments service", [py, "-m", "raccoon.payments"]),
+            "lane1_api": Proc("lane1_api", "Lane 1 API", [py, "-m", "raccoon.lane1.api"]),
+            "lane1_worker": Proc("lane1_worker", "Lane 1 worker", [py, "-m", "raccoon.lane1.worker"]),
             "support_worker": Proc(
                 "support_worker",
                 "Support worker (Temporal)",
@@ -72,17 +64,13 @@ class ProcessManager:
 
     # -- lifecycle ---------------------------------------------------------
     def ensure_temporal(self) -> str:
-        host, _, port = config.TEMPORAL_ADDRESS.rpartition(":")
+        port = config.TEMPORAL_ADDRESS.rpartition(":")[2]
         if port_open(int(port)):
-            return (
-                "using the Temporal server already running on "
-                + config.TEMPORAL_ADDRESS
-            )
+            return "using the Temporal server already running on " + config.TEMPORAL_ADDRESS
         exe = shutil.which("temporal")
         if exe is None:
             raise RuntimeError(
-                "No Temporal server on %s and no `temporal` CLI on PATH (brew install temporal)."
-                % config.TEMPORAL_ADDRESS
+                f"No Temporal server on {config.TEMPORAL_ADDRESS} and no `temporal` CLI on PATH (brew install temporal)."
             )
         config.ensure_data_dir()
         self.temporal = subprocess.Popen(
@@ -160,9 +148,7 @@ class ProcessManager:
             for p in self.procs.values():
                 dead = p.popen is None or p.popen.poll() is not None
                 if dead and p.restart_at is None:
-                    p.restart_at = (
-                        now + 2.0
-                    )  # an unplanned exit: restart like an orchestrator would
+                    p.restart_at = now + 2.0  # an unplanned exit: restart like an orchestrator would
                 if dead and p.restart_at is not None and now >= p.restart_at:
                     self._spawn(p)
                     self.emit("restart", f"{p.label} restarted", proc=name_of(p))

@@ -128,3 +128,11 @@ flowchart LR
     Gate -->|"violations or stuck tickets"| Rollback["Flip the flag back<br/>no ticket is dual-processed"]
     Gate -->|"clean on the review date"| Expand[Widen the cohort]
 ```
+
+## What is not tested here
+
+- **Retargeting the Nexus endpoint while operations are in flight.** Temporal's docs say new operations route to the
+  updated target immediately; for a namespace change, completion callbacks stay with the original handler namespace and
+  the docs recommend draining first (https://docs.temporal.io/nexus/registry). They do not say what a task-queue change
+  does to in-flight operations, and this repository does not test either case.
+- **Workflow versioning** with executions in flight, and **long approval waits**: the demo waits seconds, not days.
