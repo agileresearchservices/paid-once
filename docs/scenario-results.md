@@ -18,7 +18,9 @@ What `make scenario` printed on the runs behind the case study. Everything here 
   kills land at wall-clock times, so Lane 1 duplicates vary run to run (see `double_delivery` below). What repeats is
   the pattern: duplicates in `tip_over`, `double_delivery` and `payments_timeout`, lost tickets in `tip_over` and
   `deploy_wait`.
-- **Not covered here:** the live model. These runs use the stub agent. The invariants do not depend on the wording
+- **Not covered here:** endpoint retargeting with operations in flight (the effect of a task-queue change is not
+  documented and was not tested), workflow versioning, and approval waits longer than seconds.
+- **Also not covered:** the live model. These runs use the stub agent. The invariants do not depend on the wording
   of the model's reply, but the live demo (`make demo`) is a separate check and is not in these tables.
 
 ## Two default runs
