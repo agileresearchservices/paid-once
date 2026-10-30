@@ -1,48 +1,52 @@
-# Handoff: where this stands (2026-10-30, Friday)
+# Handoff: where this stands (2026-10-30)
 
-Due **Monday 2026-11-02**. Deliverables: written case study with diagrams, a repo (this), a slide deck, a live
-UI demo run from Kevin's machine. The written case study is required; the deck is its presentation companion.
-Strategy, customer profile, scene list and open questions live in the Claude project "Temporal"
-(`claude/demo-scope.md`). This file covers the code.
+Everything the demo needs is built and verified on Python 3.12 with a local Temporal dev server (CLI 1.9.1,
+server 1.32.0). Start with `README.md` for setup and `docs/architecture.md` for the design. This file is for
+whoever changes the code next.
 
-## Done and tested
-- Payments service + ledger, audit invariants, Lane 1 (12 tests pass, stub model).
-- Lane 2 on a real Temporal dev server: ticket -> approval signal -> Nexus operation `PaymentsService.issue_refund`
-  -> `RefundWorkflow` in `raccoon-payments` -> ledger. 4 integration tests pass (`make test-temporal`):
-  one refund through Nexus; duplicate approval signals ignored; commit-then-timeout gives one refund; an approval
-  sent while no worker is running survives.
+## Verified
+- `make test`: 12 passed (payments service, ledger, audit, Lane 1; stub model).
+- `make test-temporal`: 4 passed (one refund through Nexus; duplicate approval signals ignored; commit-then-timeout
+  gives one refund; an approval sent while no worker is running survives).
+- `make scenario`: runs six scenes headless against both lanes and exits non-zero if Lane 2 breaks an invariant.
+  Results, SHAs and caveats: `docs/scenario-results.md`. It also passed from a fresh clone with no `.env`.
+- The Vite UI (`make ui`, then `make demo`) was clicked through in Chrome.
 
-## Written but NOT yet run end to end
-- `raccoon/show/*` (process manager, scenes, server) and `scripts/smoke.py`. Run
-  `RACCOON_STUB_LLM=1 uv run python scripts/smoke.py intro tip_over` (needs `temporal` on PATH) and check each scene
-  moves the right counters: Lane 1 shows duplicates/missing, Lane 2 stays clean. Expect to tune sleeps and the
-  `SETTLE_S` window in `raccoon/show/engine.py`.
-- Live Anthropic calls (`raccoon/agent.py`) were never exercised: no API key where this was written. Check the
-  forced tool call returns a `propose_action` block for `claude-haiku-5-5`.
-- The Nexus panel reads `raw_description.pending_nexus_operations`; field names were checked against the proto, not against a live pending op.
+## Not verified
+- Production anything: volume, a real payments service, approval waits longer than seconds, cost of running Temporal.
+- Endpoint retargeting under in-flight Nexus operations (the docs cover a namespace change; a task-queue change is
+  undocumented and untested here).
+- Workflow versioning with executions in flight.
+- The model path in `make scenario`: scored runs use the stub model. The live model is checked by `make demo`.
 
-## Not started
-- Vite UI in `ui/` (step-wise NEXT/BACK, lanes side by side, scoreboard via SSE from `/api/stream`, Nexus panel).
-- Slide deck, written case study, architecture diagrams, README polish.
-- Scene 7 narrative: show the Nexus contract, the endpoint in the registry, the pending operation retrying, the endpoint retarget.
+## Decisions worth knowing
+- **Scoring reads only the payments ledger** (`raccoon/audit.py`). It iterates tickets the harness recorded, so
+  ledger rows for unrecorded tickets are ignored; "no refund without an approval" covers recorded tickets only.
+- **The key comes from the business operation.** Lane 2 uses `refund-<ticket_id>` for both the idempotency key and the
+  refund workflow ID. The ledger is UNIQUE on the key only, not on the ticket. Do not weaken this.
+- **Model:** the demo agent defaults to `claude-sonnet-5-5` (`RACCOON_MODEL` overrides). Forced `tool_choice` is
+  rejected by that model, so `raccoon/agent.py` uses `auto` with a strict tool schema. Sampling parameters such as
+  `temperature` are rejected on current models, so the agent does not set any. Strict schemas reject `minimum` on
+  integers; the amount floor is applied in code.
+- **For a workflow-run Nexus operation the caller's operation stays `STARTED, attempt 1`** while the payments-side
+  activity retries. The UI reads retry state from pending-activity data, because retry attempts are not in workflow
+  history.
+- `raccoon/show/server.py` resets the scoreboard at boot and sets uvicorn `timeout_graceful_shutdown=2`, because an
+  open SSE tab otherwise blocks shutdown and orphans the child services on 8101 and 8102.
+- The show reuses any Temporal server already listening on `TEMPORAL_ADDRESS` and will create its two namespaces
+  and the Nexus endpoint there. Point `TEMPORAL_ADDRESS` somewhere else if that server belongs to something else.
 
 ## Lane 1 realism (keep it fair; these are the deliberate choices)
-- Per-attempt idempotency key in the client (fresh uuid each try). Very common bug; fixing it (derive the key from the ticket) is a one-line change that fixes the double-delivery and timeout scenes. Say so in the write-up.
+- Per-attempt idempotency key in the client (fresh uuid each try). Very common bug; fixing it (derive the key from the ticket) is a one-line change that fixes the double-delivery and timeout scenes. The write-up measures this.
 - LangGraph `MemorySaver` (the tutorial default). Approval interrupt state is lost when the worker restarts.
 - At-least-once queue with a visibility timeout. A recovery path re-drives "executing" tickets from the DB after a crash, which is what turns a crash-after-commit into a second refund.
 - A careful dedupe check exists for finished tickets, so redelivery after completion is a no-op. Duplicates only arise for in-flight work.
-- `RACCOON_L1_STABLE_KEY=1` (added in Phase 5, off by default) makes Lane 1 derive its idempotency key from the ticket instead of the attempt. It exists only so the write-up can measure the one-line fix (duplicates drop to 0, the 7 lost tickets remain). Default runs, the UI and the demo are unchanged, so Lane 1 is still the competent-team-today system described above.
-- "Improve the current implementation" (idempotency keys, outbox, sweeper, durable checkpointer) is argued in the write-up, not built as a third lane.
+- `RACCOON_L1_STABLE_KEY=1` (off by default) makes Lane 1 derive its idempotency key from the ticket instead of the attempt. It exists only so the write-up can measure the one-line fix (duplicates drop to 0, the 7 lost tickets remain). Default runs, the UI and the demo are unchanged, so Lane 1 is still the competent-team-today system described above.
+- "Improve the current implementation" (outbox, sweeper, durable checkpointer) is argued in the write-up, not built as a third lane.
 
-## Environment notes
-- Written in a cloud sandbox plus a Linux VM on Kevin's Mac; the Temporal CLI was downloaded in the VM. On the Mac: `brew install temporal uv`.
-- Python 3.12 via uv; `requires-python >=3.11`. Node 22 for the UI.
-- The tool that synced these files could not write a file named `Makefile`. Run `cp docs/Makefile.txt Makefile` once.
-- Delete before committing: `raccoon/lane2/zz_test.py` (stray empty file) and any `refund-raccoon-sync*.tgz` in the parent folder.
-
-## Suggested next steps in Claude Code
-1. `make install && make test` then `temporal server start-dev` in another terminal, `make setup`, `make test-temporal`.
-2. Run `scripts/smoke.py` for all six scenes and fix timing until Lane 1 fails and Lane 2 does not, every time.
-3. Add `ANTHROPIC_API_KEY`, run one scene with the real model.
-4. Build the UI against `/api/state` and `/api/stream`.
-5. Then the deck and the written case study; diagrams can be generated from the Layout above.
+## Constraints that bite
+- Workflow modules (`lane2/support_side.py`, `lane2/payments_side.py`) must not import `raccoon.config`,
+  `raccoon.agent`, httpx or anything that touches the filesystem at import time: the Temporal workflow sandbox rejects
+  it. Activities live in `*_activities.py` and are called by name.
+- Workflow code must stay deterministic and replay-safe.
+- Lane 1's counts vary run to run because kills land at wall-clock times. Assert on Lane 2 only.
