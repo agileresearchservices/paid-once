@@ -25,5 +25,6 @@ done
 temporal operator cluster health --address "$ADDRESS" >/dev/null 2>&1 || { echo "temporal dev server on $ADDRESS never became healthy" >&2; exit 1; }
 
 export TEMPORAL_ADDRESS="$ADDRESS"
+export RACCOON_TEST_TEMPORAL="$ADDRESS"  # the tests refuse any server but this one
 uv run python -m raccoon.lane2.client
 RACCOON_STUB_LLM=1 uv run pytest -q -m temporal "$@"

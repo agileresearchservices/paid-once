@@ -26,7 +26,7 @@ testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-m 'not temporal'"
 asyncio_default_fixture_loop_scope = "function"
-markers = ["temporal: needs a running Temporal dev server with the raccoon namespaces"]
+markers = ["temporal: Lane 2 + Nexus integration tests; run with `make test-temporal` (own throwaway server)"]
 
 [tool.setuptools.packages.find]
 include = ["raccoon*"]

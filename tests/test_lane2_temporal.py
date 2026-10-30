@@ -5,6 +5,7 @@ Run with `make test-temporal`: it starts a throwaway Temporal server, creates th
 """
 
 import asyncio
+import os
 import uuid
 
 import httpx
@@ -23,6 +24,17 @@ from raccoon.payments.service import app as payments_app
 from tests.helpers import Server
 
 pytestmark = pytest.mark.temporal
+
+
+@pytest.fixture(autouse=True)
+def own_temporal_server():
+    # scripts/test-temporal.sh names the throwaway server it started. On any other server (the show's, say) another
+    # worker may poll these task queues and take the tests' workflows, so refuse rather than fail mysteriously.
+    if os.environ.get("RACCOON_TEST_TEMPORAL") != config.TEMPORAL_ADDRESS:
+        pytest.fail(
+            f"refusing to run on {config.TEMPORAL_ADDRESS}: use `make test-temporal`, which starts its own server",
+            pytrace=False,
+        )
 
 
 @pytest.fixture

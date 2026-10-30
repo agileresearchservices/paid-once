@@ -64,6 +64,6 @@ whoever changes the code next.
   it. Activities live in `*_activities.py` and are called by name.
 - Workflow code must stay deterministic and replay-safe.
 - Lane 1's counts vary run to run because kills land at wall-clock times. Assert on Lane 2 only.
-- Never point the integration tests at the show's Temporal server. The show's workers poll the same task queues, pick
-  up the tests' workflows and write to the show's ledger, so the tests see no refund. `make test-temporal` avoids
-  this by starting its own server; running `pytest -m temporal` by hand against :7233 brings the clash back.
+- The integration tests must not share a Temporal server with the show. The show's workers poll the same task queues
+  and would take the tests' workflows, so the tests would see no refund. `make test-temporal` starts its own server
+  and tells the tests its address (`RACCOON_TEST_TEMPORAL`); the tests refuse to run on any other server.
