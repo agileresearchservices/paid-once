@@ -4,7 +4,9 @@ What `make scenario` printed on the runs behind the case study. Everything here 
 (`raccoon/audit.py`), never from a lane's own state.
 
 - **Date:** 2026-10-30
-- **Code:** commit `c57210e` (the flagged run adds the off-by-default `RACCOON_L1_STABLE_KEY` switch, nothing else)
+- **Code:** the two default runs and the flagged run used commit `c57210e` (the flagged run adds the off-by-default
+  `RACCOON_L1_STABLE_KEY` switch, then uncommitted). A third default run from a fresh clone at `a5f62d6`, the commit that
+  contains the switch, is below.
 - **Command:** `make scenario` (stub model, no API key, local Temporal dev server, about 4 minutes)
 - **Machine:** one laptop, all services as local processes
 
@@ -47,6 +49,20 @@ In `nexus_kill`, the payments-side activity attempt peaked at 2 in both runs whi
 stayed at attempt 1, `STARTED`. Retries inside the handler's workflow are not visible as retries on the caller. All
 five refund workflows finished with `replayed: true` (the ledger returned the stored row for the retry).
 
+## Fresh clone at `a5f62d6`
+
+Cloned into an empty directory with no `.env` and no `ANTHROPIC_API_KEY`, then
+`TEMPORAL_ADDRESS=127.0.0.1:7299 make install && make scenario`. The show started its own Temporal dev server on that
+port (it created its own `data/temporal.db`), the run ended `SCENARIO PASSED`, and no process was left listening.
+
+| | Submitted | Refunded once | Duplicates | Missing | Stuck | Unapproved |
+|---|---|---|---|---|---|---|
+| Lane 1 | 26 | 10 | 9 | 7 | 0 | 0 |
+| Lane 2 | 31 | 31 | 0 | 0 | 0 | 0 |
+
+Per scene, Lane 1: `tip_over` 4 duplicates / 2 missing, `double_delivery` 1 / 0, `deploy_wait` 0 / 5,
+`payments_timeout` 4 / 0. Same pattern as the earlier runs.
+
 ## One run with Lane 1's key fixed
 
 `RACCOON_L1_STABLE_KEY=1 make scenario` makes Lane 1 derive its idempotency key from the ticket
@@ -68,5 +84,7 @@ execution. This is one run, so treat 0 duplicates as "the mechanism works", not 
 
 The default Lane 1 sends a fresh `Idempotency-Key` per attempt (`l1-{ticket_id}-{uuid8}`). When payments commits and
 then the response is lost, the retry arrives with a new key and the ledger correctly treats it as a new refund.
-Lane 2 keys on the business operation (`refund-{ticket_id}`), so a retry gets the stored row back. Durable execution
-alone would not fix this: the key must come from the business operation, which is what the stable-key run shows.
+Lane 2 keys on the business operation (`refund-{ticket_id}`), so a retry gets the stored row back. Temporal's own
+documentation says Nexus operations run at least once and handlers must be idempotent
+(https://docs.temporal.io/nexus/operations), so the key must come from the business operation. The stable-key run
+shows that fix works in Lane 1 too; Lane 2 was not run with a per-attempt key.

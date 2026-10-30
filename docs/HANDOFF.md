@@ -31,6 +31,7 @@ Strategy, customer profile, scene list and open questions live in the Claude pro
 - LangGraph `MemorySaver` (the tutorial default). Approval interrupt state is lost when the worker restarts.
 - At-least-once queue with a visibility timeout. A recovery path re-drives "executing" tickets from the DB after a crash, which is what turns a crash-after-commit into a second refund.
 - A careful dedupe check exists for finished tickets, so redelivery after completion is a no-op. Duplicates only arise for in-flight work.
+- `RACCOON_L1_STABLE_KEY=1` (added in Phase 5, off by default) makes Lane 1 derive its idempotency key from the ticket instead of the attempt. It exists only so the write-up can measure the one-line fix (duplicates drop to 0, the 7 lost tickets remain). Default runs, the UI and the demo are unchanged, so Lane 1 is still the competent-team-today system described above.
 - "Improve the current implementation" (idempotency keys, outbox, sweeper, durable checkpointer) is argued in the write-up, not built as a third lane.
 
 ## Environment notes
