@@ -41,7 +41,11 @@ def call_payments(ticket_id: str, amount_cents: int) -> str:
     """
     last: Exception | None = None
     for attempt in range(1, ATTEMPTS + 1):
-        key = f"l1-{ticket_id}-{uuid.uuid4().hex[:8]}"
+        key = (
+            f"l1-{ticket_id}"  # RACCOON_L1_STABLE_KEY=1: the one-line fix, measured in the write-up
+            if config.L1_STABLE_KEY
+            else f"l1-{ticket_id}-{uuid.uuid4().hex[:8]}"
+        )
         try:
             resp = httpx.post(
                 f"{config.PAYMENTS_URL}/refunds",
@@ -74,9 +78,7 @@ def _await_approval(state: State) -> State:
     proposal = state["proposal"]
     if proposal.action != "refund":
         return {"outcome": "denied"}
-    decision = interrupt(
-        {"ticket_id": state["ticket"].ticket_id, "amount_cents": proposal.amount_cents}
-    )
+    decision = interrupt({"ticket_id": state["ticket"].ticket_id, "amount_cents": proposal.amount_cents})
     return {"approved": bool(decision.get("approved"))}
 
 
@@ -103,7 +105,5 @@ def build_graph():
     graph.add_node("execute", _execute)
     graph.add_edge(START, "decide")
     graph.add_edge("decide", "await_approval")
-    graph.add_conditional_edges(
-        "await_approval", _after_approval, {"execute": "execute", END: END}
-    )
+    graph.add_conditional_edges("await_approval", _after_approval, {"execute": "execute", END: END})
     return graph.compile(checkpointer=MemorySaver())
