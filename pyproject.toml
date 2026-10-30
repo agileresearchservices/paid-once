@@ -13,12 +13,17 @@ dependencies = [
   "nexus-rpc>=1.1",
 ]
 
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [dependency-groups]
 dev = ["pytest>=8", "pytest-asyncio>=0.24", "ruff>=0.6"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+pythonpath = ["."]
 addopts = "-m 'not temporal'"
 asyncio_default_fixture_loop_scope = "function"
 markers = ["temporal: needs a running Temporal dev server with the raccoon namespaces"]
