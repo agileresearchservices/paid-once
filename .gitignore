@@ -11,3 +11,4 @@ ui/dist/
 *.tgz
 *.egg-info/
 CLAUDE.md
+drafts/

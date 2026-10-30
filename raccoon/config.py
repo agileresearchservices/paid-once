@@ -42,6 +42,10 @@ NEXUS_ENDPOINT = "payments-endpoint"  # keep in sync with raccoon.lane2.contract
 MODEL = os.environ.get("RACCOON_MODEL", "claude-sonnet-5-5")
 STUB_LLM = os.environ.get("RACCOON_STUB_LLM", "") == "1"
 
+# Off by default. Turns on the one-line Lane 1 fix (derive the idempotency key from the ticket, not the
+# attempt) so the write-up can measure what that fix does and does not close. Lane 1 stays as shipped otherwise.
+L1_STABLE_KEY = os.environ.get("RACCOON_L1_STABLE_KEY", "") == "1"
+
 # Lane 1 queue: a visibility timeout like SQS or Pub/Sub ack deadlines.
 VISIBILITY_TIMEOUT_S = float(os.environ.get("RACCOON_VISIBILITY_S", "10"))
 # What a typical client does against a slow downstream.
