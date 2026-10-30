@@ -1,0 +1,542 @@
+"""The show engine: submits tickets to both lanes, plays the human approver, and unleashes the raccoon.
+
+Every scene runs the same story against Lane 1 and Lane 2 at the same time, so the audience watches
+two systems take identical hits. Scoring comes from the payments ledger (raccoon.audit), never from
+what either lane reports about itself.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import random
+import time
+import uuid
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+
+import httpx
+from temporalio.client import Client
+
+from raccoon import audit, config
+from raccoon.lane2.client import connect
+from raccoon.lane2.support_side import SupportTicketWorkflow, ticket_workflow_id
+from raccoon.models import ApprovalDecision, Ticket
+from raccoon.show.procs import ProcessManager
+
+SETTLE_S = 20.0
+
+MESSAGES = [
+    "The mug arrived in pieces. Please refund me.",
+    "I was charged twice for the same order, please refund the duplicate.",
+    "My package never arrived and tracking says delivered to the wrong city.",
+    "The headphones are dead on arrival, I would like my money back.",
+    "Wrong size shipped and the box was crushed. I want a refund.",
+    "The blender leaks from the base and cracked on first use. Refund please.",
+]
+
+
+@dataclass
+class SceneInfo:
+    id: str
+    title: str
+
+
+SCENES = [
+    SceneInfo("intro", "Happy path"),
+    SceneInfo("tip_over", "The raccoon tips over the agent"),
+    SceneInfo("double_delivery", "Double-delivered mail"),
+    SceneInfo("deploy_wait", "Deploy during the approval wait"),
+    SceneInfo("payments_timeout", "Payments commits, then goes quiet"),
+    SceneInfo("nexus_kill", "Nexus: the payments worker dies mid-refund"),
+    SceneInfo("free_roam", "Free roam"),
+]
+
+
+class Engine:
+    def __init__(self, procs: ProcessManager, seed: int = 7) -> None:
+        self.procs = procs
+        self.seed = seed
+        self.rng = random.Random(seed)
+        self.run_id = uuid.uuid4().hex[:4]
+        self.events: list[dict] = []
+        self.current: str | None = None
+        self.running = False
+        self.scene_tickets: dict[str, list[tuple[str, str]]] = {}
+        self._temporal: Client | None = None
+        self._http: httpx.AsyncClient | None = None
+        self.nexus_view: list[dict] = []
+        self.lane1_view: dict[str, int] = {}
+        self.lane2_view: dict[str, int] = {}
+        self.faults: dict = {}
+        self._task: asyncio.Task | None = None
+        self.procs.emit = self.emit_from_procs
+
+    # -- plumbing ------------------------------------------------------------
+    def emit(self, kind: str, msg: str, **extra) -> None:
+        self.events.append({"ts": time.time(), "kind": kind, "msg": msg, **extra})
+        del self.events[:-200]
+
+    def emit_from_procs(self, kind: str, msg: str, **extra) -> None:
+        self.emit(kind, msg, **extra)
+
+    @property
+    def http(self) -> httpx.AsyncClient:
+        if self._http is None:
+            self._http = httpx.AsyncClient(timeout=5.0)
+        return self._http
+
+    async def temporal(self) -> Client:
+        if self._temporal is None:
+            self._temporal = await connect(config.SUPPORT_NAMESPACE)
+        return self._temporal
+
+    # -- tickets and approvals --------------------------------------------------
+    def _make_ticket(
+        self, scene: str, i: int, lane: str, amount: int, message: str
+    ) -> Ticket:
+        tid = f"{self.run_id}-{scene}-{i:02d}-{lane}"
+        return Ticket(
+            tid, f"cust-{i:02d}", f"ord-{self.run_id}-{i:02d}", amount, message
+        )
+
+    async def submit_ticket(self, lane: str, scene: str, ticket: Ticket) -> None:
+        audit.record_ticket(lane, ticket.ticket_id, scene, ticket.amount_cents)
+        self.scene_tickets.setdefault(scene, []).append((lane, ticket.ticket_id))
+        if lane == "lane1":
+            body = {
+                "ticket_id": ticket.ticket_id,
+                "customer": ticket.customer,
+                "order_id": ticket.order_id,
+                "amount_cents": ticket.amount_cents,
+                "message": ticket.message,
+            }
+            for _ in range(60):  # a helpdesk webhook retries until the API answers
+                try:
+                    r = await self.http.post(f"{config.LANE1_URL}/tickets", json=body)
+                    if r.status_code < 500:
+                        return
+                except httpx.HTTPError:
+                    pass
+                await asyncio.sleep(0.5)
+        else:
+            client = await self.temporal()
+            await client.start_workflow(
+                SupportTicketWorkflow.run,
+                ticket,
+                id=ticket_workflow_id(ticket.ticket_id),
+                task_queue=config.SUPPORT_TASK_QUEUE,
+            )
+
+    async def submit_cohort(
+        self, scene: str, n: int, lanes=("lane1", "lane2")
+    ) -> list[tuple[int, int, str]]:
+        specs = [
+            (i, self.rng.randrange(1500, 9500, 100), self.rng.choice(MESSAGES))
+            for i in range(n)
+        ]
+        jobs = []
+        for lane in lanes:
+            for i, amount, msg in specs:
+                jobs.append(
+                    self.submit_ticket(
+                        lane, scene, self._make_ticket(scene, i, lane, amount, msg)
+                    )
+                )
+        await asyncio.gather(*jobs)
+        self.emit(
+            "submit",
+            f"{n} refund tickets submitted to {' and '.join(lanes)}",
+            scene=scene,
+        )
+        return specs
+
+    async def approve_ticket(self, lane: str, ticket_id: str) -> None:
+        """A human clicks Approve. The decision is recorded the moment it is made, delivered or not."""
+        audit.record_approval(lane, ticket_id, delivered=False)
+        if lane == "lane1":
+            for _ in range(80):
+                try:
+                    r = await self.http.post(
+                        f"{config.LANE1_URL}/tickets/{ticket_id}/approve"
+                    )
+                    if r.status_code == 200:
+                        audit.record_approval(lane, ticket_id, delivered=True)
+                        return
+                except httpx.HTTPError:
+                    pass
+                await asyncio.sleep(
+                    0.5
+                )  # 409 = no proposal yet, or the API is down: click again
+        else:
+            for _ in range(80):
+                try:
+                    client = await self.temporal()
+                    handle = client.get_workflow_handle(ticket_workflow_id(ticket_id))
+                    await handle.signal(
+                        SupportTicketWorkflow.approve, ApprovalDecision(True)
+                    )
+                    audit.record_approval(lane, ticket_id, delivered=True)
+                    return
+                except Exception:  # noqa: BLE001
+                    await asyncio.sleep(0.5)
+
+    async def approve_scene(self, scene: str, stagger: float = 0.05) -> None:
+        pairs = list(self.scene_tickets.get(scene, []))
+        tasks = []
+        for lane, tid in pairs:
+            tasks.append(asyncio.create_task(self.approve_ticket(lane, tid)))
+            await asyncio.sleep(stagger)
+        await asyncio.gather(*tasks)
+
+    async def wait_for_proposals(self, scene: str, timeout: float = 45.0) -> None:
+        """Wait until every ticket in the scene has an agent proposal waiting for a human."""
+        end = time.time() + timeout
+        pairs = list(self.scene_tickets.get(scene, []))
+        while time.time() < end:
+            ready = 0
+            try:
+                r = await self.http.get(f"{config.LANE1_URL}/tickets")
+                l1 = {t["ticket_id"]: t["status"] for t in r.json()}
+            except Exception:  # noqa: BLE001
+                l1 = {}
+            client = await self.temporal()
+            for lane, tid in pairs:
+                if lane == "lane1":
+                    ready += l1.get(tid) == "awaiting_approval"
+                else:
+                    try:
+                        st = await client.get_workflow_handle(
+                            ticket_workflow_id(tid)
+                        ).query(SupportTicketWorkflow.status)
+                        ready += st["state"] == "awaiting_approval"
+                    except Exception:  # noqa: BLE001
+                        pass
+            if ready >= len(pairs):
+                return
+            await asyncio.sleep(0.5)
+        self.emit("note", "timed out waiting for every proposal", scene=scene)
+
+    # -- chaos primitives ----------------------------------------------------------
+    async def set_fault(
+        self,
+        lane: str = "all",
+        mode: str = "none",
+        count: int = 0,
+        delay_s: float = 8.0,
+        latency_s: float = 0.0,
+    ) -> None:
+        await self.http.post(
+            f"{config.PAYMENTS_URL}/admin/fault",
+            json={
+                "lane": lane,
+                "mode": mode,
+                "count": count,
+                "delay_s": delay_s,
+                "latency_s": latency_s,
+            },
+        )
+
+    async def clear_faults(self) -> None:
+        await self.set_fault("all", "none", 0, 0.0, 0.0)
+
+    async def redeliver_lane1(self, n: int) -> None:
+        try:
+            await self.http.post(f"{config.LANE1_URL}/admin/redeliver", json={"n": n})
+        except httpx.HTTPError:
+            pass
+
+    async def replay_approvals_lane2(self, scene: str, times: int = 3) -> None:
+        client = await self.temporal()
+        for lane, tid in self.scene_tickets.get(scene, []):
+            if lane != "lane2":
+                continue
+            handle = client.get_workflow_handle(ticket_workflow_id(tid))
+            for _ in range(times):
+                try:
+                    await handle.signal(
+                        SupportTicketWorkflow.approve, ApprovalDecision(True)
+                    )
+                except Exception:  # noqa: BLE001
+                    pass
+
+    # -- scenes ---------------------------------------------------------------------
+    async def scene_intro(self) -> None:
+        self.emit(
+            "scene",
+            "Happy path: both lanes handle 5 refunds with nothing going wrong",
+            scene="intro",
+        )
+        await self.submit_cohort("intro", 5)
+        await self.wait_for_proposals("intro")
+        self.emit("human", "A human approves all 5 in both lanes", scene="intro")
+        await self.approve_scene("intro")
+
+    async def scene_tip_over(self) -> None:
+        self.emit(
+            "scene",
+            "The raccoon will kill the agent workers right after payments commits",
+            scene="tip_over",
+        )
+        await self.set_fault("all", "commit_then_stall", count=6, delay_s=9.0)
+        await self.submit_cohort("tip_over", 6)
+        await self.wait_for_proposals("tip_over")
+        self.emit("human", "A human approves all 6", scene="tip_over")
+        await self.approve_scene("tip_over")
+        await asyncio.sleep(1.6)
+        self.emit(
+            "raccoon",
+            "🦝 Raccoon tips over both agent workers (kill -9)",
+            scene="tip_over",
+        )
+        self.procs.kill("lane1_worker", restart_after=3.0)
+        self.procs.kill("support_worker", restart_after=3.0)
+        await asyncio.sleep(25)
+        await self.clear_faults()
+
+    async def scene_double_delivery(self) -> None:
+        self.emit(
+            "scene", "The broker delivers the same work twice", scene="double_delivery"
+        )
+        await self.set_fault("all", "none", latency_s=2.5)
+        await self.submit_cohort("double_delivery", 5)
+        await self.wait_for_proposals("double_delivery")
+        self.emit("human", "A human approves all 5", scene="double_delivery")
+        await self.approve_scene("double_delivery")
+        await asyncio.sleep(1.0)
+        self.emit(
+            "raccoon",
+            "🦝 Raccoon double-delivers the mail (Lane 1: queue redelivery, Lane 2: replayed approval signals)",
+            scene="double_delivery",
+        )
+        await self.redeliver_lane1(5)
+        await self.replay_approvals_lane2("double_delivery", 3)
+        await asyncio.sleep(14)
+        await self.clear_faults()
+
+    async def scene_deploy_wait(self) -> None:
+        self.emit(
+            "scene",
+            "Tickets are waiting for a human. A deploy restarts the workers.",
+            scene="deploy_wait",
+        )
+        await self.submit_cohort("deploy_wait", 5)
+        await self.wait_for_proposals("deploy_wait")
+        self.emit(
+            "raccoon",
+            "🦝 Raccoon restarts both agent workers while approvals are pending",
+            scene="deploy_wait",
+        )
+        self.procs.kill("lane1_worker", restart_after=3.0)
+        self.procs.kill("support_worker", restart_after=3.0)
+        await asyncio.sleep(6)
+        self.emit(
+            "human", "The human finally clicks Approve on all 5", scene="deploy_wait"
+        )
+        await self.approve_scene("deploy_wait")
+        await asyncio.sleep(10)
+
+    async def scene_payments_timeout(self) -> None:
+        self.emit(
+            "scene",
+            "Payments commits the refund, then the response never arrives",
+            scene="payments_timeout",
+        )
+        await self.set_fault("all", "commit_then_stall", count=5, delay_s=9.0)
+        await self.submit_cohort("payments_timeout", 5)
+        await self.wait_for_proposals("payments_timeout")
+        self.emit("human", "A human approves all 5", scene="payments_timeout")
+        await self.approve_scene("payments_timeout")
+        self.emit(
+            "raccoon",
+            "🦝 Raccoon holds the payments response after the commit",
+            scene="payments_timeout",
+        )
+        await asyncio.sleep(20)
+        await self.clear_faults()
+
+    async def scene_nexus_kill(self) -> None:
+        self.emit(
+            "scene",
+            "Lane 2 only: the payments team's worker dies in the middle of Nexus operations",
+            scene="nexus_kill",
+        )
+        await self.set_fault("lane2", "none", latency_s=3.0)
+        await self.submit_cohort("nexus_kill", 5, lanes=("lane2",))
+        await self.wait_for_proposals("nexus_kill")
+        self.emit(
+            "human",
+            "A human approves all 5; each becomes a Nexus operation to payments",
+            scene="nexus_kill",
+        )
+        await self.approve_scene("nexus_kill")
+        await asyncio.sleep(1.2)
+        self.emit(
+            "raccoon",
+            "🦝 Raccoon kills the payments team's worker for 10 seconds",
+            scene="nexus_kill",
+        )
+        self.procs.kill("payments_worker", restart_after=10.0)
+        await asyncio.sleep(22)
+        await self.clear_faults()
+
+    async def scene_free_roam(self) -> None:
+        self.emit(
+            "scene", "Free roam: the raccoon picks its own victims", scene="free_roam"
+        )
+        actions: list[Callable[[str], Awaitable[None]]] = [
+            self._roam_kill_agents,
+            self._roam_stall,
+            self._roam_redeliver,
+            self._roam_kill_payments_worker,
+        ]
+        for round_no in range(4):
+            scene = f"free_roam_{round_no}"
+            await self.submit_cohort(scene, 3)
+            await self.wait_for_proposals(scene)
+            await self.approve_scene(scene)
+            await asyncio.sleep(self.rng.uniform(0.5, 1.5))
+            await self.rng.choice(actions)(scene)
+            await asyncio.sleep(self.rng.uniform(6, 10))
+        await self.clear_faults()
+
+    async def _roam_kill_agents(self, scene: str) -> None:
+        self.emit("raccoon", "🦝 Raccoon: kill -9 on the agent workers", scene=scene)
+        self.procs.kill("lane1_worker", 3.0)
+        self.procs.kill("support_worker", 3.0)
+
+    async def _roam_stall(self, scene: str) -> None:
+        self.emit(
+            "raccoon", "🦝 Raccoon: payments goes quiet after committing", scene=scene
+        )
+        await self.set_fault("all", "commit_then_stall", count=3, delay_s=8.0)
+
+    async def _roam_redeliver(self, scene: str) -> None:
+        self.emit("raccoon", "🦝 Raccoon: double-delivers the mail", scene=scene)
+        await self.redeliver_lane1(3)
+        await self.replay_approvals_lane2(scene, 2)
+
+    async def _roam_kill_payments_worker(self, scene: str) -> None:
+        self.emit("raccoon", "🦝 Raccoon: kills the payments worker", scene=scene)
+        self.procs.kill("payments_worker", 6.0)
+
+    # -- scene runner -----------------------------------------------------------------
+    async def run_scene(self, scene_id: str) -> bool:
+        if self.running:
+            return False
+        fn = getattr(self, f"scene_{scene_id}", None)
+        if fn is None:
+            return False
+        self.running = True
+        self.current = scene_id
+
+        async def go() -> None:
+            try:
+                await fn()
+            except Exception as exc:  # noqa: BLE001
+                self.emit("error", f"scene {scene_id} failed: {exc!r}", scene=scene_id)
+            finally:
+                self.running = False
+                self.emit("scene_done", f"{scene_id} finished", scene=scene_id)
+
+        self._task = asyncio.create_task(go())
+        return True
+
+    async def reset(self) -> None:
+        if self.running and self._task:
+            self._task.cancel()
+            self.running = False
+        await self.clear_faults()
+        for url in (
+            f"{config.PAYMENTS_URL}/admin/reset",
+            f"{config.LANE1_URL}/admin/reset",
+        ):
+            try:
+                await self.http.post(url)
+            except httpx.HTTPError:
+                pass
+        audit.reset()
+        self.run_id = uuid.uuid4().hex[:4]
+        self.rng = random.Random(self.seed)
+        self.scene_tickets.clear()
+        self.events.clear()
+        self.current = None
+        self.emit("reset", "Scoreboard reset")
+
+    # -- views -------------------------------------------------------------------------
+    async def refresh_views(self) -> None:
+        """Background: what each lane believes, and the live Nexus operations (Lane 2)."""
+        try:
+            r = await self.http.get(f"{config.LANE1_URL}/tickets")
+            counts: dict[str, int] = {}
+            for t in r.json():
+                counts[t["status"]] = counts.get(t["status"], 0) + 1
+            self.lane1_view = counts
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            r = await self.http.get(f"{config.PAYMENTS_URL}/admin/fault")
+            self.faults = r.json()
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            client = await self.temporal()
+            view, states = [], {}
+            lane2 = [
+                tid
+                for lane, tid in self.scene_tickets.get(self.current or "", [])
+                if lane == "lane2"
+            ]
+            for tid in lane2:
+                handle = client.get_workflow_handle(ticket_workflow_id(tid))
+                desc = await handle.describe()
+                states[desc.status.name if desc.status else "UNKNOWN"] = (
+                    states.get(desc.status.name if desc.status else "UNKNOWN", 0) + 1
+                )
+                for op in desc.raw_description.pending_nexus_operations:
+                    view.append(
+                        {
+                            "ticket": tid,
+                            "endpoint": op.endpoint,
+                            "service": op.service,
+                            "operation": op.operation,
+                            "state": _enum_name(op),
+                            "attempt": op.attempt,
+                            "last_failure": (
+                                op.last_attempt_failure.message[:120]
+                                if op.last_attempt_failure
+                                and op.last_attempt_failure.message
+                                else ""
+                            ),
+                        }
+                    )
+            self.nexus_view = view
+            self.lane2_view = states
+        except Exception:  # noqa: BLE001
+            pass
+
+    def snapshot(self) -> dict:
+        board = audit.compute_all(SETTLE_S)
+        return {
+            "now": time.time(),
+            "running": self.running,
+            "current": self.current,
+            "scenes": [{"id": s.id, "title": s.title} for s in SCENES],
+            "audit": board,
+            "processes": self.procs.status(),
+            "events": self.events[-60:],
+            "nexus": self.nexus_view,
+            "lane1_view": self.lane1_view,
+            "lane2_view": self.lane2_view,
+            "faults": self.faults,
+        }
+
+
+def _enum_name(op) -> str:
+    try:
+        from temporalio.api.enums.v1 import PendingNexusOperationState  # type: ignore
+
+        return PendingNexusOperationState.Name(op.state).replace(
+            "PENDING_NEXUS_OPERATION_STATE_", ""
+        )
+    except Exception:  # noqa: BLE001
+        return str(op.state)

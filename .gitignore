@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+data/*
+!data/.gitkeep
+node_modules/
+ui/dist/
+.env
+*.tgz
+*.egg-info/
+CLAUDE.md
