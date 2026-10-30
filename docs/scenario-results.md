@@ -5,8 +5,8 @@ What `make scenario` printed on the runs behind the case study. Everything here 
 
 - **Date:** 2026-10-30
 - **Code:** the two default runs and the flagged run used commit `c57210e` (the flagged run adds the off-by-default
-  `RACCOON_L1_STABLE_KEY` switch, then uncommitted). A third default run from a fresh clone at `a5f62d6`, the commit that
-  contains the switch, is below.
+  `RACCOON_L1_STABLE_KEY` switch, then uncommitted). Two more default runs from fresh clones are below: `a5f62d6` (the commit that
+  contains the switch) and `main` at `9d77b11`.
 - **Command:** `make scenario` (stub model, no API key, local Temporal dev server, about 4 minutes)
 - **Machine:** one laptop, all services as local processes
 
@@ -64,6 +64,16 @@ port (it created its own `data/temporal.db`), the run ended `SCENARIO PASSED`, a
 
 Per scene, Lane 1: `tip_over` 4 duplicates / 2 missing, `double_delivery` 1 / 0, `deploy_wait` 0 / 5,
 `payments_timeout` 4 / 0. Same pattern as the earlier runs.
+
+## Fresh clone of `main` at `9d77b11`
+
+After the work was merged, a clone of `main` from GitHub (no `.env`, no `ANTHROPIC_API_KEY`) ran
+`TEMPORAL_ADDRESS=127.0.0.1:7299 make install && make scenario` on 2026-10-30. Same result: `SCENARIO PASSED`.
+
+| | Submitted | Refunded once | Duplicates | Missing | Stuck | Unapproved |
+|---|---|---|---|---|---|---|
+| Lane 1 | 26 | 9 | 10 | 7 | 0 | 0 |
+| Lane 2 | 31 | 31 | 0 | 0 | 0 | 0 |
 
 ## One run with Lane 1's key fixed
 
