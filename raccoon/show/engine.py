@@ -165,7 +165,7 @@ class Engine:
                     await handle.signal(SupportTicketWorkflow.approve, ApprovalDecision(True))
                     audit.record_approval(lane, ticket_id, delivered=True)
                     return
-                except Exception:  # noqa: BLE001
+                except Exception:
                     await asyncio.sleep(0.5)
 
     async def approve_scene(self, scene: str, stagger: float = 0.05) -> None:
@@ -185,7 +185,7 @@ class Engine:
             try:
                 r = await self.http.get(f"{config.LANE1_URL}/tickets")
                 l1 = {t["ticket_id"]: t["status"] for t in r.json()}
-            except Exception:  # noqa: BLE001
+            except Exception:
                 l1 = {}
             client = await self.temporal()
             for lane, tid in pairs:
@@ -197,7 +197,7 @@ class Engine:
                             SupportTicketWorkflow.status
                         )
                         ready += st["state"] == "awaiting_approval"
-                    except Exception:  # noqa: BLE001
+                    except Exception:
                         pass
             if ready >= len(pairs):
                 return
@@ -242,7 +242,7 @@ class Engine:
             for _ in range(times):
                 try:
                     await handle.signal(SupportTicketWorkflow.approve, ApprovalDecision(True))
-                except Exception:  # noqa: BLE001
+                except Exception:
                     pass
 
     # -- scenes ---------------------------------------------------------------------
@@ -410,7 +410,7 @@ class Engine:
         async def go() -> None:
             try:
                 await fn()
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 self.emit("error", f"scene {scene_id} failed: {exc!r}", scene=scene_id)
             finally:
                 self.running = False
@@ -449,12 +449,12 @@ class Engine:
             for t in r.json():
                 counts[t["status"]] = counts.get(t["status"], 0) + 1
             self.lane1_view = counts
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass
         try:
             r = await self.http.get(f"{config.PAYMENTS_URL}/admin/fault")
             self.faults = r.json()
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass
         try:
             client = await self.temporal()
@@ -486,7 +486,7 @@ class Engine:
                     )
             self.nexus_view = view
             self.lane2_view = states
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass
 
     def snapshot(self) -> dict:
@@ -524,7 +524,7 @@ class Engine:
                     act.last_failure.message[:120] if act and act.last_failure and act.last_failure.message else ""
                 ),
             }
-        except Exception:  # noqa: BLE001
+        except Exception:
             return {}
 
 
@@ -533,5 +533,5 @@ def _enum_name(op) -> str:
         from temporalio.api.enums.v1 import PendingNexusOperationState  # type: ignore
 
         return PendingNexusOperationState.Name(op.state).replace("PENDING_NEXUS_OPERATION_STATE_", "")
-    except Exception:  # noqa: BLE001
+    except Exception:
         return str(op.state)

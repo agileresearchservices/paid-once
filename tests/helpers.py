@@ -19,9 +19,7 @@ def free_port() -> int:
 class Server:
     def __init__(self, app) -> None:
         self.port = free_port()
-        self.server = uvicorn.Server(
-            uvicorn.Config(app, host="127.0.0.1", port=self.port, log_level="error")
-        )
+        self.server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=self.port, log_level="error"))
         self.thread = threading.Thread(target=self.server.run, daemon=True)
 
     @property

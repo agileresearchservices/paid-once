@@ -47,9 +47,7 @@ class Worker:
         state = self.graph.get_state(cfg).values
         proposal = state["proposal"]
         if "__interrupt__" in result:
-            store.set_status(
-                ticket["ticket_id"], "awaiting_approval", proposal=asdict(proposal)
-            )
+            store.set_status(ticket["ticket_id"], "awaiting_approval", proposal=asdict(proposal))
         else:
             store.set_status(
                 ticket["ticket_id"],
@@ -98,15 +96,11 @@ class Worker:
 
 
 def main() -> None:
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s lane1.worker %(message)s"
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s lane1.worker %(message)s")
     store.init()
     worker = Worker()
     log.info("lane1 worker started with %d threads", THREADS)
-    threads = [
-        threading.Thread(target=worker.loop, daemon=True) for _ in range(THREADS)
-    ]
+    threads = [threading.Thread(target=worker.loop, daemon=True) for _ in range(THREADS)]
     for t in threads:
         t.start()
     for t in threads:

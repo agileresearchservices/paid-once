@@ -39,9 +39,7 @@ def create_ticket(ticket: dict) -> bool:
     now = time.time()
     with connect(config.LANE1_DB) as conn:
         conn.execute("BEGIN IMMEDIATE")
-        exists = conn.execute(
-            "SELECT 1 FROM tickets WHERE ticket_id = ?", (ticket["ticket_id"],)
-        ).fetchone()
+        exists = conn.execute("SELECT 1 FROM tickets WHERE ticket_id = ?", (ticket["ticket_id"],)).fetchone()
         if exists:
             conn.execute("COMMIT")
             return False
@@ -69,9 +67,7 @@ def create_ticket(ticket: dict) -> bool:
 def get_ticket(ticket_id: str) -> dict | None:
     init()
     with connect(config.LANE1_DB) as conn:
-        row = conn.execute(
-            "SELECT * FROM tickets WHERE ticket_id = ?", (ticket_id,)
-        ).fetchone()
+        row = conn.execute("SELECT * FROM tickets WHERE ticket_id = ?", (ticket_id,)).fetchone()
     if row is None:
         return None
     out = dict(row)
@@ -82,9 +78,7 @@ def get_ticket(ticket_id: str) -> dict | None:
 def list_tickets() -> list[dict]:
     init()
     with connect(config.LANE1_DB) as conn:
-        rows = conn.execute(
-            "SELECT ticket_id, status, refund_id, detail FROM tickets ORDER BY created_at"
-        ).fetchall()
+        rows = conn.execute("SELECT ticket_id, status, refund_id, detail FROM tickets ORDER BY created_at").fetchall()
     return [dict(r) for r in rows]
 
 
@@ -117,19 +111,13 @@ def approve(ticket_id: str) -> str:
     now = time.time()
     with connect(config.LANE1_DB) as conn:
         conn.execute("BEGIN IMMEDIATE")
-        row = conn.execute(
-            "SELECT status FROM tickets WHERE ticket_id = ?", (ticket_id,)
-        ).fetchone()
+        row = conn.execute("SELECT status FROM tickets WHERE ticket_id = ?", (ticket_id,)).fetchone()
         if row is None:
             conn.execute("COMMIT")
             return "unknown"
         if row["status"] != "awaiting_approval":
             conn.execute("COMMIT")
-            return (
-                "already"
-                if row["status"] in ("approved", "executing", "done")
-                else "not_ready"
-            )
+            return "already" if row["status"] in ("approved", "executing", "done") else "not_ready"
         conn.execute(
             "UPDATE tickets SET status = 'approved', updated_at = ? WHERE ticket_id = ?",
             (now, ticket_id),

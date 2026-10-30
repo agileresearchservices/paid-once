@@ -90,9 +90,7 @@ def test_crash_after_commit_then_recovery_double_refunds(payments, monkeypatch):
     # Run the execute job on a thread we then abandon, the way kill -9 abandons a process.
     t = threading.Thread(target=first.run_one, daemon=True)
     t.start()
-    time.sleep(
-        0.4
-    )  # payments has committed; the client is still waiting on the stalled response
+    time.sleep(0.4)  # payments has committed; the client is still waiting on the stalled response
     assert len(ledger.all_refunds("lane1")) == 1
     time.sleep(0.4)  # lease expires; a fresh worker (empty memory) picks the job up
     restarted = Worker()

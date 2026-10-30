@@ -36,9 +36,7 @@ def record_refund(ticket_id: str, amount_cents: int, idem_key: str, lane: str) -
     init()
     with connect(config.LEDGER_DB) as conn:
         conn.execute("BEGIN IMMEDIATE")
-        row = conn.execute(
-            "SELECT * FROM refunds WHERE idem_key = ?", (idem_key,)
-        ).fetchone()
+        row = conn.execute("SELECT * FROM refunds WHERE idem_key = ?", (idem_key,)).fetchone()
         if row is not None:
             conn.execute("COMMIT")
             return {**dict(row), "replayed": True}
@@ -65,9 +63,7 @@ def all_refunds(lane: str | None = None) -> list[dict]:
     init()
     with connect(config.LEDGER_DB) as conn:
         if lane:
-            rows = conn.execute(
-                "SELECT * FROM refunds WHERE lane = ? ORDER BY created_at", (lane,)
-            )
+            rows = conn.execute("SELECT * FROM refunds WHERE lane = ? ORDER BY created_at", (lane,))
         else:
             rows = conn.execute("SELECT * FROM refunds ORDER BY created_at")
         return [dict(r) for r in rows.fetchall()]
