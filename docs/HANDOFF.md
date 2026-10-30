@@ -7,7 +7,8 @@ whoever changes the code next.
 ## Verified
 - `make test`: 12 passed (payments service, ledger, audit, Lane 1; stub model).
 - `make test-temporal`: 4 passed (one refund through Nexus; duplicate approval signals ignored; commit-then-timeout
-  gives one refund; an approval sent while no worker is running survives).
+  gives one refund; an approval sent while no worker is running survives). It runs on its own throwaway Temporal
+  server (`scripts/test-temporal.sh`, port 7299), and passed with `make demo` running.
 - `make scenario`: runs six scenes headless against both lanes and exits non-zero if Lane 2 breaks an invariant.
   Results, SHAs and caveats: `docs/scenario-results.md`. It also passed from a fresh clone with no `.env`.
 - The Vite UI (`make ui`, then `make demo`) was clicked through in Chrome. The Nexus step was checked full screen at
@@ -63,5 +64,6 @@ whoever changes the code next.
   it. Activities live in `*_activities.py` and are called by name.
 - Workflow code must stay deterministic and replay-safe.
 - Lane 1's counts vary run to run because kills land at wall-clock times. Assert on Lane 2 only.
-- Stop `make demo` before `make test-temporal`: the show's workers poll the same task queues on the same Temporal
-  server, pick up the tests' workflows and write to the show's ledger, so the tests see no refund.
+- Never point the integration tests at the show's Temporal server. The show's workers poll the same task queues, pick
+  up the tests' workflows and write to the show's ledger, so the tests see no refund. `make test-temporal` avoids
+  this by starting its own server; running `pytest -m temporal` by hand against :7233 brings the clash back.

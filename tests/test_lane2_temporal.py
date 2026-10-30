@@ -1,6 +1,7 @@
-"""Integration tests: need `temporal server start-dev` running and `python -m raccoon.lane2.client` run once.
+"""Integration tests for Lane 2 and Nexus.
 
-Run with: pytest -m temporal
+Run with `make test-temporal`: it starts a throwaway Temporal server, creates the namespaces and endpoint, then runs
+`pytest -m temporal`. Never run them against the show's server: its workers share these task queues.
 """
 
 import asyncio

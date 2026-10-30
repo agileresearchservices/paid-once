@@ -74,8 +74,9 @@ RACCOON_L1_STABLE_KEY=1 make scenario
 
 Lane 1 is unchanged unless that variable is set.
 
-Integration tests for Lane 2 and Nexus: `temporal server start-dev` in another terminal, then `make setup` and
-`make test-temporal`.
+Integration tests for Lane 2 and Nexus: `make test-temporal`. It starts a throwaway in-memory Temporal dev server on
+port 7299 (`RACCOON_TEST_TEMPORAL_PORT` changes it), creates the namespaces and endpoint there, and stops it after,
+so it is safe to run while `make demo` is up.
 
 ## Run the live demo
 
