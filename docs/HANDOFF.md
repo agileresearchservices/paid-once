@@ -7,10 +7,13 @@ whoever changes the code next.
 ## Verified
 - `make test`: 12 passed (payments service, ledger, audit, Lane 1; stub model).
 - `make test-temporal`: 4 passed (one refund through Nexus; duplicate approval signals ignored; commit-then-timeout
-  gives one refund; an approval sent while no worker is running survives).
+  gives one refund; an approval sent while no worker is running survives). It runs on its own throwaway Temporal
+  server (`scripts/test-temporal.sh`, port 7299), and passed with `make demo` running.
 - `make scenario`: runs six scenes headless against both lanes and exits non-zero if Lane 2 breaks an invariant.
   Results, SHAs and caveats: `docs/scenario-results.md`. It also passed from a fresh clone with no `.env`.
-- The Vite UI (`make ui`, then `make demo`) was clicked through in Chrome.
+- The Vite UI (`make ui`, then `make demo`) was clicked through in Chrome. The Nexus step was checked full screen at
+  1512x945 (14-inch MacBook Pro): it fits without scrolling, including mid-kill with the worker-down banner, and a
+  second run of the scene shows only the new run's rows.
 
 ## Not verified
 - Production anything: volume, a real payments service, approval waits longer than seconds, cost of running Temporal.
@@ -30,7 +33,18 @@ whoever changes the code next.
   integers; the amount floor is applied in code.
 - **For a workflow-run Nexus operation the caller's operation stays `STARTED, attempt 1`** while the payments-side
   activity retries. The UI reads retry state from pending-activity data, because retry attempts are not in workflow
-  history.
+  history. `raccoon/show/engine.py` keeps each row (and the peak activity attempt) after the operation completes, so
+  the evidence stays on screen when the scene ends.
+- **Ticket IDs carry a scene-run number** (`<reset id>-<scene>-r<n>-<i>-<lane>`), so re-running a scene starts new
+  workflows instead of colliding with the last run's IDs. The idempotency key is still `refund-<ticket_id>`.
+- **The show links into the Temporal Web UI** (`TEMPORAL_UI_URL`, default `http://127.0.0.1:8233`; the engine re-checks
+  it every 10 seconds and hides the links while it doesn't answer). Each Nexus row links the caller's workflow history in `raccoon-support` and the
+  handler's in `raccoon-payments`.
+- **The UI is a stepper** for a laptop browser, full screen (`#1`..`#7` in the URL, arrow keys, 1-7, R runs the
+  scene). Nothing is built for tablet or phone.
+- **Temporal look, local only.** Palette and fonts (Inter, Noto Sans Mono, bundled) follow temporal.io. The wordmark and
+  favicon go in `ui/public/brand/`, which is gitignored because they are trademarks; without them the header shows
+  text.
 - `raccoon/show/server.py` resets the scoreboard at boot and sets uvicorn `timeout_graceful_shutdown=2`, because an
   open SSE tab otherwise blocks shutdown and orphans the child services on 8101 and 8102.
 - The show reuses any Temporal server already listening on `TEMPORAL_ADDRESS` and will create its two namespaces
@@ -50,3 +64,6 @@ whoever changes the code next.
   it. Activities live in `*_activities.py` and are called by name.
 - Workflow code must stay deterministic and replay-safe.
 - Lane 1's counts vary run to run because kills land at wall-clock times. Assert on Lane 2 only.
+- The integration tests must not share a Temporal server with the show. The show's workers poll the same task queues
+  and would take the tests' workflows, so the tests would see no refund. `make test-temporal` starts its own server
+  and tells the tests its address (`RACCOON_TEST_TEMPORAL`); the tests refuse to run on any other server.

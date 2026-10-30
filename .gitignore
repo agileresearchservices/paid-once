@@ -7,6 +7,8 @@ data/*
 !data/.gitkeep
 node_modules/
 ui/dist/
+# Temporal's logo and favicon are trademarks: kept local, never committed. The UI falls back to text without them.
+ui/public/brand/
 .env
 *.tgz
 *.egg-info/

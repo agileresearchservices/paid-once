@@ -49,12 +49,12 @@ class ProcessManager:
             "lane1_worker": Proc("lane1_worker", "Lane 1 worker", [py, "-m", "raccoon.lane1.worker"]),
             "support_worker": Proc(
                 "support_worker",
-                "Support worker (Temporal)",
+                "Support team worker",
                 [py, "-m", "raccoon.lane2.support_worker"],
             ),
             "payments_worker": Proc(
                 "payments_worker",
-                "Payments worker + Nexus handler",
+                "Payments team worker + Nexus handler",
                 [py, "-m", "raccoon.lane2.payments_worker"],
             ),
         }
@@ -77,8 +77,7 @@ class ProcessManager:
             [
                 exe,
                 "server",
-                "start-dev",
-                "--headless",
+                "start-dev",  # with its Web UI: the demo links both namespaces from the Nexus panel
                 "--port",
                 port,
                 "--db-filename",

@@ -74,8 +74,9 @@ RACCOON_L1_STABLE_KEY=1 make scenario
 
 Lane 1 is unchanged unless that variable is set.
 
-Integration tests for Lane 2 and Nexus: `temporal server start-dev` in another terminal, then `make setup` and
-`make test-temporal`.
+Integration tests for Lane 2 and Nexus: `make test-temporal`. It starts a throwaway in-memory Temporal dev server on
+port 7299 (`RACCOON_TEST_TEMPORAL_PORT` changes it), creates the namespaces and endpoint there, and stops it after,
+so it is safe to run while `make demo` is up.
 
 ## Run the live demo
 
@@ -87,8 +88,21 @@ make ui                                 # builds the Vite UI (needs Node 22+)
 make demo                               # http://127.0.0.1:8100
 ```
 
-The page steps through the scenes (use the arrow keys), runs each one, and shows both lanes' scoreboards plus the
-Nexus operations live. The scoreboard resets whenever the show server starts.
+The page steps through seven scenes and shows both lanes' scoreboards plus the Nexus operations live. Arrow keys or
+1-7 move between steps, R runs the current scene, and the step is kept in the URL (`#6`), so a refresh stays put. It
+is built for a laptop browser in full screen. The scoreboard resets whenever the show server starts.
+
+Run of show, about ten minutes:
+- **Step 1, Meet the system**: both lanes refund five tickets cleanly.
+- **Steps 2-5** (agent tipped over, double delivery, deploy mid-wait, payments goes quiet): the same chaos hits both
+  lanes; watch the ledger-based scoreboards diverge.
+- **Step 6, Nexus**: the raccoon kills the payments team's worker mid-refund. Support's side stays `STARTED` with no
+  failure while payments retries. Click a row's `history ↗` links to show both sides in the Temporal Web UI
+  (http://127.0.0.1:8233), including the caller's Nexus Links tab.
+- **Step 7, Scoreboard**: the totals.
+
+The Temporal wordmark and favicon are not in the repo. To show them, put `temporal-wordmark.svg` and `favicon.svg` in
+`ui/public/brand/` (gitignored) before `make ui`; otherwise the header shows text.
 
 ## Layout
 

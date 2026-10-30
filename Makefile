@@ -6,8 +6,8 @@ install:
 test:            ## fast suite: payments, audit, Lane 1 (stub model, no Temporal server needed)
 	RACCOON_STUB_LLM=1 uv run pytest -q
 
-test-temporal:   ## Lane 2 + Nexus integration tests (needs: temporal server start-dev, then `make setup`)
-	RACCOON_STUB_LLM=1 uv run pytest -q -m temporal
+test-temporal:   ## Lane 2 + Nexus integration tests on their own throwaway Temporal server (needs the temporal CLI)
+	scripts/test-temporal.sh
 
 setup:           ## create the two namespaces and the Nexus endpoint (safe to repeat)
 	uv run python -m raccoon.lane2.client

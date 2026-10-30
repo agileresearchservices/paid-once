@@ -1,12 +1,14 @@
 // The deck: one step per scene, in order, then the scoreboard. `scene` is the show-server scene id.
+// Talk-track material that doesn't fit on screen lives in drafts/talk-track.md (private).
 
 export interface Step {
   id: string;
   scene: string | null;
   title: string;
   short: string; // label on the step button
-  story: string; // what happens
-  watch: string; // what to look at
+  story: string; // what happens, about 25 words
+  watch: string; // what to look at, without giving the outcome away
+  result?: string; // what it showed; appears once this step's scene has finished
   nexus?: boolean; // show the Nexus panel
 }
 
@@ -17,9 +19,9 @@ export const STEPS: Step[] = [
     short: "Meet the system",
     title: "Meet the system",
     story:
-      "A support agent proposes refunds, a human approves, and the payments team's service moves the money. Both lanes get the same five tickets.",
-    watch:
-      "With no trouble, both lanes agree: five approved, five refunded once. The difference only shows up under failure.",
+      "A support agent proposes refunds, a human approves, and the payments team moves the money. Temporal makes it durable; Nexus decides whose failure it is.",
+    watch: "Both lanes get the same five tickets, with no trouble yet.",
+    result: "Both lanes agree: five approved, five refunded once. The differences only show up under failure.",
   },
   {
     id: "tip_over",
@@ -27,36 +29,39 @@ export const STEPS: Step[] = [
     short: "Agent tipped over",
     title: "The raccoon tips over the agent",
     story:
-      "Payments has saved each refund but is slow to answer. At that moment the raccoon kills the agent workers (kill -9). Lane 1 loses its in-memory state and re-drives the work with a fresh idempotency key. Lane 2's workflows live in Temporal, so the restarted worker carries on and retries with a key derived from the ticket.",
-    watch: "Lane 1: duplicated refunds and lost tickets. Lane 2: every ticket refunded once.",
+      "Payments saves each refund but answers slowly. Mid-call, the raccoon kills the agent workers (kill -9). Each lane has to pick up where it left off.",
+    watch: "How each lane re-drives the refund, and what the ledger records.",
+    result:
+      "Lane 1 lost its in-memory state and retried with a fresh idempotency key: duplicates and lost tickets. Lane 2's restarted worker replayed from history and retried with a key derived from the ticket.",
   },
   {
     id: "double_delivery",
     scene: "double_delivery",
     short: "Double delivery",
     title: "The same message arrives twice",
-    story:
-      "The raccoon replays the same work. Lane 1's queue redelivers the jobs, as at-least-once brokers do. Lane 2 receives the approval signal again and counts it instead of acting on it twice.",
-    watch: "Lane 1's duplicate count and the dollars refunded twice.",
+    story: "The raccoon replays the same work: Lane 1's queue redelivers its jobs, and Lane 2 receives the approval signal a second time.",
+    watch: "The duplicate count, and dollars refunded twice.",
+    result: "Lane 1 refunded some tickets twice. Lane 2 counted the second approval and did not act on it again.",
   },
   {
     id: "deploy_wait",
     scene: "deploy_wait",
     short: "Deploy mid-wait",
     title: "A deploy lands during the approval wait",
-    story:
-      "Approvals can take days, so a deploy will happen while tickets wait. The raccoon restarts both lanes' workers. Lane 1 kept its place in memory and loses it. Lane 2's workflows were waiting in Temporal the whole time.",
-    watch: "Lane 1's missing tickets: approved by a human, never refunded.",
+    story: "Approvals can take days, so a deploy will land while tickets wait. The raccoon restarts both lanes' workers mid-wait.",
+    watch: "Tickets a human approved: do they still get refunded?",
+    result:
+      "Lane 1 kept its place in memory and lost it: approved, never refunded. Lane 2's workflows were waiting in Temporal the whole time.",
   },
   {
     id: "payments_timeout",
     scene: "payments_timeout",
     short: "Payments goes quiet",
     title: "Payments commits, then goes quiet",
-    story:
-      "The refund is saved, then the response never arrives and the caller times out. Lane 1 retries with a fresh idempotency key each time. Lane 2 retries with a key derived from the ticket, so the ledger recognises it.",
-    watch:
-      "Temporal made the retry safe only because the key comes from the business operation. Durable execution alone is not exactly-once.",
+    story: "Payments saves the refund, then the response never arrives and the caller times out. Both lanes retry.",
+    watch: "Which retries the ledger recognises as the same refund.",
+    result:
+      "Temporal retries at least once. The retry is safe because the ledger dedupes on a key derived from the ticket; Lane 1's fresh key per attempt pays twice.",
   },
   {
     id: "nexus_kill",
@@ -64,9 +69,10 @@ export const STEPS: Step[] = [
     short: "Nexus",
     title: "Nexus: kill the payments worker mid-refund",
     story:
-      "The support team calls one operation on the payments team's contract. The raccoon kills the payments worker. The support workflow keeps waiting; the retry happens inside the payments namespace, where the failure belongs.",
-    watch:
-      "The caller's operation stays STARTED. The payments-side refund workflow shows the activity timing out and retrying. The refund may already be in the ledger by then, so the retry gets the stored result back instead of paying twice.",
+      "Support calls one operation on the payments team's endpoint. The raccoon kills the payments worker while refunds are in progress.",
+    watch: "The caller's view on the left, the payments namespace on the right. Where does the failure show up?",
+    result:
+      "Once payments accepts the operation, the caller shows STARTED while payments retries, for up to the 10-minute schedule-to-close timeout. A retry after the ledger commit gets the stored result back.",
     nexus: true,
   },
   {
@@ -75,7 +81,7 @@ export const STEPS: Step[] = [
     short: "Scoreboard",
     title: "The scoreboard",
     story:
-      "Everything above is scored from the payments ledger, not from either lane's own records. It counts refunds per ticket and compares them with approvals.",
+      "Everything is scored from the payments ledger, not from either lane's own records. It counts refunds per ticket and compares them with approvals.",
     watch:
       "Three invariants: every approved ticket refunded exactly once, no refund without an approval, no ticket lost or stuck.",
   },
