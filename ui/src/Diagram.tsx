@@ -21,9 +21,9 @@ interface Box {
 
 const NODES: Record<string, Box> = {
   lane1_api: { x: 60, y: ROW.lane1, w: 200, h: NODE_H, title: "Queue API", sub: "jobs table (SQLite)", proc: "lane1_api" },
-  lane1_worker: { x: 320, y: ROW.lane1, w: 210, h: NODE_H, title: "Queue worker", sub: "agent · state in memory", proc: "lane1_worker" },
+  lane1_worker: { x: 320, y: ROW.lane1, w: 224, h: NODE_H, title: "Queue worker", sub: "agent · state in memory", proc: "lane1_worker" },
   temporal: { x: 60, y: ROW.lane2, w: 200, h: NODE_H, title: "Temporal server", sub: "durable history" },
-  support_worker: { x: 320, y: ROW.lane2, w: 210, h: NODE_H, title: "Support worker", sub: "agent · SupportTicketWorkflow", proc: "support_worker" },
+  support_worker: { x: 320, y: ROW.lane2, w: 224, h: NODE_H, title: "Support worker", sub: "agent · SupportTicketWorkflow", proc: "support_worker" },
   endpoint: { x: 600, y: ROW.lane2, w: 190, h: NODE_H, title: "Nexus endpoint", sub: "payments-endpoint" },
   payments_worker: { x: 860, y: ROW.lane2, w: 210, h: NODE_H, title: "Payments worker", sub: "RefundWorkflow", proc: "payments_worker" },
   payments: { x: 1170, y: ROW.lane1, w: 294, h: ROW.lane2 + NODE_H - ROW.lane1, title: "Payments service + ledger", sub: "the audit reads this ledger", proc: "payments" },
@@ -35,10 +35,10 @@ const mid = (lane: LaneId) => ROW[lane] + NODE_H / 2;
 const WIRES: { id: string; x1: number; x2: number; lane: LaneId; label?: string }[] = [
   { id: "in_lane1", x1: 8, x2: 60, lane: "lane1" },
   { id: "lane1_api>lane1_worker", x1: 260, x2: 320, lane: "lane1" },
-  { id: "lane1_worker>payments", x1: 530, x2: 1170, lane: "lane1", label: "plain HTTP" },
+  { id: "lane1_worker>payments", x1: 544, x2: 1170, lane: "lane1", label: "plain HTTP" },
   { id: "in_lane2", x1: 8, x2: 60, lane: "lane2" },
   { id: "temporal>support_worker", x1: 260, x2: 320, lane: "lane2" },
-  { id: "support_worker>endpoint", x1: 530, x2: 600, lane: "lane2" },
+  { id: "support_worker>endpoint", x1: 544, x2: 600, lane: "lane2" },
   { id: "endpoint>payments_worker", x1: 790, x2: 860, lane: "lane2", label: "Nexus" },
   { id: "payments_worker>payments", x1: 1070, x2: 1170, lane: "lane2" },
 ];
