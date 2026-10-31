@@ -15,12 +15,13 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 import httpx
+from temporalio.api.enums.v1 import PendingActivityState
 from temporalio.client import Client, WorkflowExecutionStatus
 
 from paidonce import audit, config
 from paidonce.lane2.client import connect
 from paidonce.lane2.contract import NEXUS_ENDPOINT, PaymentsService
-from paidonce.lane2.payments_side import RefundWorkflow, refund_workflow_id
+from paidonce.lane2.payments_side import REFUND_RETRY, REFUND_START_TO_CLOSE, RefundWorkflow, refund_workflow_id
 from paidonce.lane2.support_side import SupportTicketWorkflow, ticket_workflow_id
 from paidonce.models import ApprovalDecision, Ticket, TicketOutcome
 from paidonce.show.procs import ProcessManager
@@ -113,6 +114,9 @@ class Engine:
         self.decisions: dict[str, bool] = {}
         # This scene's calls to payments per lane, from payments' own counter: calls, booked, replays.
         self.payments_calls: dict[str, dict[str, int]] = {}
+        # The same counter per ticket ({lane: {ticket: {calls, replays}}}), and when each Lane 2 refund was booked.
+        self.payments_calls_by_ticket: dict[str, dict[str, dict[str, int]]] = {}
+        self.booked_at: dict[str, float] = {}
         # Where each stack thinks each of this scene's tickets is, for the architecture diagram.
         self.flow: dict[str, list[dict]] = {"lane1": [], "lane2": []}
         self._task: asyncio.Task | None = None
@@ -534,6 +538,8 @@ class Engine:
         self.decisions.clear()
         self.lane2_outcomes.clear()
         self.payments_calls = {}
+        self.payments_calls_by_ticket = {}
+        self.booked_at = {}
         self.nexus_seen = {}
         self.flow = {"lane1": [], "lane2": []}
         self.scene_runs = {}  # a cancelled scene's finally block then updates a run nobody shows
@@ -568,7 +574,10 @@ class Engine:
             r = await self.http.get(f"{config.PAYMENTS_URL}/admin/fault")
             self.faults = r.json()
             r = await self.http.get(f"{config.PAYMENTS_URL}/admin/calls")
-            self.payments_calls = _scene_calls(r.json(), pairs)
+            self.payments_calls_by_ticket = r.json()
+            self.payments_calls = _scene_calls(self.payments_calls_by_ticket, pairs)
+            r = await self.http.get(f"{config.PAYMENTS_URL}/refunds", params={"lane": "lane2"})
+            self.booked_at = {row["ticket_id"]: row["created_at"] for row in r.json()}
         except Exception:
             pass
         try:
@@ -610,11 +619,17 @@ class Engine:
                     else ""
                 )
                 handler = await self._handler_view(tid)
+                pending = handler.pop("pending", None)
                 prev = row or {}
                 handler["peak_activity_attempt"] = max(
                     handler.get("activity_attempt", 0),
                     prev.get("handler", {}).get("peak_activity_attempt", 0),
                 )
+                now = time.time()
+                state = _enum_name(op)
+                phases = list(prev.get("phases", []))
+                if not phases or phases[-1]["state"] != state:
+                    phases.append({"state": state, "at": now})
                 seen[tid] = {
                     "ticket": tid,
                     "live": True,
@@ -625,7 +640,12 @@ class Engine:
                     "endpoint": op.endpoint,
                     "service": op.service,
                     "operation": op.operation,
-                    "state": _enum_name(op),
+                    "state": state,
+                    "phases": phases,
+                    "op_scheduled_at": _ts(op.scheduled_time) or prev.get("op_scheduled_at") or now,
+                    "op_closed_at": None,
+                    "attempts": _merge_attempts(prev.get("attempts", []), pending, now),
+                    "ledger": _ticket_ledger(self.payments_calls_by_ticket, self.booked_at, "lane2", tid),
                     "attempt": op.attempt,
                     "peak_attempt": max(op.attempt, prev.get("peak_attempt", 0)),
                     "last_failure": failure,
@@ -633,11 +653,38 @@ class Engine:
                 }
             elif row is not None and row["live"]:
                 # The operation closed since the last refresh: keep the row, with its final state.
+                now = time.time()
                 handler = await self._handler_view(tid) or dict(row["handler"])
+                pending = handler.pop("pending", None)
                 handler["peak_activity_attempt"] = row["handler"].get("peak_activity_attempt", 0)
                 handler["activity_attempt"] = 0
                 closed_badly = status in ("FAILED", "TIMED_OUT", "TERMINATED", "CANCELED")
-                row.update(live=False, state="FAILED" if closed_badly else "COMPLETED", handler=handler)
+                final_state = "FAILED" if closed_badly else "COMPLETED"
+                attempts = _merge_attempts(row.get("attempts", []), pending, now)
+                if handler.get("status") not in (None, "RUNNING"):
+                    attempts = _finish_attempts(attempts, await self._final_attempt(tid), now)
+                caller = await self._caller_op_times(client, ticket_workflow_id(tid))
+                phases = list(row.get("phases", []))
+                if caller.get("started_at") and not any(p["state"] == "STARTED" for p in phases):
+                    phases.append({"state": "STARTED", "at": caller["started_at"]})
+                for p in phases:  # history has the exact time payments accepted the operation
+                    if p["state"] == "STARTED" and caller.get("started_at"):
+                        p["at"] = caller["started_at"]
+                row.update(
+                    live=False,
+                    state=final_state,
+                    handler=handler,
+                    attempts=attempts,
+                    phases=phases,
+                    op_scheduled_at=caller.get("scheduled_at") or row.get("op_scheduled_at"),
+                    op_closed_at=caller.get("closed_at") or now,
+                )
+            elif row is not None and row.get("attempts") and any(a["outcome"] == "running" for a in row["attempts"]):
+                # Closed earlier, but the refund workflow hadn't finished then: try its history again.
+                if (await self._handler_view(tid)).get("status") not in (None, "RUNNING"):
+                    row["attempts"] = _finish_attempts(row["attempts"], await self._final_attempt(tid), time.time())
+            if tid in seen:
+                seen[tid]["ledger"] = _ticket_ledger(self.payments_calls_by_ticket, self.booked_at, "lane2", tid)
         if seen is self.nexus_seen:
             self.lane2_view = states
             self.flow["lane2"] = flow2
@@ -715,9 +762,73 @@ class Engine:
                 "activity_failure": (
                     act.last_failure.message[:120] if act and act.last_failure and act.last_failure.message else ""
                 ),
+                # Raw timings for the attempt timeline; refresh_views pops this before it reaches the UI.
+                "pending": (
+                    {
+                        "state": PendingActivityState.Name(act.state).replace("PENDING_ACTIVITY_STATE_", ""),
+                        "attempt": act.attempt,
+                        "scheduled_at": _ts(act.scheduled_time),
+                        "started_at": _ts(act.last_started_time),
+                        # The server's current_retry_interval isn't usable (garbage or unset), so the backoff
+                        # before this attempt comes from the refund workflow's own retry policy.
+                        "retry_interval": _backoff_before(act.attempt),
+                        "start_to_close": REFUND_START_TO_CLOSE.total_seconds(),
+                        "failure": act.last_failure.message[:120]
+                        if act.last_failure and act.last_failure.message
+                        else "",
+                    }
+                    if act
+                    else None
+                ),
             }
         except Exception:
             return {}
+
+    async def _final_attempt(self, ticket_id: str) -> dict | None:
+        """The refund workflow's last activity attempt, exactly, from its history."""
+        try:
+            client = await self.payments_temporal()
+            final: dict | None = None
+            async for e in client.get_workflow_handle(refund_workflow_id(ticket_id)).fetch_history_events():
+                kind = e.WhichOneof("attributes")
+                if kind == "activity_task_started_event_attributes":
+                    final = {
+                        "n": e.activity_task_started_event_attributes.attempt,
+                        "started_at": _ts(e.event_time),
+                        "ended_at": None,
+                        "ok": False,
+                        "failure": "",
+                    }
+                elif final is not None and kind == "activity_task_completed_event_attributes":
+                    final.update(ended_at=_ts(e.event_time), ok=True)
+                elif final is not None and kind in (
+                    "activity_task_failed_event_attributes",
+                    "activity_task_timed_out_event_attributes",
+                ):
+                    attrs = getattr(e, kind)
+                    final.update(ended_at=_ts(e.event_time), failure=attrs.failure.message[:120])
+            return final if final and final["ended_at"] else None
+        except Exception:
+            return None
+
+    @staticmethod
+    async def _caller_op_times(client: Client, workflow_id: str) -> dict:
+        """When support scheduled the Nexus operation, when payments accepted it, and when it closed."""
+        out: dict = {}
+        try:
+            async for e in client.get_workflow_handle(workflow_id).fetch_history_events():
+                kind = e.WhichOneof("attributes") or ""
+                if kind == "nexus_operation_scheduled_event_attributes":
+                    out["scheduled_at"] = _ts(e.event_time)
+                elif kind == "nexus_operation_started_event_attributes":
+                    out["started_at"] = _ts(e.event_time)
+                elif (
+                    kind.startswith("nexus_operation_") and kind != "nexus_operation_cancel_requested_event_attributes"
+                ):
+                    out["closed_at"] = _ts(e.event_time)
+        except Exception:
+            pass
+        return out
 
 
 # Lane 1 ticket status -> (diagram node or wire, what the queue believes). Read from its own table.
@@ -806,3 +917,91 @@ def _enum_name(op) -> str:
         return PendingNexusOperationState.Name(op.state).replace("PENDING_NEXUS_OPERATION_STATE_", "")
     except Exception:
         return str(op.state)
+
+
+def _merge_attempts(prev: list[dict], pending: dict | None, now: float) -> list[dict]:
+    """Fold one poll of the refund workflow's pending activity into the attempts seen so far.
+
+    `pending` is {state, attempt, scheduled_at, started_at, retry_interval, start_to_close, failure} or None.
+    Attempt N is recorded only once the activity is STARTED with attempt == N: after a timeout it goes back to
+    SCHEDULED with attempt N+1, and that poll is what ends attempt N. A StartToClose timeout ended it at its start
+    plus the timeout; otherwise at the next attempt's scheduled time minus the backoff, or at `now`.
+    """
+    attempts = [dict(a) for a in prev]
+    if not pending:
+        return attempts
+    n = pending["attempt"]
+    for a in attempts:
+        if a["n"] < n and a["outcome"] == "running":
+            failure = pending.get("failure", "")
+            sched = pending.get("scheduled_at")
+            if "StartToClose" in failure and pending.get("start_to_close"):
+                end = a["started_at"] + pending["start_to_close"]  # exact: the timeout is what ended it
+            elif sched:
+                end = sched - pending.get("retry_interval", 0.0)
+            else:
+                end = now
+            a.update(ended_at=min(max(end, a["started_at"]), now), outcome="failed", failure=failure)
+    if pending["state"] == "STARTED" and not any(a["n"] == n for a in attempts):
+        attempts.append(
+            {
+                "n": n,
+                "started_at": pending.get("started_at") or now,
+                "ended_at": None,
+                "outcome": "running",
+                "failure": "",
+            }
+        )
+    return attempts
+
+
+def _finish_attempts(prev: list[dict], final: dict | None, now: float) -> list[dict]:
+    """Close the attempts once the refund workflow has closed, using its history for the last attempt.
+
+    `final` is {n, started_at, ended_at, ok, failure} from the last ActivityTaskStarted and the event that
+    closed it. That attempt may have started and finished between two polls, so history is the only exact
+    source. Without history, anything still running is closed at `now` with an unknown outcome.
+    """
+    attempts = [dict(a) for a in prev]
+    if final is None:
+        for a in attempts:
+            if a["outcome"] == "running":
+                a.update(ended_at=now, outcome="unknown")
+        return attempts
+    for a in attempts:
+        if a["n"] < final["n"] and a["outcome"] == "running":
+            a.update(ended_at=max(final["started_at"], a["started_at"]), outcome="failed")
+    attempts = [a for a in attempts if a["n"] != final["n"]]
+    attempts.append(
+        {
+            "n": final["n"],
+            "started_at": final["started_at"],
+            "ended_at": final["ended_at"],
+            "outcome": "ok" if final["ok"] else "failed",
+            "failure": final.get("failure", ""),
+        }
+    )
+    return sorted(attempts, key=lambda a: a["n"])
+
+
+def _backoff_before(attempt: int) -> float:
+    """The refund retry policy's wait before `attempt` (attempt 2 waits the initial interval)."""
+    if attempt <= 1:
+        return 0.0
+    initial = REFUND_RETRY.initial_interval.total_seconds()
+    wait = initial * REFUND_RETRY.backoff_coefficient ** (attempt - 2)
+    cap = REFUND_RETRY.maximum_interval.total_seconds() if REFUND_RETRY.maximum_interval else wait
+    return min(wait, cap)
+
+
+def _ticket_ledger(calls: dict, booked_at: dict, lane: str, ticket_id: str) -> dict:
+    """One ticket as payments saw it: calls, calls answered from the ledger, and when the money was booked."""
+    c = calls.get(lane, {}).get(ticket_id) or {"calls": 0, "replays": 0}
+    return {"calls": c["calls"], "replays": c["replays"], "booked_at": booked_at.get(ticket_id)}
+
+
+def _ts(stamp) -> float | None:
+    """A protobuf Timestamp as epoch seconds, or None if unset."""
+    if stamp is None or not (stamp.seconds or stamp.nanos):
+        return None
+    return stamp.seconds + stamp.nanos / 1e9

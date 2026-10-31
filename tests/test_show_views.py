@@ -1,9 +1,19 @@
-"""The diagram's view of a Lane 2 ticket, the per-scene payments call totals, and when a scene has settled."""
+"""The diagram's view of a Lane 2 ticket, the per-scene payments call totals, when a scene has settled, and the
+Nexus timeline's attempts and ledger fields."""
 
 from types import SimpleNamespace
 
 from paidonce.models import TicketOutcome
-from paidonce.show.engine import LANE1_STAGES, _lane2_stage, _scene_calls, _unsettled
+from paidonce.show.engine import (
+    LANE1_STAGES,
+    _backoff_before,
+    _finish_attempts,
+    _lane2_stage,
+    _merge_attempts,
+    _scene_calls,
+    _ticket_ledger,
+    _unsettled,
+)
 
 
 def test_unapproved_parked_workflow_waits_for_a_human():
@@ -94,3 +104,100 @@ def test_tickets_closed_with_no_refund_let_the_scene_settle():
     # The ledger alone isn't enough: a denial the stack hasn't closed yet still holds the scene open.
     flow["lane2"] = [{"ticket": "b", "at": "temporal", "state": "denied, queued in Temporal for a worker"}]
     assert _unsettled(PAIRS, ledger, flow) == ["b"]
+
+
+def _pending(state, attempt, scheduled_at=None, started_at=None, retry_interval=0.0, failure="", start_to_close=8.0):
+    return {
+        "state": state,
+        "attempt": attempt,
+        "scheduled_at": scheduled_at,
+        "started_at": started_at,
+        "retry_interval": retry_interval,
+        "start_to_close": start_to_close,
+        "failure": failure,
+    }
+
+
+def test_attempt_is_recorded_only_once_started():
+    assert _merge_attempts([], _pending("SCHEDULED", 1, scheduled_at=100.0), now=100.5) == []
+    attempts = _merge_attempts([], _pending("STARTED", 1, scheduled_at=100.0, started_at=101.0), now=101.5)
+    assert attempts == [{"n": 1, "started_at": 101.0, "ended_at": None, "outcome": "running", "failure": ""}]
+
+
+def test_timeout_ends_the_attempt_at_start_plus_start_to_close():
+    """What the probe saw: after the 8 s timeout the activity is SCHEDULED again with attempt 2."""
+    attempts = _merge_attempts([], _pending("STARTED", 1, started_at=102.4), now=103.0)
+    attempts = _merge_attempts(
+        attempts,
+        _pending("SCHEDULED", 2, scheduled_at=111.4, retry_interval=1.0, failure="activity StartToClose timeout"),
+        now=111.6,
+    )
+    assert attempts == [
+        {
+            "n": 1,
+            "started_at": 102.4,
+            "ended_at": 110.4,
+            "outcome": "failed",
+            "failure": "activity StartToClose timeout",
+        }
+    ]
+    attempts = _merge_attempts(attempts, _pending("STARTED", 2, scheduled_at=111.4, started_at=114.4), now=114.9)
+    assert [(a["n"], a["outcome"]) for a in attempts] == [(1, "failed"), (2, "running")]
+
+
+def test_other_failures_end_at_the_retry_schedule_minus_backoff():
+    attempts = _merge_attempts([], _pending("STARTED", 1, started_at=100.0), now=100.5)
+    attempts = _merge_attempts(
+        attempts, _pending("SCHEDULED", 2, scheduled_at=104.0, retry_interval=1.0, failure="HTTP 500"), now=104.2
+    )
+    assert attempts[0]["ended_at"] == 103.0 and attempts[0]["failure"] == "HTTP 500"
+
+
+def test_an_end_is_never_before_the_start_or_after_now():
+    attempts = _merge_attempts([], _pending("STARTED", 1, started_at=100.0), now=100.5)
+    early = _merge_attempts(attempts, _pending("SCHEDULED", 2, scheduled_at=99.0, retry_interval=5.0), now=101.0)
+    assert early[0]["ended_at"] == 100.0
+    late = _merge_attempts(attempts, _pending("SCHEDULED", 2, failure="StartToClose timeout"), now=105.0)
+    assert late[0]["ended_at"] == 105.0
+
+
+def test_backoff_follows_the_refund_retry_policy():
+    assert [_backoff_before(n) for n in (1, 2, 3, 4)] == [0.0, 1.0, 2.0, 3.0]
+
+
+def test_repeated_polls_do_not_duplicate_an_attempt():
+    attempts = _merge_attempts([], _pending("STARTED", 1, started_at=101.0), now=101.5)
+    again = _merge_attempts(attempts, _pending("STARTED", 1, started_at=101.0), now=102.5)
+    assert again == attempts
+
+
+def test_history_supplies_the_final_attempt_even_if_no_poll_saw_it():
+    attempts = [{"n": 1, "started_at": 102.4, "ended_at": 110.4, "outcome": "failed", "failure": "timeout"}]
+    final = {"n": 2, "started_at": 114.4, "ended_at": 116.4, "ok": True, "failure": ""}
+    done = _finish_attempts(attempts, final, now=117.0)
+    assert [(a["n"], a["outcome"], a["ended_at"]) for a in done] == [(1, "failed", 110.4), (2, "ok", 116.4)]
+
+
+def test_history_replaces_the_polled_copy_of_the_final_attempt():
+    attempts = [{"n": 1, "started_at": 101.0, "ended_at": None, "outcome": "running", "failure": ""}]
+    final = {"n": 1, "started_at": 101.02, "ended_at": 103.1, "ok": True, "failure": ""}
+    assert _finish_attempts(attempts, final, now=104.0) == [
+        {"n": 1, "started_at": 101.02, "ended_at": 103.1, "outcome": "ok", "failure": ""}
+    ]
+
+
+def test_without_history_a_running_attempt_is_closed_as_unknown():
+    attempts = [{"n": 1, "started_at": 101.0, "ended_at": None, "outcome": "running", "failure": ""}]
+    assert _finish_attempts(attempts, None, now=105.0)[0] == {
+        "n": 1,
+        "started_at": 101.0,
+        "ended_at": 105.0,
+        "outcome": "unknown",
+        "failure": "",
+    }
+
+
+def test_ticket_ledger_reads_payments_counter_and_booking_time():
+    calls = {"lane2": {"t1": {"calls": 2, "replays": 1}}}
+    assert _ticket_ledger(calls, {"t1": 104.0}, "lane2", "t1") == {"calls": 2, "replays": 1, "booked_at": 104.0}
+    assert _ticket_ledger(calls, {}, "lane2", "t2") == {"calls": 0, "replays": 0, "booked_at": None}
