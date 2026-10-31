@@ -2,7 +2,8 @@
 
 from types import SimpleNamespace
 
-from raccoon.show.engine import _lane2_stage, _scene_calls, _unsettled
+from raccoon.models import TicketOutcome
+from raccoon.show.engine import LANE1_STAGES, _lane2_stage, _scene_calls, _unsettled
 
 
 def test_unapproved_parked_workflow_waits_for_a_human():
@@ -10,14 +11,32 @@ def test_unapproved_parked_workflow_waits_for_a_human():
 
 
 def test_approved_parked_workflow_is_not_drawn_as_waiting():
-    stage = _lane2_stage("RUNNING", [], [], approved=True)
+    stage = _lane2_stage("RUNNING", [], [], decision=True)
     assert stage["at"] == "temporal"
     assert not stage["state"].startswith("waiting")  # the UI draws "waiting…" as the waiting-for-a-human ring
 
 
+def test_denied_parked_workflow_is_not_drawn_as_waiting_or_approved():
+    stage = _lane2_stage("RUNNING", [], [], decision=False)
+    assert stage["state"].startswith("denied")
+
+
+def test_completed_workflow_is_placed_by_its_result():
+    assert _lane2_stage("COMPLETED", [], [], outcome=TicketOutcome("b", "done", "r1"))["at"] == "done"
+    denied = _lane2_stage("COMPLETED", [], [], outcome=TicketOutcome("b", "denied", detail="policy: over the limit"))
+    assert denied == {"at": "closed", "state": "denied by the agent: policy: over the limit"}
+    assert _lane2_stage("COMPLETED", [], [], decision=False, outcome=TicketOutcome("b", "rejected"))["at"] == "closed"
+    # Until the result is read, a completed workflow is not drawn as refunded.
+    assert _lane2_stage("COMPLETED", [], [])["at"] != "done"
+
+
+def test_lane1_denials_are_closed():
+    assert LANE1_STAGES["denied"][0] == LANE1_STAGES["rejected"][0] == "closed"
+
+
 def test_started_operation_sits_with_payments():
     op = SimpleNamespace(state=3)  # PENDING_NEXUS_OPERATION_STATE_STARTED
-    assert _lane2_stage("RUNNING", [], [op], approved=True)["at"] == "payments_worker"
+    assert _lane2_stage("RUNNING", [], [op], decision=True)["at"] == "payments_worker"
 
 
 def test_scene_calls_only_sum_this_scenes_tickets():
@@ -63,3 +82,15 @@ def test_refunded_ticket_still_moving_in_its_stack_holds_the_scene_open():
     }
     assert _unsettled(PAIRS, ledger, flow) == ["b"]
     assert _unsettled(PAIRS, ledger, {"lane1": flow["lane1"], "lane2": []}) == ["b"]
+
+
+def test_tickets_closed_with_no_refund_let_the_scene_settle():
+    ledger = {"lane1": {"a": "declined"}, "lane2": {"b": "rejected"}}
+    flow = {
+        "lane1": [{"ticket": "a", "at": "closed", "state": "denied by the agent: policy: over the limit"}],
+        "lane2": [{"ticket": "b", "at": "closed", "state": "denied by a human"}],
+    }
+    assert _unsettled(PAIRS, ledger, flow) == []
+    # The ledger alone isn't enough: a denial the stack hasn't closed yet still holds the scene open.
+    flow["lane2"] = [{"ticket": "b", "at": "temporal", "state": "denied, queued in Temporal for a worker"}]
+    assert _unsettled(PAIRS, ledger, flow) == ["b"]

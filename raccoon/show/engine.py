@@ -22,7 +22,7 @@ from raccoon.lane2.client import connect
 from raccoon.lane2.contract import NEXUS_ENDPOINT, PaymentsService
 from raccoon.lane2.payments_side import RefundWorkflow, refund_workflow_id
 from raccoon.lane2.support_side import SupportTicketWorkflow, ticket_workflow_id
-from raccoon.models import ApprovalDecision, Ticket
+from raccoon.models import ApprovalDecision, Ticket, TicketOutcome
 from raccoon.show.procs import ProcessManager
 
 SETTLE_S = 20.0
@@ -103,6 +103,8 @@ class Engine:
         self.lane1_view: dict[str, int] = {}  # this scene's tickets, by the queue's own status
         self.lane1_view_all: dict[str, int] = {}  # every ticket since reset: the scoreboard compares it with the ledger
         self.lane2_view: dict[str, int] = {}
+        # How each completed Lane 2 workflow ended (done, denied or rejected), read once from its result.
+        self.lane2_outcomes: dict[str, TicketOutcome] = {}
         self.faults: dict = {}
         # What the harness wrote each ticket to be: "refund", "policy" (breaks the refund policy) or "human_no".
         self.plan: dict[str, str] = {}
@@ -530,6 +532,7 @@ class Engine:
         self.scene_tickets.clear()
         self.plan.clear()
         self.decisions.clear()
+        self.lane2_outcomes.clear()
         self.payments_calls = {}
         self.nexus_seen = {}
         self.flow = {"lane1": [], "lane2": []}
@@ -553,6 +556,8 @@ class Engine:
                 if t["ticket_id"] in ours:
                     counts[t["status"]] = counts.get(t["status"], 0) + 1
                     at, state = LANE1_STAGES.get(t["status"], ("lane1_api", t["status"]))
+                    if t["status"] == "denied" and t.get("detail"):
+                        state = f"{state}: {t['detail']}"
                     flow1.append({"ticket": t["ticket_id"], "at": at, "state": state})
             self.lane1_view = counts
             self.lane1_view_all = counts_all
@@ -583,14 +588,19 @@ class Engine:
             status = desc.status.name if desc.status else "UNKNOWN"
             states[status] = states.get(status, 0) + 1
             ops = desc.raw_description.pending_nexus_operations
-            flow2.append(
-                {
-                    "ticket": tid,
-                    **_lane2_stage(
-                        status, desc.raw_description.pending_activities, ops, self.decisions.get(tid) is True
-                    ),
-                }
+            if status == "COMPLETED" and tid not in self.lane2_outcomes:
+                # describe() can't tell a refund from a denial. The result can, and reading it needs no worker.
+                outcome = await self._outcome(client, ticket_workflow_id(tid))
+                if outcome is not None:
+                    self.lane2_outcomes[tid] = outcome
+            stage = _lane2_stage(
+                status,
+                desc.raw_description.pending_activities,
+                ops,
+                self.decisions.get(tid),
+                self.lane2_outcomes.get(tid),
             )
+            flow2.append({"ticket": tid, **stage})
             row = seen.get(tid)
             if ops:
                 op = ops[0]
@@ -641,6 +651,14 @@ class Engine:
     async def _describe(client: Client, workflow_id: str):
         try:
             return await client.get_workflow_handle(workflow_id).describe()
+        except Exception:
+            return None
+
+    @staticmethod
+    async def _outcome(client: Client, workflow_id: str) -> TicketOutcome | None:
+        try:
+            handle = client.get_workflow_handle(workflow_id, result_type=TicketOutcome)
+            return await asyncio.wait_for(handle.result(), timeout=2.0)
         except Exception:
             return None
 
@@ -711,6 +729,9 @@ LANE1_STAGES = {
     "executing": ("lane1_worker>payments", "calling payments"),
     "done": ("done", "refunded"),
     "failed": ("lane1_worker", "failed"),
+    # Closed with no refund: the ticket goes back to the helpdesk with the answer.
+    "denied": ("closed", "denied by the agent"),
+    "rejected": ("closed", "denied by a human"),
 }
 
 
@@ -718,9 +739,18 @@ LANE1_STAGES = {
 STOPPED_STATES = {"failed", "terminated", "canceled", "timed out", "continued as new"}
 
 
-def _lane2_stage(status: str, activities, ops, approved: bool = False) -> dict:
-    """Where a support workflow is, from describe() alone: a query would need a live worker."""
+def _lane2_stage(
+    status: str, activities, ops, decision: bool | None = None, outcome: TicketOutcome | None = None
+) -> dict:
+    """Where a support workflow is, from describe() and its result: a query would need a live worker.
+    `decision` is the human's (True = approve), `outcome` the completed workflow's result."""
     if status == "COMPLETED":
+        if outcome is None:
+            return {"at": "temporal", "state": "completed, reading the result"}  # for a refresh at most
+        if outcome.status == "denied":
+            return {"at": "closed", "state": f"denied by the agent: {outcome.detail}"}
+        if outcome.status == "rejected":
+            return {"at": "closed", "state": "denied by a human"}
         return {"at": "done", "state": "refunded"}
     if status != "RUNNING":
         return {"at": "support_worker", "state": status.lower().replace("_", " ")}
@@ -731,23 +761,26 @@ def _lane2_stage(status: str, activities, ops, approved: bool = False) -> dict:
         return {"at": "endpoint", "state": "Nexus operation starting"}
     if activities:
         return {"at": "support_worker", "state": "agent deciding"}
-    if approved:
+    if decision is True:
         # Approved but nothing pending: the signal is in history and the support worker is down or not yet polling.
         return {"at": "temporal", "state": "approved, queued in Temporal for a worker"}
+    if decision is False:
+        return {"at": "temporal", "state": "denied, queued in Temporal for a worker"}
     return {"at": "temporal", "state": "waiting in Temporal"}
 
 
 def _unsettled(
     pairs: list[tuple[str, str]], ledger: dict[str, dict[str, str]], flow: dict[str, list[dict]]
 ) -> list[str]:
-    """Tickets still moving. The ledger must have decided each one (refunded, or missing once the settle window has
-    passed), and the stack must have stopped: done, or a terminal status such as Lane 1's "failed"."""
+    """Tickets still moving. The ledger must have decided each one (refunded, owed nothing, or missing once the
+    settle window has passed), and the stack must have stopped: done, closed with no refund, or a terminal status
+    such as Lane 1's "failed"."""
     dots = {lane: {d["ticket"]: d for d in flow.get(lane, [])} for lane in flow}
     out = []
     for lane, tid in pairs:
         dot = dots.get(lane, {}).get(tid)
         decided = ledger.get(lane, {}).get(tid) not in (None, "in_flight", "waiting")
-        stopped = dot is not None and (dot["at"] == "done" or dot["state"] in STOPPED_STATES)
+        stopped = dot is not None and (dot["at"] in ("done", "closed") or dot["state"] in STOPPED_STATES)
         if not (decided and stopped):
             out.append(tid)
     return out
