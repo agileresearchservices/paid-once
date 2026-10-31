@@ -5,12 +5,16 @@ server 1.32.0). Start with `README.md` for setup and `docs/architecture.md` for 
 whoever changes the code next.
 
 ## Verified
-- `make test`: 12 passed (payments service, ledger, audit, Lane 1; stub model).
+- `make test`: 19 passed (payments service, ledger, audit, Lane 1, the show server's guards; stub model).
 - `make test-temporal`: 4 passed (one refund through Nexus; duplicate approval signals ignored; commit-then-timeout
   gives one refund; an approval sent while no worker is running survives). It runs on its own throwaway Temporal
   server (`scripts/test-temporal.sh`, port 7299), and passed with `make demo` running.
 - `make scenario`: runs six scenes headless against both lanes and exits non-zero if Lane 2 breaks an invariant.
   Results, SHAs and caveats: `docs/scenario-results.md`. It also passed from a fresh clone with no `.env`.
+- Two guards on the show server, after a browser left open on :8100 wrecked two scenario runs. `make scenario` locks
+  the controls (`RACCOON_SCENARIO_TOKEN`: reset, run and kill answer 423 without it, and the UI shows a "not the demo"
+  banner). A second show server, or `make scenario` with the demo up, refuses to start while :8100 is taken: a second
+  instance used to run its whole startup, boot-time reset included, before the bind failed.
 - The Vite UI (`make ui`, then `make demo`) was clicked through in Chrome. The Nexus step was checked full screen at
   1512x945 (14-inch MacBook Pro): it fits without scrolling, including mid-kill with the worker-down banner, and a
   second run of the scene shows only the new run's rows.

@@ -65,6 +65,8 @@ Two things to know:
   (`raccoon-support`, `raccoon-payments`) and one Nexus endpoint (`payments-endpoint`) on it. To keep it separate, start
   your own on another port and point at it: `temporal server start-dev --port 7299` and
   `TEMPORAL_ADDRESS=127.0.0.1:7299 make scenario`.
+- It needs port 8100, so stop `make demo` first; it refuses to start if anything is listening there. While it runs,
+  a browser on :8100 shows a "not the demo" banner, and Run and Reset are locked to the test runner.
 - The seed fixes ticket amounts and messages, not the exact timing of the kills. The reproducible claim is the Lane 2
   outcome (zero violations). Lane 1's failure counts vary a little from run to run, most in `double_delivery`.
 
