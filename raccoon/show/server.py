@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import signal
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
@@ -127,6 +129,9 @@ def main() -> None:
             f"Port {config.SHOW_PORT} is already serving (a show server or `make scenario`?). Not starting a "
             f"second one: its startup would reset the running show. See: lsof -nP -iTCP:{config.SHOW_PORT} -sTCP:LISTEN"
         )
+    # Closing the terminal sends SIGHUP, which uvicorn doesn't handle: the show died without stop_all(), and the
+    # services, each in its own session, kept their ports. Shut down as for Ctrl-C instead.
+    signal.signal(signal.SIGHUP, lambda *_: os.kill(os.getpid(), signal.SIGTERM))
     uvicorn.run(
         app,
         host="127.0.0.1",
