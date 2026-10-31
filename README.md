@@ -106,7 +106,7 @@ Run of show, about ten minutes:
   helpdesk as grey dots.
 - **Steps 3-6** (agent crash, double delivery, deploy mid-wait, payments goes quiet): the same chaos hits both
   lanes; watch the ledger-based scoreboards diverge. The payments node's slots mark each ticket in the ledger
-  (`✓` once, `×2` twice, `∅` never, `—` none owed), and each lane shows what payments saw in the scene: calls, refunds booked, and
+  (`✓` paid once, `×2` paid twice, `∅` owed, never paid, `—` denied, nothing owed), and each lane shows what payments saw in the scene: calls, refunds booked, and
   calls answered from an existing key. On step 6 that line is the evidence: Temporal's retry is answered from the
   ledger, the queue's is booked again.
 - **Step 7, Nexus**: the payments team's worker is killed mid-refund. The payments team box goes DOWN; support's

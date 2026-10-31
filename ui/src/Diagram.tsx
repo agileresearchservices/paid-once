@@ -116,7 +116,7 @@ function Ledger({ lane, label, dots, tickets }: { lane: LaneId; label: string; d
         const owedNothing = st === "rejected" || st === "declined";
         const cls = st === "ok" ? "slot ok" : st === "duplicate" || st === "unapproved" ? "slot bad" : st === "missing" ? "slot missing" : owedNothing ? "slot none" : "slot";
         const glyph = owedNothing ? OUTCOME_GLYPH.denied : st === "ok" || st === "duplicate" || st === "missing" || st === "unapproved" ? OUTCOME_GLYPH[st] : "";
-        const what = st === "ok" ? "refunded once" : st === "duplicate" ? "refunded more than once" : owedNothing ? "no refund owed, none paid" : st;
+        const what = st === "ok" ? "refunded once" : st === "duplicate" ? "refunded more than once" : owedNothing ? "denied, nothing owed" : st;
         return (
           <g key={id} className={cls}>
             <rect x={x} y={y} width={22} height={18} rx={4} />
@@ -172,13 +172,22 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
           <span className="fault-caption" role="status">{caption.msg}</span>
         ) : (
           <span className="legend">
-            <span><i className="lg active" /> where each stack thinks a ticket is</span>
-            <span><i className="lg waiting" /> waiting for a human</span>
-            <span><i className="lg paying" /> refund in flight</span>
-            <span><i className="lg failed" /> job failed</span>
-            <span><i className="lg closed" /> denied, no refund</span>
-            <span className="lg-slots">
-              ledger {OUTCOME_GLYPH.ok} once · {OUTCOME_GLYPH.duplicate} twice · {OUTCOME_GLYPH.missing} never · {OUTCOME_GLYPH.denied} none owed
+            {/* Two keys, two sources: the dots are where each stack thinks a ticket is; the boxes are what the payments
+                ledger actually paid. Each ledger key is a small copy of the real slot, so it reads as the same mark. */}
+            <span className="lg-group">
+              <b>Ticket</b>
+              <span><i className="lg active" /> in progress</span>
+              <span><i className="lg waiting" /> waiting for a human</span>
+              <span><i className="lg paying" /> refund in flight</span>
+              <span><i className="lg failed" /> job failed</span>
+              <span><i className="lg closed" /> denied</span>
+            </span>
+            <span className="lg-group">
+              <b>Ledger</b>
+              <span><i className="lg-slot ok">{OUTCOME_GLYPH.ok}</i> paid once</span>
+              <span><i className="lg-slot bad">{OUTCOME_GLYPH.duplicate}</i> paid twice</span>
+              <span><i className="lg-slot missing">{OUTCOME_GLYPH.missing}</i> owed, never paid</span>
+              <span><i className="lg-slot none">{OUTCOME_GLYPH.denied}</i> denied, nothing owed</span>
             </span>
             <span className="lg-stage">⏱ slowed on purpose, so a fault lands mid-call</span>
           </span>
