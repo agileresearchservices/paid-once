@@ -149,3 +149,35 @@ async def test_approval_before_any_worker_is_picked_up_survives():
         ):
             outcome = await asyncio.wait_for(handle.result(), 30)
         assert outcome.status == "done"
+
+
+async def test_human_rejection_ends_rejected_with_no_refund(stack):
+    support, _ = stack
+    t = new_ticket()
+    handle = await support.start_workflow(
+        SupportTicketWorkflow.run,
+        t,
+        id=ticket_workflow_id(t.ticket_id),
+        task_queue=config.SUPPORT_TASK_QUEUE,
+    )
+    await handle.signal(SupportTicketWorkflow.approve, ApprovalDecision(False))
+    outcome = await handle.result()
+    assert outcome.status == "rejected"
+    assert ledger.all_refunds("lane2") == []
+
+
+async def test_policy_denial_ends_without_a_nexus_operation(stack):
+    support, _ = stack
+    t = Ticket(f"it-{uuid.uuid4().hex[:8]}", "c", "o", 4200, "my item arrived broken", order_age_days=45)
+    handle = await support.start_workflow(
+        SupportTicketWorkflow.run,
+        t,
+        id=ticket_workflow_id(t.ticket_id),
+        task_queue=config.SUPPORT_TASK_QUEUE,
+    )
+    outcome = await handle.result()
+    assert outcome.status == "denied"
+    assert "30-day window" in outcome.detail
+    history = await handle.fetch_history()
+    assert not any(e.HasField("nexus_operation_scheduled_event_attributes") for e in history.events)
+    assert ledger.all_refunds("lane2") == []
