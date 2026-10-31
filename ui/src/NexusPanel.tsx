@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { NexusTimeline } from "./NexusTimeline";
 import { shortTicket } from "./nexusLinks";
 import { ProcTile } from "./Processes";
-import type { NexusRow, ProcStatus, SceneRun, ShowEvent, Topology } from "./types";
+import type { FaultWindow, NexusRow, ProcStatus, SceneRun, Topology } from "./types";
 
 function Ext({ href, children }: { href: string; children: ReactNode }) {
   return (
@@ -19,18 +19,20 @@ function BoundaryStrip({
   ui,
   support,
   payments,
+  temporal,
   kills,
 }: {
   t: Topology;
   ui: string | null;
   support?: ProcStatus;
   payments?: ProcStatus;
+  temporal?: ProcStatus;
   kills: Record<string, number>;
 }) {
-  const down = payments !== undefined && !payments.alive;
+  const isDown = (p?: ProcStatus) => p !== undefined && !p.alive;
   return (
     <div className="strip">
-      <div className="team">
+      <div className={isDown(support) ? "team down" : "team"}>
         <div className="team-head">
           <span className="team-name">Support team</span>
           {ui && <Ext href={`${ui}/namespaces/${t.support.namespace}/workflows`}>namespace ↗</Ext>}
@@ -43,11 +45,21 @@ function BoundaryStrip({
       <span className="strip-arrow" aria-hidden="true">
         ▶
       </span>
-      <div className="endpoint-card">
+      <div className={isDown(temporal) ? "endpoint-card down" : "endpoint-card"}>
         <span className="headline-label">
-          Team boundary
-          <br />
-          the only name in support's code
+          {isDown(temporal) ? (
+            <>
+              ⚡ Temporal server down
+              <br />
+              {kills.temporal ? "killed during this run" : " "}
+            </>
+          ) : (
+            <>
+              Team boundary
+              <br />
+              the only name in support's code
+            </>
+          )}
         </span>
         <code>{t.endpoint}</code>
         <code>
@@ -57,7 +69,7 @@ function BoundaryStrip({
       <span className="strip-arrow" aria-hidden="true">
         ▶
       </span>
-      <div className={down ? "team down" : "team"}>
+      <div className={isDown(payments) ? "team down" : "team"}>
         <div className="team-head">
           <span className="team-name">Payments team</span>
           {(kills.payments_worker ?? 0) > 0 && (
@@ -79,21 +91,31 @@ function BoundaryStrip({
 
 type Beat = { text: string };
 
-// The story in four beats, read from the snapshot. Each one lights up when what it says has happened.
-function beatsFor(rows: NexusRow[], kill: boolean, back: boolean, done: boolean): { beats: Beat[]; reached: number } {
+// The story in four beats, read from the run's fault windows and the rows. Each lights up when it has happened.
+function beatsFor(
+  rows: NexusRow[],
+  faults: FaultWindow[],
+  planned: number,
+  done: boolean,
+  verdict: string,
+): { beats: Beat[]; reached: number } {
   const n = rows.length;
-  const notAccepted = rows.some((r) => r.peak_attempt > 1);
+  const on = faults.filter((f) => f.start != null);
+  const landed = on.length;
+  const latest = on[on.length - 1];
+  const allBack = landed > 0 && faults.every((f) => f.start != null && f.end != null);
   const beats = [
     { text: `Support starts ${n || "the"} refund${n === 1 ? "" : "s"} on the endpoint` },
     {
-      text: notAccepted
-        ? "⚡ Payments worker killed: some operations weren't accepted yet, so support sees those retry"
-        : "⚡ Payments worker killed: support still sees STARTED, no error",
+      text:
+        landed === 0
+          ? `⚡ ${planned} failures while they're in flight`
+          : `⚡ Failure ${landed} of ${planned}: ${latest.effect === "stall" ? "payments goes quiet" : `${latest.label} killed`}`,
     },
-    { text: "Worker back: payments retries with the same key" },
-    { text: "Each refund paid once; support never saw the outage" },
+    { text: "Everything back up: payments retries with the same key" },
+    { text: done ? verdict : "The ledger decides: was each refund paid once?" },
   ];
-  const reached = done ? 4 : back ? 3 : kill ? 2 : n > 0 ? 1 : 0;
+  const reached = done ? 4 : allBack ? 3 : landed > 0 ? 2 : n > 0 ? 1 : 0;
   return { beats, reached };
 }
 
@@ -105,7 +127,6 @@ export function NexusPanel({
   processes,
   run,
   finished,
-  events,
   now,
   ledgerTickets,
   calls,
@@ -117,17 +138,13 @@ export function NexusPanel({
   processes: Record<string, ProcStatus>;
   run?: SceneRun;
   finished: boolean;
-  events: ShowEvent[];
   now: number;
   ledgerTickets: Record<string, string>; // the ledger's verdict per ticket (audit), every scene since reset
   calls?: { calls: number; booked: number; replays: number }; // this scene's calls to payments, counted by payments
 }) {
   const t0 = ran && run ? run.started_at : null;
-  const mine = t0 == null ? [] : events.filter((e) => e.ts >= t0 && e.proc === "payments_worker");
-  const kill = mine.some((e) => e.kind === "kill");
-  const back = kill && mine.some((e) => e.kind === "restart");
+  const faults = ran ? (run?.faults ?? []) : [];
   const allClosed = rows.length > 0 && rows.every((r) => !r.live && r.attempts.every((a) => a.outcome !== "running"));
-  const { beats, reached } = beatsFor(rows, kill, back, finished && allClosed);
 
   // This run's tickets, by the ledger (audit), never by the lane's own state.
   const scene = ran ? sceneTickets(ledgerTickets) : [];
@@ -139,6 +156,13 @@ export function NexusPanel({
   const maxStarts = Math.max(0, ...rows.map((r) => r.peak_attempt));
   const retries = rows.reduce((n, r) => n + Math.max(0, r.attempts.length - 1, (r.handler.peak_activity_attempt ?? 0) - 1), 0);
   const show = finished && allClosed;
+  const landed = faults.filter((f) => f.start != null);
+  const verdict =
+    paidTwice || missing || errors
+      ? `⚠ ${[paidTwice && `${paidTwice} paid twice`, missing && `${missing} never paid`, errors && `support saw ${errors} error${errors === 1 ? "" : "s"}`].filter(Boolean).join(", ")}`
+      : "Each refund paid once; support's code saw no errors";
+  const planned = processes.temporal ? 4 : 3; // the Temporal kill needs a server the show started itself
+  const { beats, reached } = beatsFor(rows, faults, planned, show, verdict);
 
   return (
     <section className="nexus" aria-label="Nexus">
@@ -147,6 +171,7 @@ export function NexusPanel({
         ui={temporalUi}
         support={processes.support_worker}
         payments={processes.payments_worker}
+        temporal={processes.temporal}
         kills={ran && run ? run.kills : {}}
       />
       <p className="without">
@@ -164,12 +189,13 @@ export function NexusPanel({
         </ol>
       ) : (
         <p className="beats-pre">
-          Press Run: 7 tickets, the approved ones go to payments over Nexus, then the payments worker is killed.
+          Press Run: 7 tickets, the approved ones go to payments over Nexus. Then, while they're in flight, payments
+          goes quiet and the support worker, the payments worker and the Temporal server itself are killed.
         </p>
       )}
 
       <div className="timeline-wrap">
-        <NexusTimeline rows={rows} t0={t0} now={now} events={events} temporalUi={temporalUi} />
+        <NexusTimeline rows={rows} t0={t0} now={now} faults={faults} temporalUi={temporalUi} />
         <div className="timeline-notes">
           <span>
             {denied.length > 0
@@ -184,6 +210,16 @@ export function NexusPanel({
       </div>
 
       <div className="headline payoff">
+        <div>
+          <span className="headline-label">Failures</span>
+          {show ? (
+            <>
+              <b>{landed.length}</b> <span className="muted">· each with {Math.min(...landed.map((f) => f.hit))}+ refunds in flight</span>
+            </>
+          ) : (
+            <b className="muted">…</b>
+          )}
+        </div>
         <div>
           <span className="headline-label">Support's code saw</span>
           {show ? (

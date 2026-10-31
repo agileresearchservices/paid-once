@@ -1,72 +1,68 @@
 import { OUTCOME_GLYPH } from "./outcomes";
-import type { NexusRow, RefundAttempt, ShowEvent } from "./types";
+import type { FaultWindow, NexusRow, RefundAttempt } from "./types";
 import { shortTicket, workflowLink } from "./nexusLinks";
 
 // The Nexus scene over time. x = seconds since the scene started, on an axis fixed at 0-30 s (it only grows if a
 // run takes longer), so bars grow into it with the clock and nothing rescales. Each approved ticket gets two
 // tracks: what support's code sees (the caller's Nexus operation) and what payments does about it (the refund
-// activity's attempts, with the moment the ledger booked the money).
+// activity's attempts, with the moment the ledger booked the money). Above them, one row per failure the scene
+// injects, in the order they land, each washing faintly down through the tickets it hit.
 
 const W = 1400; // viewBox width; the SVG scales to the panel
 const LABEL = 172; // left column: ticket number and the two track labels
 const RIGHT = 12;
-const TOP = 44; // the outage label, then the axis ticks
+const FAULT_ROW = 17;
+const TICKS = 22;
 const TRACK = 18;
 const TRACK_GAP = 5;
 const ROW_GAP = 13;
 const ROW = TRACK * 2 + TRACK_GAP + ROW_GAP;
 const MIN_ROWS = 5; // the scene approves five: reserve their height so the page doesn't jump when they arrive
 const CHAR = 7.4; // rough width of one 13px character, to decide whether a label fits inside its bar
+const MIN_SPAN = 30; // seconds on the axis before it ever grows
+
+// The gauntlet, in order. Shown muted before the run, so the audience sees what's coming; each fills as it lands.
+const PLANNED: { key: string; label: string }[] = [
+  { key: "payments", label: "payments quiet" },
+  { key: "support_worker", label: "support worker" },
+  { key: "payments_worker", label: "payments worker" },
+  { key: "temporal", label: "Temporal server" },
+];
 
 type Props = {
   rows: NexusRow[];
   t0: number | null; // when the scene started, or null before it ever ran
   now: number;
-  events: ShowEvent[];
+  faults: FaultWindow[];
   temporalUi: string | null;
 };
 
-export function NexusTimeline({ rows, t0, now, events, temporalUi }: Props) {
+export function NexusTimeline({ rows, t0, now, faults, temporalUi }: Props) {
   const start = t0 ?? now;
   const t = (ts: number) => ts - start;
   const ends = rows.flatMap((r) => [r.op_closed_at ?? now, ...r.attempts.map((a) => a.ended_at ?? now)]);
   const latest = Math.max(0, ...ends.map(t));
-  const span = Math.max(30, Math.ceil(latest / 5) * 5);
+  const faultEnds = faults.map((f) => (f.end != null ? Math.min(f.end, now) : now)).map(t);
+  const span = Math.max(MIN_SPAN, Math.ceil(Math.max(latest, ...faultEnds) / 5) * 5);
   const x = (ts: number) => LABEL + (Math.max(0, Math.min(span, t(ts))) / span) * (W - LABEL - RIGHT);
+  const TOP = PLANNED.length * FAULT_ROW + TICKS;
   const H = TOP + Math.max(MIN_ROWS, rows.length) * ROW;
-
-  // The outage: from the payments worker's kill to its restart in this run (or to now while it is still down).
-  const mine = t0 == null ? [] : events.filter((e) => e.ts >= t0 && e.proc === "payments_worker");
-  const kill = mine.find((e) => e.kind === "kill");
-  const back = kill && mine.find((e) => e.kind === "restart" && e.ts >= kill.ts);
-  const downTo = back ? back.ts : now;
+  const byKey = new Map(faults.map((f) => [f.key, f]));
 
   return (
     <svg className="timeline" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Nexus operations over time">
-      <defs>
-        <pattern id="outage-hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-          <rect width="8" height="8" className="hatch-bg" />
-          <line x1="0" y1="0" x2="0" y2="8" className="hatch-line" />
-        </pattern>
-      </defs>
-
       {Array.from({ length: span / 5 + 1 }, (_, i) => i * 5).map((s) => (
         <g key={s} className="tick">
           <line x1={x(start + s)} x2={x(start + s)} y1={TOP - 6} y2={H} />
-          <text x={x(start + s)} y={TOP - 10} textAnchor="middle">
+          <text x={x(start + s)} y={TOP - 9} textAnchor="middle">
             {s}s
           </text>
         </g>
       ))}
 
-      {kill && (
-        <g className="outage">
-          <rect x={x(kill.ts)} y={TOP - 24} width={Math.max(2, x(downTo) - x(kill.ts))} height={H - TOP + 24} />
-          <text x={x(kill.ts)} y={TOP - 28} textAnchor="start">
-            ⚡ payments worker down{back ? ` · ${Math.round(back.ts - kill.ts)} s` : ""}
-          </text>
-        </g>
-      )}
+      {PLANNED.map((p, i) => (
+        <FaultRow key={p.key} label={p.label} f={byKey.get(p.key)} y={i * FAULT_ROW} washTo={H} top={TOP} x={x} now={now} />
+      ))}
 
       {rows.length === 0 && (
         <text className="empty" x={LABEL + 12} y={TOP + ROW}>
@@ -78,6 +74,47 @@ export function NexusTimeline({ rows, t0, now, events, temporalUi }: Props) {
         <Ticket key={r.ticket} r={r} y={TOP + 8 + i * ROW} x={x} now={now} ui={temporalUi} />
       ))}
     </svg>
+  );
+}
+
+// One failure: its label on the left, a solid bar for how long it lasted, and a faint wash down through the tickets.
+function FaultRow({
+  label,
+  f,
+  y,
+  top,
+  washTo,
+  x,
+  now,
+}: {
+  label: string;
+  f?: FaultWindow;
+  y: number;
+  top: number;
+  washTo: number;
+  x: (ts: number) => number;
+  now: number;
+}) {
+  const live = f != null && f.start != null;
+  const x0 = live ? x(f.start!) : 0;
+  const x1 = live ? x(f.end != null ? Math.min(f.end, now) : now) : 0;
+  const secs = live ? Math.max(0, Math.round((f.end != null ? Math.min(f.end, now) : now) - f.start!)) : 0;
+  const what = f?.effect === "stall" ? `replies held · ${f.hit} booked` : `down${f?.end != null ? ` ${secs} s` : ""} · ${f?.hit ?? 0} in flight`;
+  return (
+    <g className={live ? "fault on" : "fault"}>
+      <text className="fault-label" x={8} y={y + FAULT_ROW - 5}>
+        ⚡ {label}
+      </text>
+      {live && (
+        <>
+          <rect className="fault-wash" x={x0} y={top - 6} width={Math.max(2, x1 - x0)} height={washTo - top + 6} />
+          <rect className="fault-bar" x={x0} y={y + 2} width={Math.max(2, x1 - x0)} height={FAULT_ROW - 4} rx={3} />
+          <text className="fault-text" x={x1 + 6} y={y + FAULT_ROW - 5}>
+            {what}
+          </text>
+        </>
+      )}
+    </g>
   );
 }
 
@@ -178,11 +215,14 @@ function PaymentsTrack({ r, y, x, now }: { r: NexusRow; y: number; x: (ts: numbe
       {atts.map((a) => {
         const x0 = x(a.started_at);
         const x1 = x(a.ended_at ?? now);
+        const secs = Math.round((a.ended_at ?? now) - a.started_at);
+        // The failure text can be long (or Temporal's "Failure exceeds size limit."), so the bar says how long the
+        // attempt lasted and the full text is on hover.
         const text =
           a.outcome === "failed"
-            ? `✕ attempt ${a.n} ${timedOut(a) ? `timed out (${Math.round((a.ended_at ?? now) - a.started_at)} s)` : `failed: ${a.failure || "error"}`}`
+            ? `✕ attempt ${a.n} ${timedOut(a) ? `timed out (${secs} s)` : `failed after ${secs} s`}`
             : a.outcome === "ok"
-              ? `${OUTCOME_GLYPH.ok} attempt ${a.n}${replayed(a) ? " · answered from the ledger, not paid again" : ""}`
+              ? `${OUTCOME_GLYPH.ok} attempt ${a.n}${replayed(a) ? " · answered from the ledger" : ""}`
               : `attempt ${a.n}…`;
         // Keep the label clear of the $ marker when the booking falls inside this attempt.
         const bx = booked != null ? x(booked) : null;
@@ -190,7 +230,17 @@ function PaymentsTrack({ r, y, x, now }: { r: NexusRow; y: number; x: (ts: numbe
         return (
           <g key={a.n}>
             <rect className={`seg ${a.outcome}`} x={x0} y={y} width={Math.max(2, x1 - x0)} height={TRACK} rx={4} />
-            <FittedLabel from={from} x1={x1} y={y} text={text} cls={a.outcome} after={a.outcome === "ok"} />
+            <FittedLabel
+              from={from}
+              x0={x0}
+              x1={x1}
+              y={y}
+              text={text}
+              cls={a.outcome}
+              after={a.outcome === "ok"}
+              short={a.outcome === "failed" ? `✕ ${a.n}` : undefined}
+              hover={a.failure ? `attempt ${a.n}: ${a.failure}` : undefined}
+            />
           </g>
         );
       })}
@@ -215,10 +265,55 @@ function PaymentsTrack({ r, y, x, now }: { r: NexusRow; y: number; x: (ts: numbe
 const timedOut = (a: RefundAttempt) => /StartToClose|timeout/i.test(a.failure);
 
 // A label inside its bar (from `from`) if it fits, otherwise just after the bar's end. `after` always puts it after.
-function FittedLabel({ from, x1, y, text, cls, after }: { from: number; x1: number; y: number; text: string; cls: string; after?: boolean }) {
-  const fits = !after && x1 - from > text.length * CHAR + 4;
+// If an "after" label would run off the right edge, it sits before the bar instead, ending where the bar starts.
+// With `short`, a label that doesn't fit stays inside its bar in the short form (a failed attempt is followed by the
+// next attempt, so text after the bar would run under it); the full text is on hover.
+function FittedLabel({
+  from,
+  x0,
+  x1,
+  y,
+  text,
+  cls,
+  after,
+  short,
+  hover,
+}: {
+  from: number;
+  x0: number;
+  x1: number;
+  y: number;
+  text: string;
+  cls: string;
+  after?: boolean;
+  short?: string;
+  hover?: string;
+}) {
+  const room = x1 - from - 4;
+  const fits = !after && room > text.length * CHAR;
+  const tip = <title>{hover ? `${text} · ${hover}` : text}</title>;
+  if (!fits && short !== undefined) {
+    return room > short.length * CHAR ? (
+      <text className={`seg-text ${cls} inside`} x={from} y={y + TRACK - 4}>
+        {tip}
+        {short}
+      </text>
+    ) : (
+      <rect className="hit" x={x0} y={y} width={Math.max(2, x1 - x0)} height={TRACK}>
+        {tip}
+      </rect>
+    );
+  }
+  const width = text.length * CHAR;
+  const offRight = !fits && x1 + 6 + width > W - RIGHT;
   return (
-    <text className={`seg-text ${cls} ${fits ? "inside" : "outside"}`} x={fits ? from : x1 + 6} y={y + TRACK - 4}>
+    <text
+      className={`seg-text ${cls} ${fits ? "inside" : "outside"}`}
+      x={fits ? from : offRight ? x0 - 6 : x1 + 6}
+      textAnchor={offRight ? "end" : "start"}
+      y={y + TRACK - 4}
+    >
+      {tip}
       {text}
     </text>
   );

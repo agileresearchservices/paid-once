@@ -185,7 +185,6 @@ export function App() {
           processes={snap.processes}
           run={run}
           finished={finished}
-          events={snap.events}
           now={snap.now}
           ledgerTickets={snap.audit.lane2.tickets ?? {}}
           calls={onScreen ? snap.payments_calls?.lane2 : undefined}

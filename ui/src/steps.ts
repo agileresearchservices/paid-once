@@ -80,12 +80,12 @@ export const STEPS: Step[] = [
     id: "nexus_kill",
     scene: "nexus_kill",
     short: "Nexus",
-    title: "Nexus: the payments worker dies mid-refund",
+    title: "Nexus: four failures mid-refund",
     story:
-      "Support asks payments for each approved refund through one Nexus operation. Payments runs it in its own namespace. Mid-call, we kill the payments worker for 10 seconds.",
-    watch: "Each ticket's top track is all support sees. The bottom track is what payments does about it.",
+      "Support asks payments for each approved refund through one Nexus operation. While they're in flight, payments goes quiet after booking, then we kill the support worker, the payments worker and the Temporal server itself.",
+    watch: "Each ticket's top track is all support sees. The bottom track is what payments does about it. The red rows are the failures.",
     result:
-      "Once payments accepts an operation, support sees STARTED and no error while payments retries, for up to the 10-minute schedule-to-close timeout. Payments' retries reuse the ticket's key, so a refund already booked is answered from the ledger, not paid again.",
+      "Once payments accepts an operation, support sees STARTED and no error while payments retries, for up to the 10-minute schedule-to-close timeout. Every retry reuses the ticket's key, so a refund already booked is answered from the ledger, not paid again. The Temporal server came back from its database with every workflow where it left off.",
     nexus: true,
   },
   {

@@ -254,7 +254,8 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 /* Boundary strip: support → endpoint → payments, left to right like the architecture diagram. */
 .strip { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto minmax(0, 1.15fr); align-items: stretch; gap: 10px; }
 .strip .team { display: grid; gap: 4px; align-content: start; border: 1px solid var(--axis); border-radius: 10px; padding: 8px 14px; background: var(--page); font-size: 15px; transition: background 0.8s, border-color 0.8s; }
-.strip .team.down { border-color: var(--critical); background: var(--critical-wash); }
+.strip .team.down, .endpoint-card.down { border-color: var(--critical); background: var(--critical-wash); }
+.endpoint-card.down .headline-label { color: var(--critical-ink); }
 .strip .team .tile { justify-self: start; padding: 2px 10px; font-size: 14px; white-space: nowrap; }
 .strip .team .tile .tile-state, .strip .team .tile .tile-kills { font-size: 13px; }
 .team-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
@@ -279,10 +280,12 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .timeline { width: 100%; height: auto; display: block; font-size: 13px; }
 .timeline .tick line { stroke: var(--grid); }
 .timeline .tick text { fill: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
-.timeline .outage rect { fill: url(#outage-hatch); stroke: var(--critical); stroke-opacity: 0.6; transition: width 0.7s linear; }
-.timeline .outage text { fill: var(--critical-ink); font-size: 12px; font-weight: 700; }
-.timeline .hatch-bg { fill: var(--critical-wash); fill-opacity: 0.55; }
-.timeline .hatch-line { stroke: var(--critical); stroke-width: 2; stroke-opacity: 0.35; }
+.timeline rect.hit { fill: transparent; }
+.timeline .fault-label { fill: var(--muted); font-size: 12px; }
+.timeline .fault.on .fault-label { fill: var(--critical-ink); font-weight: 700; }
+.timeline .fault-bar { fill: var(--critical); transition: width 0.7s linear; }
+.timeline .fault-wash { fill: var(--critical); fill-opacity: 0.07; transition: width 0.7s linear; }
+.timeline .fault-text { fill: var(--critical-ink); font-size: 12px; }
 .timeline .empty { fill: var(--muted); font-size: 14px; }
 .timeline .tnum { fill: var(--ink); font-size: 15px; font-weight: 700; }
 .timeline .track-label { fill: var(--muted); font-size: 12px; }
@@ -310,7 +313,7 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .key-dollar { display: inline-block; width: 16px; height: 16px; border-radius: 50%; background: var(--good); color: var(--page); font-style: normal; font-weight: 800; font-size: 12px; text-align: center; line-height: 16px; }
 
 .headline { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.headline.payoff { grid-template-columns: auto auto 1fr; }
+.headline.payoff { grid-template-columns: auto auto auto 1fr; }
 .headline > div { background: var(--page); border: 1px solid var(--axis); border-radius: 10px; padding: 6px 14px; font-size: 15px; }
 .headline b { font-size: 24px; font-variant-numeric: tabular-nums; }
 .headline b.n-good { color: var(--good-ink); }

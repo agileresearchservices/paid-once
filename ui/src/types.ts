@@ -109,6 +109,17 @@ export interface SceneRun {
   finished_at: number | null;
   ok: boolean | null;
   kills: Record<string, number>; // kill -9s during this run, by process
+  faults?: FaultWindow[]; // the failures this run injected, each with its window (the Nexus gauntlet records these)
+}
+
+// One injected failure: when it started and ended (null while it lasts), and how many refunds were in flight.
+export interface FaultWindow {
+  key: string; // process name, or "payments" for the payments service's stall
+  label: string;
+  effect: "kill" | "stall";
+  start: number | null; // a stall's start is known once the first stalled refund is booked
+  end: number | null;
+  hit: number;
 }
 
 export interface Snapshot {
