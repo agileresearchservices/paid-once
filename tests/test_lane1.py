@@ -59,6 +59,20 @@ def test_policy_denies_an_old_order_sent_through_the_api(payments):
     assert ledger.all_refunds("lane1") == []
 
 
+def test_human_reject_closes_the_ticket_for_good(payments):
+    submit()
+    assert store.reject("t1") == "not_ready"  # nothing to reject before the agent proposes
+    worker = Worker()
+    drain(worker)
+    assert store.reject("t1") == "accepted"
+    assert store.reject("t1") == "already"
+    assert store.approve("t1") == "not_ready"
+    store.redeliver(5)  # redelivery touches execute jobs only, and a rejection queues none
+    drain(worker)
+    assert store.get_ticket("t1")["status"] == "rejected"
+    assert ledger.all_refunds("lane1") == []
+
+
 def test_approve_before_proposal_is_not_ready(payments):
     submit()
     assert store.approve("t1") == "not_ready"

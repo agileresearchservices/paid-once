@@ -15,7 +15,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 import httpx
-from temporalio.client import Client
+from temporalio.client import Client, WorkflowExecutionStatus
 
 from raccoon import audit, config
 from raccoon.lane2.client import connect
@@ -104,8 +104,11 @@ class Engine:
         self.lane1_view_all: dict[str, int] = {}  # every ticket since reset: the scoreboard compares it with the ledger
         self.lane2_view: dict[str, int] = {}
         self.faults: dict = {}
-        # Tickets the approver bot has approved, so a parked workflow isn't drawn as waiting for a human.
-        self.approved: set[str] = set()
+        # What the harness wrote each ticket to be: "refund", "policy" (breaks the refund policy) or "human_no".
+        self.plan: dict[str, str] = {}
+        # The approver bot's decision per ticket (True = approve), so a parked workflow isn't drawn as waiting for
+        # a human.
+        self.decisions: dict[str, bool] = {}
         # This scene's calls to payments per lane, from payments' own counter: calls, booked, replays.
         self.payments_calls: dict[str, dict[str, int]] = {}
         # Where each stack thinks each of this scene's tickets is, for the architecture diagram.
@@ -150,8 +153,9 @@ class Engine:
         tid = f"{self.run_id}-{scene}-r{self.run_no}-{i:02d}-{lane}"
         return Ticket(tid, f"cust-{i:02d}", f"ord-{self.run_id}-r{self.run_no}-{i:02d}", amount, message, age)
 
-    async def submit_ticket(self, lane: str, scene: str, ticket: Ticket) -> None:
-        audit.record_ticket(lane, ticket.ticket_id, scene, ticket.amount_cents)
+    async def submit_ticket(self, lane: str, scene: str, ticket: Ticket, expect: str = "refund") -> None:
+        audit.record_ticket(lane, ticket.ticket_id, scene, ticket.amount_cents, expect)
+        self.plan[ticket.ticket_id] = expect
         self.scene_tickets.setdefault(scene, []).append((lane, ticket.ticket_id))
         if lane == "lane1":
             body = {
@@ -179,30 +183,39 @@ class Engine:
                 task_queue=config.SUPPORT_TASK_QUEUE,
             )
 
-    async def submit_cohort(self, scene: str, n: int, lanes=("lane1", "lane2")) -> list[tuple[int, int, str]]:
-        specs = [(i, self.rng.randrange(1500, 9500, 100), self.rng.choice(MESSAGES)) for i in range(n)]
+    async def submit_cohort(self, scene: str, n: int, lanes=("lane1", "lane2")) -> None:
+        """n refunds the human will approve, then two the money must never reach: one that breaks the refund
+        policy (over the limit, or past the return window, alternating by scene run) and one a human denies."""
+        specs = [(i, self.rng.randrange(1500, 9500, 100), self.rng.choice(MESSAGES), 3, "refund") for i in range(n)]
+        if self.run_no % 2:
+            specs.append((n, self.rng.randrange(24000, 60000, 100), self.rng.choice(MESSAGES), 3, "policy"))
+        else:
+            specs.append((n, self.rng.randrange(1500, 9500, 100), self.rng.choice(MESSAGES), 45, "policy"))
+        specs.append((n + 1, self.rng.randrange(1500, 9500, 100), self.rng.choice(MESSAGES), 3, "human_no"))
         jobs = []
         for lane in lanes:
-            for i, amount, msg in specs:
-                jobs.append(self.submit_ticket(lane, scene, self._make_ticket(scene, i, lane, amount, msg)))
+            for i, amount, msg, age, expect in specs:
+                ticket = self._make_ticket(scene, i, lane, amount, msg, age)
+                jobs.append(self.submit_ticket(lane, scene, ticket, expect))
         await asyncio.gather(*jobs)
         self.emit(
             "submit",
-            f"{n} refund tickets submitted to {' and '.join(LANE_NAMES[lane] for lane in lanes)}",
+            f"{len(specs)} support tickets asking for refunds submitted to "
+            f"{' and '.join(LANE_NAMES[lane] for lane in lanes)}",
             scene=scene,
         )
-        return specs
 
-    async def approve_ticket(self, lane: str, ticket_id: str) -> None:
-        """A human clicks Approve. The decision is recorded the moment it is made, delivered or not."""
-        audit.record_decision(lane, ticket_id, approved=True, delivered=False)
-        self.approved.add(ticket_id)
+    async def decide_ticket(self, lane: str, ticket_id: str, approved: bool) -> None:
+        """A human clicks Approve or Deny. The decision is recorded the moment it is made, delivered or not."""
+        audit.record_decision(lane, ticket_id, approved, delivered=False)
+        self.decisions[ticket_id] = approved
         if lane == "lane1":
+            action = "approve" if approved else "reject"
             for _ in range(80):
                 try:
-                    r = await self.http.post(f"{config.LANE1_URL}/tickets/{ticket_id}/approve")
+                    r = await self.http.post(f"{config.LANE1_URL}/tickets/{ticket_id}/{action}")
                     if r.status_code == 200:
-                        audit.record_decision(lane, ticket_id, approved=True, delivered=True)
+                        audit.record_decision(lane, ticket_id, approved, delivered=True)
                         return
                 except httpx.HTTPError:
                     pass
@@ -212,22 +225,34 @@ class Engine:
                 try:
                     client = await self.temporal()
                     handle = client.get_workflow_handle(ticket_workflow_id(ticket_id))
-                    await handle.signal(SupportTicketWorkflow.approve, ApprovalDecision(True))
-                    audit.record_decision(lane, ticket_id, approved=True, delivered=True)
+                    await handle.signal(SupportTicketWorkflow.approve, ApprovalDecision(approved))
+                    audit.record_decision(lane, ticket_id, approved, delivered=True)
                     return
                 except Exception:
                     await asyncio.sleep(0.5)
 
-    async def approve_scene(self, scene: str, stagger: float = 0.05) -> None:
-        pairs = list(self.scene_tickets.get(scene, []))
+    async def approve_scene(self, scene: str, who: str = "A human", then: str = "", stagger: float = 0.05) -> None:
+        """The human reviews the agent's proposals: approves the refunds, denies one. Policy tickets never reach
+        the human; the agent's policy check already closed them."""
+        pairs = [(lane, tid) for lane, tid in self.scene_tickets.get(scene, []) if self.plan[tid] != "policy"]
+        one_lane = [tid for lane, tid in self.scene_tickets.get(scene, []) if lane == pairs[0][0]] if pairs else []
+        yes = sum(self.plan[tid] == "refund" for tid in one_lane)
+        no = sum(self.plan[tid] == "human_no" for tid in one_lane)
+        closed = sum(self.plan[tid] == "policy" for tid in one_lane)
+        self.emit(
+            "human",
+            f"{who} reviews {yes + no} proposals: approves {yes}, denies {no}{then}. "
+            f"The agent's policy check closed {closed} before review.",
+            scene=scene,
+        )
         tasks = []
         for lane, tid in pairs:
-            tasks.append(asyncio.create_task(self.approve_ticket(lane, tid)))
+            tasks.append(asyncio.create_task(self.decide_ticket(lane, tid, self.plan[tid] == "refund")))
             await asyncio.sleep(stagger)
         await asyncio.gather(*tasks)
 
     async def wait_for_proposals(self, scene: str, timeout: float = 45.0) -> None:
-        """Wait until every ticket in the scene has an agent proposal waiting for a human."""
+        """Wait until the agent has handled every ticket in the scene: a proposal waiting for a human, or denied."""
         end = time.time() + timeout
         pairs = list(self.scene_tickets.get(scene, []))
         while time.time() < end:
@@ -240,15 +265,17 @@ class Engine:
             client = await self.temporal()
             for lane, tid in pairs:
                 if lane == "lane1":
-                    ready += l1.get(tid) == "awaiting_approval"
+                    ready += l1.get(tid) in ("awaiting_approval", "denied")
                 else:
+                    handle = client.get_workflow_handle(ticket_workflow_id(tid))
                     try:
-                        st = await client.get_workflow_handle(ticket_workflow_id(tid)).query(
-                            SupportTicketWorkflow.status
-                        )
-                        ready += st["state"] == "awaiting_approval"
+                        st = await handle.query(SupportTicketWorkflow.status)
+                        ready += st["state"] in ("awaiting_approval", "denied")
                     except Exception:
-                        pass
+                        try:  # a denied workflow has completed; describe() needs no worker
+                            ready += (await handle.describe()).status == WorkflowExecutionStatus.COMPLETED
+                        except Exception:
+                            pass
             if ready >= len(pairs):
                 return
             await asyncio.sleep(0.5)
@@ -284,14 +311,16 @@ class Engine:
             pass
 
     async def replay_approvals_lane2(self, scene: str, times: int = 3) -> None:
+        """Redeliver the human's decision signals. Each replay repeats the decision the human made: replaying an
+        approval onto a denied ticket would be a forged message, not a duplicate one."""
         client = await self.temporal()
         for lane, tid in self.scene_tickets.get(scene, []):
-            if lane != "lane2":
+            if lane != "lane2" or tid not in self.decisions:
                 continue
             handle = client.get_workflow_handle(ticket_workflow_id(tid))
             for _ in range(times):
                 try:
-                    await handle.signal(SupportTicketWorkflow.approve, ApprovalDecision(True))
+                    await handle.signal(SupportTicketWorkflow.approve, ApprovalDecision(self.decisions[tid]))
                 except Exception:
                     pass
 
@@ -299,13 +328,12 @@ class Engine:
     async def scene_intro(self) -> None:
         self.emit(
             "scene",
-            "Happy path: both stacks handle 5 refunds with nothing going wrong",
+            "Happy path: both stacks handle 7 tickets with nothing going wrong",
             scene="intro",
         )
         await self.submit_cohort("intro", 5)
         await self.wait_for_proposals("intro")
-        self.emit("human", "A human approves all 5 in both stacks", scene="intro")
-        await self.approve_scene("intro")
+        await self.approve_scene("intro", then=" in both stacks")
 
     async def scene_tip_over(self) -> None:
         self.emit(
@@ -316,7 +344,6 @@ class Engine:
         await self.set_fault("all", "commit_then_stall", count=6, delay_s=9.0)
         await self.submit_cohort("tip_over", 6)
         await self.wait_for_proposals("tip_over")
-        self.emit("human", "A human approves all 6", scene="tip_over")
         await self.approve_scene("tip_over")
         await asyncio.sleep(1.6)
         self.fault("tip_over", "Fault: kill -9 on both agent workers", AGENT_WORKERS, "kill")
@@ -330,7 +357,6 @@ class Engine:
         await self.set_fault("all", "none", latency_s=2.5)
         await self.submit_cohort("double_delivery", 5)
         await self.wait_for_proposals("double_delivery")
-        self.emit("human", "A human approves all 5", scene="double_delivery")
         await self.approve_scene("double_delivery")
         await asyncio.sleep(1.0)
         self.fault(
@@ -358,8 +384,7 @@ class Engine:
         self.procs.kill("lane1_worker", restart_after=3.0)
         self.procs.kill("support_worker", restart_after=3.0)
         await asyncio.sleep(6)
-        self.emit("human", "The human finally clicks Approve on all 5", scene="deploy_wait")
-        await self.approve_scene("deploy_wait")
+        await self.approve_scene("deploy_wait", who="After the deploy, the human")
         await asyncio.sleep(10)
 
     async def scene_payments_timeout(self) -> None:
@@ -371,7 +396,6 @@ class Engine:
         await self.set_fault("all", "commit_then_stall", count=5, delay_s=9.0)
         await self.submit_cohort("payments_timeout", 5)
         await self.wait_for_proposals("payments_timeout")
-        self.emit("human", "A human approves all 5", scene="payments_timeout")
         await self.approve_scene("payments_timeout")
         self.fault("payments_timeout", "Fault: payments holds its response after the commit", ["payments"], "stall")
         await asyncio.sleep(20)
@@ -386,12 +410,7 @@ class Engine:
         await self.set_fault("lane2", "none", latency_s=2.0)
         await self.submit_cohort("nexus_kill", 5, lanes=("lane2",))
         await self.wait_for_proposals("nexus_kill")
-        self.emit(
-            "human",
-            "A human approves all 5; each becomes a Nexus operation to payments",
-            scene="nexus_kill",
-        )
-        await self.approve_scene("nexus_kill")
+        await self.approve_scene("nexus_kill", then="; each approval becomes a Nexus operation to payments")
         await asyncio.sleep(1.2)
         self.fault(
             "nexus_kill",
@@ -509,7 +528,8 @@ class Engine:
         self.run_id = uuid.uuid4().hex[:4]
         self.rng = random.Random(self.seed)
         self.scene_tickets.clear()
-        self.approved.clear()
+        self.plan.clear()
+        self.decisions.clear()
         self.payments_calls = {}
         self.nexus_seen = {}
         self.flow = {"lane1": [], "lane2": []}
@@ -566,7 +586,9 @@ class Engine:
             flow2.append(
                 {
                     "ticket": tid,
-                    **_lane2_stage(status, desc.raw_description.pending_activities, ops, tid in self.approved),
+                    **_lane2_stage(
+                        status, desc.raw_description.pending_activities, ops, self.decisions.get(tid) is True
+                    ),
                 }
             )
             row = seen.get(tid)

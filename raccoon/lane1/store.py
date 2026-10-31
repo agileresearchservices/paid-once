@@ -136,6 +136,29 @@ def approve(ticket_id: str) -> str:
     return "accepted"
 
 
+def reject(ticket_id: str) -> str:
+    """Human denial. Closes the row at the API: no job is queued, so nothing can re-drive it.
+    Returns accepted | not_ready | unknown | already | approved."""
+    init()
+    with connect(config.LANE1_DB) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute("SELECT status FROM tickets WHERE ticket_id = ?", (ticket_id,)).fetchone()
+        if row is None:
+            conn.execute("COMMIT")
+            return "unknown"
+        if row["status"] != "awaiting_approval":
+            conn.execute("COMMIT")
+            if row["status"] == "rejected":
+                return "already"
+            return "approved" if row["status"] in ("approved", "executing", "done") else "not_ready"
+        conn.execute(
+            "UPDATE tickets SET status = 'rejected', detail = 'denied by a human', updated_at = ? WHERE ticket_id = ?",
+            (time.time(), ticket_id),
+        )
+        conn.execute("COMMIT")
+    return "accepted"
+
+
 def claim_job() -> dict | None:
     """Claim the next visible job and hide it for the visibility timeout."""
     init()

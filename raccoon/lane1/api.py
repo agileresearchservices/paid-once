@@ -67,6 +67,18 @@ def approve(ticket_id: str) -> dict:
     return {"result": result}
 
 
+@app.post("/tickets/{ticket_id}/reject")
+def reject(ticket_id: str) -> dict:
+    result = store.reject(ticket_id)
+    if result == "unknown":
+        raise HTTPException(404, "unknown ticket")
+    if result == "not_ready":
+        raise HTTPException(409, "no proposal to reject yet")
+    if result == "approved":
+        raise HTTPException(409, "already approved")
+    return {"result": result}
+
+
 @app.post("/admin/redeliver")
 def redeliver(body: RedeliverBody) -> dict:
     return {"redelivered": store.redeliver(body.n)}
