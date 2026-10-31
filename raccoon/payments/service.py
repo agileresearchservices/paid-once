@@ -24,6 +24,10 @@ def _clear() -> dict:
 
 FAULT: dict = _clear()
 
+# Every call per lane and ticket, and how many the ledger answered from an existing key. Observation only, for the
+# dashboard: it shows a retry arriving, and whether payments recognised it as the same refund.
+CALLS: dict[str, dict[str, dict[str, int]]] = {}
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -64,6 +68,9 @@ async def create_refund(
     if fault and fault["latency_s"] > 0:
         await asyncio.sleep(fault["latency_s"])
     stored = await asyncio.to_thread(ledger.record_refund, body.ticket_id, body.amount_cents, idempotency_key, x_lane)
+    seen = CALLS.setdefault(x_lane, {}).setdefault(body.ticket_id, {"calls": 0, "replays": 0})
+    seen["calls"] += 1
+    seen["replays"] += stored["replayed"]
     if fault and fault["mode"] == "commit_then_stall" and fault["remaining"] > 0 and not stored["replayed"]:
         fault["remaining"] -= 1
         # The refund is committed above. The client gives up long before this returns.
@@ -94,8 +101,14 @@ def set_fault(body: FaultBody) -> dict:
     return FAULT
 
 
+@app.get("/admin/calls")
+def get_calls() -> dict:
+    return CALLS
+
+
 @app.post("/admin/reset")
 def reset() -> dict:
     ledger.reset()
     FAULT.update(_clear())
+    CALLS.clear()
     return {"ok": True}
