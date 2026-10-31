@@ -26,6 +26,9 @@ from raccoon.models import ApprovalDecision, Ticket
 from raccoon.show.procs import ProcessManager
 
 SETTLE_S = 20.0
+# A scene stays "running" after its script until every ticket has landed, so Run again never appears mid-flight.
+SCENE_SETTLE_MAX_S = 45.0
+SCENE_QUIET_S = 3.0
 
 # How the show names each lane on screen; the code, ledger and ticket IDs keep lane1/lane2.
 LANE_NAMES = {"lane1": "the job queue", "lane2": "Temporal + Nexus"}
@@ -435,6 +438,26 @@ class Engine:
         self.fault(scene, "Fault: kill -9 on the payments worker", ["payments_worker"], "kill")
         self.procs.kill("payments_worker", 6.0)
 
+    async def settle(self, scene_id: str) -> None:
+        """Hold the scene open until each ticket has landed: the ledger has decided it and its stack has stopped
+        moving it. Settled must hold for SCENE_QUIET_S, so a redelivered job still in the queue gets its chance."""
+        pairs = [
+            p for key, ps in self.scene_tickets.items() if key == scene_id or key.startswith(f"{scene_id}_") for p in ps
+        ]
+        end = time.time() + SCENE_SETTLE_MAX_S
+        quiet_since: float | None = None
+        while time.time() < end:
+            board = await asyncio.to_thread(audit.compute_all, SETTLE_S)
+            ledger = {lane: board[lane]["tickets"] for lane in board}
+            if _unsettled(pairs, ledger, self.flow):
+                quiet_since = None
+            elif quiet_since is None:
+                quiet_since = time.time()
+            elif time.time() - quiet_since >= SCENE_QUIET_S:
+                return
+            await asyncio.sleep(0.5)
+        self.emit("note", f"some tickets were still moving {SCENE_SETTLE_MAX_S:.0f}s after the scene", scene=scene_id)
+
     # -- scene runner -----------------------------------------------------------------
     async def run_scene(self, scene_id: str) -> bool:
         if self.running:
@@ -456,6 +479,7 @@ class Engine:
             ok = True
             try:
                 await fn()
+                await self.settle(scene_id)
             except Exception as exc:
                 ok = False
                 self.emit("error", f"scene {scene_id} failed: {exc!r}", scene=scene_id)
@@ -667,6 +691,10 @@ LANE1_STAGES = {
 }
 
 
+# Where a stack leaves a ticket it has given up on: Lane 1's job status, or a closed Lane 2 workflow (_lane2_stage).
+STOPPED_STATES = {"failed", "terminated", "canceled", "timed out", "continued as new"}
+
+
 def _lane2_stage(status: str, activities, ops, approved: bool = False) -> dict:
     """Where a support workflow is, from describe() alone: a query would need a live worker."""
     if status == "COMPLETED":
@@ -684,6 +712,22 @@ def _lane2_stage(status: str, activities, ops, approved: bool = False) -> dict:
         # Approved but nothing pending: the signal is in history and the support worker is down or not yet polling.
         return {"at": "temporal", "state": "approved, queued in Temporal for a worker"}
     return {"at": "temporal", "state": "waiting in Temporal"}
+
+
+def _unsettled(
+    pairs: list[tuple[str, str]], ledger: dict[str, dict[str, str]], flow: dict[str, list[dict]]
+) -> list[str]:
+    """Tickets still moving. The ledger must have decided each one (refunded, or missing once the settle window has
+    passed), and the stack must have stopped: done, or a terminal status such as Lane 1's "failed"."""
+    dots = {lane: {d["ticket"]: d for d in flow.get(lane, [])} for lane in flow}
+    out = []
+    for lane, tid in pairs:
+        dot = dots.get(lane, {}).get(tid)
+        decided = ledger.get(lane, {}).get(tid) not in (None, "in_flight", "waiting")
+        stopped = dot is not None and (dot["at"] == "done" or dot["state"] in STOPPED_STATES)
+        if not (decided and stopped):
+            out.append(tid)
+    return out
 
 
 def _scene_calls(calls: dict, pairs: list[tuple[str, str]]) -> dict[str, dict[str, int]]:

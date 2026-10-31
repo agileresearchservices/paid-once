@@ -20,7 +20,6 @@ import time
 
 import httpx
 
-from raccoon.show.engine import SETTLE_S
 from raccoon.show.procs import port_open
 
 PORT = 8100
@@ -92,10 +91,12 @@ def main(scenes, check):
                 peak_handler, peak_caller = max(peak_handler, h), max(peak_caller, c)
                 if not snap["running"]:
                     break
-            # let the settle window elapse so "missing" is decided
-            time.sleep(SETTLE_S + 1)
+            # The engine holds a scene open until every ticket has landed, so nothing may still be in flight here.
             snap = httpx.get(f"{BASE}/api/state", timeout=5).json()
             print(f"== {scene} ({time.time() - t0:.0f}s incl. settle)")
+            for lane in ("lane1", "lane2"):
+                if snap["audit"][lane]["in_flight"]:
+                    failures.append(f"{scene}: {lane} still in flight when the scene ended")
             for lane in ("lane1", "lane2"):
                 print(line(lane, snap["audit"][lane], prev[lane]))
                 prev[lane] = {k: snap["audit"][lane][k] for k in FIELDS}
