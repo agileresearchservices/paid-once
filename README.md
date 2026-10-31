@@ -34,7 +34,8 @@ Out of scope, so do not read results as claims about them:
 - Scale, load, latency and cost. Local processes model crash and retry semantics, not distributed-system scale.
 - Temporal Cloud features (the Nexus caller allowlist, the account-wide registry) and self-hosted authorizers. The
   dev server shows none of them.
-- Nexus cancellation and endpoint retargeting. They are documented capabilities that this repository does not build.
+- Nexus cancellation, and retargeting an endpoint while operations are in flight. They are documented capabilities
+  that this repository does not build. Setup only points an existing `payments-endpoint` at the current namespace.
 - The quality of the agent's decisions, and live routing of a real ticket stream between the lanes.
 - A third, hardened Lane 1. What hardening would fix is argued in the write-up and measured for one change only
   (see "Reproduce" below).

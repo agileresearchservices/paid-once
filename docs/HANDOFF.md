@@ -5,7 +5,8 @@ server 1.32.0). Start with `README.md` for setup and `docs/architecture.md` for 
 whoever changes the code next.
 
 ## Verified
-- `make test`: 19 passed (payments service, ledger, audit, Lane 1, the show server's guards; stub model).
+- `make test`: 27 passed (payments service and its call counts, ledger, audit, Lane 1, the show server's guards, the
+  engine's scene views and scene settling; stub model).
 - `make test-temporal`: 4 passed (one refund through Nexus; duplicate approval signals ignored; commit-then-timeout
   gives one refund; an approval sent while no worker is running survives). It runs on its own throwaway Temporal
   server (`scripts/test-temporal.sh`, port 7299), and passed with `make demo` running.
