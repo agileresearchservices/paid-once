@@ -52,7 +52,7 @@ async def lifespan(_: FastAPI):
         procs.stop_all()
 
 
-app = FastAPI(title="refund-raccoon", lifespan=lifespan)
+app = FastAPI(title="Paid Once", lifespan=lifespan)
 
 
 @app.get("/api/state")

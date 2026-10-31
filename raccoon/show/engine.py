@@ -1,6 +1,6 @@
-"""The show engine: submits tickets to both lanes, plays the human approver, and unleashes the raccoon.
+"""The show engine: submits tickets to both lanes, plays the human approver, and injects the faults.
 
-Every scene runs the same story against Lane 1 and Lane 2 at the same time, so the audience watches
+Every scene runs the same story against Lane 1 (job queue) and Lane 2 (Temporal + Nexus) at the same time, so the audience watches
 two systems take identical hits. Scoring comes from the payments ledger (raccoon.audit), never from
 what either lane reports about itself.
 """
@@ -27,6 +27,9 @@ from raccoon.show.procs import ProcessManager
 
 SETTLE_S = 20.0
 
+# How the show names each lane on screen; the code, ledger and ticket IDs keep lane1/lane2.
+LANE_NAMES = {"lane1": "the job queue", "lane2": "Temporal + Nexus"}
+
 MESSAGES = [
     "The mug arrived in pieces. Please refund me.",
     "I was charged twice for the same order, please refund the duplicate.",
@@ -45,7 +48,7 @@ class SceneInfo:
 
 SCENES = [
     SceneInfo("intro", "Happy path"),
-    SceneInfo("tip_over", "The raccoon tips over the agent"),
+    SceneInfo("tip_over", "The agent workers crash"),
     SceneInfo("double_delivery", "Double-delivered mail"),
     SceneInfo("deploy_wait", "Deploy during the approval wait"),
     SceneInfo("payments_timeout", "Payments commits, then goes quiet"),
@@ -84,7 +87,7 @@ class Engine:
         self.running = False
         self.scene_tickets: dict[str, list[tuple[str, str]]] = {}
         self.run_no = 0  # bumped per scene run, so a re-run never reuses ticket or workflow IDs
-        self.scene_runs: dict[str, dict] = {}  # last run of each scene: started_at, finished_at, ok
+        self.scene_runs: dict[str, dict] = {}  # last run of each scene: started_at, finished_at, ok, kills
         self._temporal: Client | None = None
         self._payments_temporal: Client | None = None
         self._http: httpx.AsyncClient | None = None
@@ -104,6 +107,10 @@ class Engine:
         del self.events[:-200]
 
     def emit_from_procs(self, kind: str, msg: str, **extra) -> None:
+        # Kills count against the scene that made them, so a step never shows kills from an earlier scene.
+        if kind == "kill" and self.running and self.current in self.scene_runs:
+            kills = self.scene_runs[self.current]["kills"]
+            kills[extra["proc"]] = kills.get(extra["proc"], 0) + 1
         self.emit(kind, msg, **extra)
 
     @property
@@ -164,7 +171,7 @@ class Engine:
         await asyncio.gather(*jobs)
         self.emit(
             "submit",
-            f"{n} refund tickets submitted to {' and '.join(lanes)}",
+            f"{n} refund tickets submitted to {' and '.join(LANE_NAMES[lane] for lane in lanes)}",
             scene=scene,
         )
         return specs
@@ -274,18 +281,18 @@ class Engine:
     async def scene_intro(self) -> None:
         self.emit(
             "scene",
-            "Happy path: both lanes handle 5 refunds with nothing going wrong",
+            "Happy path: both stacks handle 5 refunds with nothing going wrong",
             scene="intro",
         )
         await self.submit_cohort("intro", 5)
         await self.wait_for_proposals("intro")
-        self.emit("human", "A human approves all 5 in both lanes", scene="intro")
+        self.emit("human", "A human approves all 5 in both stacks", scene="intro")
         await self.approve_scene("intro")
 
     async def scene_tip_over(self) -> None:
         self.emit(
             "scene",
-            "The raccoon will kill the agent workers right after payments commits",
+            "The agent workers will be killed right after payments commits",
             scene="tip_over",
         )
         await self.set_fault("all", "commit_then_stall", count=6, delay_s=9.0)
@@ -295,8 +302,8 @@ class Engine:
         await self.approve_scene("tip_over")
         await asyncio.sleep(1.6)
         self.emit(
-            "raccoon",
-            "🦝 Raccoon tips over both agent workers (kill -9)",
+            "fault",
+            "Fault: kill -9 on both agent workers",
             scene="tip_over",
         )
         self.procs.kill("lane1_worker", restart_after=3.0)
@@ -313,8 +320,8 @@ class Engine:
         await self.approve_scene("double_delivery")
         await asyncio.sleep(1.0)
         self.emit(
-            "raccoon",
-            "🦝 Raccoon double-delivers the mail (Lane 1: queue redelivery, Lane 2: replayed approval signals)",
+            "fault",
+            "Fault: the same work is delivered twice (queue: redelivery, Temporal: replayed approval signals)",
             scene="double_delivery",
         )
         await self.redeliver_lane1(5)
@@ -331,8 +338,8 @@ class Engine:
         await self.submit_cohort("deploy_wait", 5)
         await self.wait_for_proposals("deploy_wait")
         self.emit(
-            "raccoon",
-            "🦝 Raccoon restarts both agent workers while approvals are pending",
+            "fault",
+            "Fault: both agent workers restart while approvals are pending",
             scene="deploy_wait",
         )
         self.procs.kill("lane1_worker", restart_after=3.0)
@@ -354,8 +361,8 @@ class Engine:
         self.emit("human", "A human approves all 5", scene="payments_timeout")
         await self.approve_scene("payments_timeout")
         self.emit(
-            "raccoon",
-            "🦝 Raccoon holds the payments response after the commit",
+            "fault",
+            "Fault: payments holds its response after the commit",
             scene="payments_timeout",
         )
         await asyncio.sleep(20)
@@ -364,7 +371,7 @@ class Engine:
     async def scene_nexus_kill(self) -> None:
         self.emit(
             "scene",
-            "Lane 2 only: the payments team's worker dies in the middle of Nexus operations",
+            "Temporal only: the payments team's worker dies in the middle of Nexus operations",
             scene="nexus_kill",
         )
         await self.set_fault("lane2", "none", latency_s=2.0)
@@ -378,8 +385,8 @@ class Engine:
         await self.approve_scene("nexus_kill")
         await asyncio.sleep(1.2)
         self.emit(
-            "raccoon",
-            "🦝 Raccoon kills the payments team's worker for 10 seconds: the support side keeps waiting, the retries happen inside payments",
+            "fault",
+            "Fault: the payments team's worker is down for 10 seconds; support keeps waiting, the retries happen inside payments",
             scene="nexus_kill",
         )
         self.procs.kill("payments_worker", restart_after=10.0)
@@ -387,7 +394,7 @@ class Engine:
         await self.clear_faults()
 
     async def scene_free_roam(self) -> None:
-        self.emit("scene", "Free roam: the raccoon picks its own victims", scene="free_roam")
+        self.emit("scene", "Free roam: faults picked at random", scene="free_roam")
         actions: list[Callable[[str], Awaitable[None]]] = [
             self._roam_kill_agents,
             self._roam_stall,
@@ -405,21 +412,21 @@ class Engine:
         await self.clear_faults()
 
     async def _roam_kill_agents(self, scene: str) -> None:
-        self.emit("raccoon", "🦝 Raccoon: kill -9 on the agent workers", scene=scene)
+        self.emit("fault", "Fault: kill -9 on the agent workers", scene=scene)
         self.procs.kill("lane1_worker", 3.0)
         self.procs.kill("support_worker", 3.0)
 
     async def _roam_stall(self, scene: str) -> None:
-        self.emit("raccoon", "🦝 Raccoon: payments goes quiet after committing", scene=scene)
+        self.emit("fault", "Fault: payments goes quiet after committing", scene=scene)
         await self.set_fault("all", "commit_then_stall", count=3, delay_s=8.0)
 
     async def _roam_redeliver(self, scene: str) -> None:
-        self.emit("raccoon", "🦝 Raccoon: double-delivers the mail", scene=scene)
+        self.emit("fault", "Fault: the same work is delivered twice", scene=scene)
         await self.redeliver_lane1(3)
         await self.replay_approvals_lane2(scene, 2)
 
     async def _roam_kill_payments_worker(self, scene: str) -> None:
-        self.emit("raccoon", "🦝 Raccoon: kills the payments worker", scene=scene)
+        self.emit("fault", "Fault: kill -9 on the payments worker", scene=scene)
         self.procs.kill("payments_worker", 6.0)
 
     # -- scene runner -----------------------------------------------------------------
@@ -436,7 +443,7 @@ class Engine:
             del self.scene_tickets[key]
         self.nexus_seen = {}  # a new dict, so a refresh still in flight writes to the old one
         title = next((s.title for s in SCENES if s.id == scene_id), scene_id)
-        run = {"started_at": time.time(), "finished_at": None, "ok": None}
+        run = {"started_at": time.time(), "finished_at": None, "ok": None, "kills": {}}
         self.scene_runs[scene_id] = run
 
         async def go() -> None:

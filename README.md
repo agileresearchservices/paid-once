@@ -1,4 +1,6 @@
-# refund-raccoon
+# Paid Once: refunds over Nexus
+
+The repository and Python package keep their working name, `refund-raccoon` / `raccoon`.
 
 A small, runnable test of one migration assumption: **moving an agent's refund-approval process onto Temporal,
 with Nexus to the payments team, keeps every approved refund exactly-once and loses no ticket under worker
@@ -7,12 +9,12 @@ agent logic or the payments service.**
 
 Two copies of the same refund agent run the same tickets under the same chaos:
 
-- **Lane 1** is the stack a competent team ships today: a job queue with a visibility timeout, a LangGraph agent
+- **Lane 1** ("Job queue" on screen) is the stack a competent team ships today: a job queue with a visibility timeout, a LangGraph agent
   with the default in-memory checkpointer, and a plain HTTP call to payments.
-- **Lane 2** is the same agent logic on Temporal, with the refund exposed to the payments team as a Nexus operation
+- **Lane 2** ("Temporal + Nexus" on screen) is the same agent logic on Temporal, with the refund exposed to the payments team as a Nexus operation
   across two namespaces.
 
-A "refund raccoon" kills things. An independent audit then scores both lanes **from the payments ledger**, never
+A fault injector kills things. An independent audit then scores both lanes **from the payments ledger**, never
 from a lane's own records.
 
 Architecture and diagrams: [`docs/architecture.md`](docs/architecture.md).
@@ -96,7 +98,7 @@ Run of show, about ten minutes:
 - **Step 1, Meet the system**: both lanes refund five tickets cleanly.
 - **Steps 2-5** (agent tipped over, double delivery, deploy mid-wait, payments goes quiet): the same chaos hits both
   lanes; watch the ledger-based scoreboards diverge.
-- **Step 6, Nexus**: the raccoon kills the payments team's worker mid-refund. Support's side stays `STARTED` with no
+- **Step 6, Nexus**: the payments team's worker is killed mid-refund. Support's side stays `STARTED` with no
   failure while payments retries. Click a row's `history ↗` links to show both sides in the Temporal Web UI
   (http://127.0.0.1:8233), including the caller's Nexus Links tab.
 - **Step 7, Scoreboard**: the totals.

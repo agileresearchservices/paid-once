@@ -26,32 +26,32 @@ export const STEPS: Step[] = [
   {
     id: "tip_over",
     scene: "tip_over",
-    short: "Agent tipped over",
-    title: "The raccoon tips over the agent",
+    short: "Agent crash",
+    title: "The agent workers crash",
     story:
-      "Payments saves each refund but answers slowly. Mid-call, the raccoon kills the agent workers (kill -9). Each lane has to pick up where it left off.",
+      "Payments saves each refund but answers slowly. Mid-call, the agent workers are killed (kill -9). Each lane has to pick up where it left off.",
     watch: "How each lane re-drives the refund, and what the ledger records.",
     result:
-      "Lane 1 lost its in-memory state and retried with a fresh idempotency key: duplicates and lost tickets. Lane 2's restarted worker replayed from history and retried with a key derived from the ticket.",
+      "The queue lost its in-memory state and retried with a fresh idempotency key: duplicates and lost tickets. Temporal's restarted worker replayed from history and retried with a key derived from the ticket.",
   },
   {
     id: "double_delivery",
     scene: "double_delivery",
     short: "Double delivery",
     title: "The same message arrives twice",
-    story: "The raccoon replays the same work: Lane 1's queue redelivers its jobs, and Lane 2 receives the approval signal a second time.",
+    story: "The same work is delivered twice: the queue redelivers its jobs, and Temporal receives the approval signal a second time.",
     watch: "The duplicate count, and dollars refunded twice.",
-    result: "Lane 1 refunded some tickets twice. Lane 2 counted the second approval and did not act on it again.",
+    result: "The queue refunded some tickets twice. Temporal counted the second approval and did not act on it again.",
   },
   {
     id: "deploy_wait",
     scene: "deploy_wait",
     short: "Deploy mid-wait",
     title: "A deploy lands during the approval wait",
-    story: "Approvals can take days, so a deploy will land while tickets wait. The raccoon restarts both lanes' workers mid-wait.",
+    story: "Approvals can take days, so a deploy will land while tickets wait. Both lanes' workers restart mid-wait.",
     watch: "Tickets a human approved: do they still get refunded?",
     result:
-      "Lane 1 kept its place in memory and lost it: approved, never refunded. Lane 2's workflows were waiting in Temporal the whole time.",
+      "The queue kept its place in memory and lost it: approved, never refunded. Temporal's workflows were waiting in Temporal the whole time.",
   },
   {
     id: "payments_timeout",
@@ -61,7 +61,7 @@ export const STEPS: Step[] = [
     story: "Payments saves the refund, then the response never arrives and the caller times out. Both lanes retry.",
     watch: "Which retries the ledger recognises as the same refund.",
     result:
-      "Temporal retries at least once. The retry is safe because the ledger dedupes on a key derived from the ticket; Lane 1's fresh key per attempt pays twice.",
+      "Temporal retries at least once. The retry is safe because the ledger dedupes on a key derived from the ticket; the queue's fresh key per attempt pays twice.",
   },
   {
     id: "nexus_kill",
@@ -69,7 +69,7 @@ export const STEPS: Step[] = [
     short: "Nexus",
     title: "Nexus: kill the payments worker mid-refund",
     story:
-      "Support calls one operation on the payments team's endpoint. The raccoon kills the payments worker while refunds are in progress.",
+      "Support calls one operation on the payments team's endpoint. The payments worker is killed while refunds are in progress.",
     watch: "The caller's view on the left, the payments namespace on the right. Where does the failure show up?",
     result:
       "Once payments accepts the operation, the caller shows STARTED while payments retries, for up to the 10-minute schedule-to-close timeout. A retry after the ledger commit gets the stored result back.",
@@ -81,7 +81,7 @@ export const STEPS: Step[] = [
     short: "Scoreboard",
     title: "The scoreboard",
     story:
-      "Everything is scored from the payments ledger, not from either lane's own records. It counts refunds per ticket and compares them with approvals.",
+      "Everything is scored from the payments ledger, not from either stack's own records. It counts refunds per ticket and compares them with approvals.",
     watch:
       "Three invariants: every approved ticket refunded exactly once, no refund without an approval, no ticket lost or stuck.",
   },

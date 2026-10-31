@@ -42,6 +42,13 @@ whoever changes the code next.
   handler's in `raccoon-payments`.
 - **The UI is a stepper** for a laptop browser, full screen (`#1`..`#7` in the URL, arrow keys, 1-7, R runs the
   scene). Nothing is built for tablet or phone.
+- **On screen the demo is "Paid Once: refunds over Nexus"**, and faults are labelled plainly ("Fault: kill -9 on both
+  agent workers", event kind `fault`). The lanes are "Job queue" and "Temporal + Nexus" on screen (`LANE_NAMES` in the
+  engine, `LANES` in `ui/src/App.tsx`); code, docs, the ledger and ticket IDs still say lane1/lane2. The repo, the `raccoon` package, `RACCOON_*` settings and the `raccoon-*`
+  namespaces keep the working name; renaming them buys nothing on screen.
+- **Kill badges count the scene on screen.** The engine records kills per scene run (`scene_runs[...]["kills"]`), so a
+  step never shows kills from an earlier scene and Reset clears them. Before a lane has a ticket its invariants read
+  "Not tested yet", not "Holds".
 - **Temporal look, local only.** Palette and fonts (Inter, Noto Sans Mono, bundled) follow temporal.io. The wordmark and
   favicon go in `ui/public/brand/`, which is gitignored because they are trademarks; without them the header shows
   text.

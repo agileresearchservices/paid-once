@@ -33,7 +33,6 @@ class Proc:
     popen: subprocess.Popen | None = None
     restart_at: float | None = None
     starts: int = 0
-    kills: int = 0
     external: bool = False  # not ours to start or kill (e.g. a Temporal server already running)
     started_at: float = 0.0
     log: list[str] = field(default_factory=list)
@@ -45,8 +44,8 @@ class ProcessManager:
         py = sys.executable
         self.procs: dict[str, Proc] = {
             "payments": Proc("payments", "Payments service", [py, "-m", "raccoon.payments"]),
-            "lane1_api": Proc("lane1_api", "Lane 1 API", [py, "-m", "raccoon.lane1.api"]),
-            "lane1_worker": Proc("lane1_worker", "Lane 1 worker", [py, "-m", "raccoon.lane1.worker"]),
+            "lane1_api": Proc("lane1_api", "Queue API", [py, "-m", "raccoon.lane1.api"]),
+            "lane1_worker": Proc("lane1_worker", "Queue worker", [py, "-m", "raccoon.lane1.worker"]),
             "support_worker": Proc(
                 "support_worker",
                 "Support team worker",
@@ -136,7 +135,6 @@ class ProcessManager:
             os.killpg(p.popen.pid, signal.SIGKILL)
         except ProcessLookupError:
             return False
-        p.kills += 1
         p.restart_at = time.time() + restart_after
         self.emit("kill", f"kill -9 {p.label}", proc=name)
         return True
@@ -162,7 +160,6 @@ class ProcessManager:
                 "label": p.label,
                 "alive": alive,
                 "starts": p.starts,
-                "kills": p.kills,
             }
         return out
 

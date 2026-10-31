@@ -7,8 +7,8 @@ import { Ticker } from "./Ticker";
 import { post, useSnapshot } from "./useSnapshot";
 
 const LANES = [
-  { id: "lane1" as const, name: "Lane 1", subtitle: "Today: job queue, polling loop, plain HTTP", procs: ["lane1_api", "lane1_worker"] },
-  { id: "lane2" as const, name: "Lane 2", subtitle: "Temporal · support calls payments over Nexus", procs: ["support_worker", "payments_worker"] },
+  { id: "lane1" as const, name: "Job queue", subtitle: "What most teams run today: queue, polling worker, in-memory agent state, HTTP to payments", procs: ["lane1_api", "lane1_worker"] },
+  { id: "lane2" as const, name: "Temporal + Nexus", subtitle: "Durable workflow; support calls payments over Nexus", procs: ["support_worker", "payments_worker"] },
 ];
 
 function Chips({ counts, empty }: { counts: Record<string, number>; empty: string }) {
@@ -106,13 +106,13 @@ export function App() {
   if (finished && run?.ok === false) status = { text: "Scene failed: see the ticker", cls: "fail" };
   else if (finished && settling) status = { text: "Done, settling…", cls: "muted" };
   else if (finished) status = { text: "Done ✓", cls: "ok" };
-  const recentRaccoon = [...snap.events].reverse().find((e) => e.kind === "raccoon" && snap.now - e.ts < 6);
+  const recentFault = [...snap.events].reverse().find((e) => e.kind === "fault" && snap.now - e.ts < 6);
 
   return (
     <main>
       <header>
         <h1>
-          <Wordmark /> 🦝 refund-raccoon
+          <Wordmark /> Paid Once <span className="tagline">Refunds over Nexus</span>
         </h1>
         <nav aria-label="Steps">
           {STEPS.map((s, i) => (
@@ -149,7 +149,7 @@ export function App() {
         </div>
       </section>
 
-      {recentRaccoon && <div className="raccoon-banner" role="status">{recentRaccoon.msg}</div>}
+      {recentFault && <div className="fault-banner" role="status">⚡ {recentFault.msg}</div>}
 
       {step.nexus && (
         <NexusPanel
@@ -163,16 +163,16 @@ export function App() {
       <PaymentsStrip proc={snap.processes.payments} faults={snap.faults} />
 
       {step.nexus ? (
-        // The Nexus scene only runs Lane 2, so the lanes shrink to one strip and the panel keeps the screen.
+        // The Nexus scene only runs the Temporal lane, so the lanes shrink to one strip and the panel keeps the screen.
         <div className="lanes compact">
           <article className="lane lane-off">
-            <h2>Lane 1</h2>
+            <h2>Job queue</h2>
             <span className="muted">not part of this scene</span>
           </article>
           <article className="lane lane2">
-            <h2>Lane 2</h2>
+            <h2>Temporal + Nexus</h2>
             <div className="tiles">
-              {LANES[1].procs.map((p) => snap.processes[p] && <ProcTile key={p} p={snap.processes[p]} />)}
+              {LANES[1].procs.map((p) => snap.processes[p] && <ProcTile key={p} p={snap.processes[p]} kills={run?.kills?.[p]} />)}
             </div>
             <div className="believes">
               <span className="muted">Workflows:</span> <Chips counts={snap.lane2_view} empty="nothing yet" />
@@ -186,7 +186,7 @@ export function App() {
               <h2>{l.name}</h2>
               <p className="muted">{l.subtitle}</p>
               <div className="tiles">
-                {l.procs.map((p) => snap.processes[p] && <ProcTile key={p} p={snap.processes[p]} />)}
+                {l.procs.map((p) => snap.processes[p] && <ProcTile key={p} p={snap.processes[p]} kills={run?.kills?.[p]} />)}
               </div>
               <div className="believes">
                 <span className="muted">{l.id === "lane1" ? "Its own job table:" : "Temporal workflow status (this scene):"}</span>{" "}
