@@ -38,7 +38,7 @@ def test_audit_scores_each_invariant():
     for tid in ("ok", "dup", "gone", "late", "waiting", "rogue"):
         audit.record_ticket("lane1", tid, "s", 1000)
     for tid in ("ok", "dup", "gone", "late"):
-        audit.record_approval("lane1", tid, delivered=True)
+        audit.record_decision("lane1", tid, approved=True, delivered=True)
     ledger.record_refund("ok", 1000, "a", "lane1")
     ledger.record_refund("dup", 1000, "b", "lane1")
     ledger.record_refund("dup", 1000, "c", "lane1")
@@ -56,6 +56,34 @@ def test_audit_scores_each_invariant():
     assert settled["missing"] == 2 and settled["in_flight"] == 0
     assert settled["violations"] == 4  # dup + 2 missing + rogue
     assert settled["tickets"]["waiting"] == "waiting"
+
+
+def test_audit_scores_tickets_owed_nothing():
+    """A human's no and a policy ticket are owed nothing: no refund is correct, any refund is unapproved."""
+    audit.record_ticket("lane1", "no", "s", 1000, expect="human_no")
+    audit.record_ticket("lane1", "no-paid", "s", 1000, expect="human_no")
+    audit.record_ticket("lane1", "policy", "s", 30000, expect="policy")
+    audit.record_ticket("lane1", "policy-paid", "s", 30000, expect="policy")
+    audit.record_ticket("lane1", "yes", "s", 1000)
+    audit.record_decision("lane1", "no", approved=False, delivered=True)
+    audit.record_decision("lane1", "no-paid", approved=False, delivered=True)
+    audit.record_decision("lane1", "yes", approved=True, delivered=True)
+    audit.record_decision("lane1", "yes", approved=False, delivered=True)  # the first decision stands
+    ledger.record_refund("no-paid", 1000, "a", "lane1")
+    ledger.record_refund("policy-paid", 30000, "b", "lane1")
+    ledger.record_refund("yes", 1000, "c", "lane1")
+
+    score = audit.compute("lane1")
+    assert score["tickets"] == {
+        "no": "rejected",
+        "no-paid": "unapproved",
+        "policy": "declined",
+        "policy-paid": "unapproved",
+        "yes": "ok",
+    }
+    assert score["approved"] == 1  # approvals only, not every decision
+    assert (score["rejected"], score["declined"], score["waiting"]) == (1, 1, 0)
+    assert score["unapproved"] == 2 and score["violations"] == 2
 
 
 def test_commit_then_stall_still_commits():

@@ -195,14 +195,14 @@ class Engine:
 
     async def approve_ticket(self, lane: str, ticket_id: str) -> None:
         """A human clicks Approve. The decision is recorded the moment it is made, delivered or not."""
-        audit.record_approval(lane, ticket_id, delivered=False)
+        audit.record_decision(lane, ticket_id, approved=True, delivered=False)
         self.approved.add(ticket_id)
         if lane == "lane1":
             for _ in range(80):
                 try:
                     r = await self.http.post(f"{config.LANE1_URL}/tickets/{ticket_id}/approve")
                     if r.status_code == 200:
-                        audit.record_approval(lane, ticket_id, delivered=True)
+                        audit.record_decision(lane, ticket_id, approved=True, delivered=True)
                         return
                 except httpx.HTTPError:
                     pass
@@ -213,7 +213,7 @@ class Engine:
                     client = await self.temporal()
                     handle = client.get_workflow_handle(ticket_workflow_id(ticket_id))
                     await handle.signal(SupportTicketWorkflow.approve, ApprovalDecision(True))
-                    audit.record_approval(lane, ticket_id, delivered=True)
+                    audit.record_decision(lane, ticket_id, approved=True, delivered=True)
                     return
                 except Exception:
                     await asyncio.sleep(0.5)
