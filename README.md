@@ -62,7 +62,7 @@ the model's wording, so the stub does not change the result.
 
 Two things to know:
 - If a Temporal server is already running on that address, the show **reuses it** and creates two namespaces
-  (`raccoon-support`, `raccoon-payments`) and one Nexus endpoint (`payments-endpoint`) on it. To keep it separate, start
+  (`support`, `payments`) and one Nexus endpoint (`payments-endpoint`) on it. To keep it separate, start
   your own on another port and point at it: `temporal server start-dev --port 7299` and
   `TEMPORAL_ADDRESS=127.0.0.1:7299 make scenario`.
 - It needs port 8100, so stop `make demo` first; it refuses to start if anything is listening there. While it runs,

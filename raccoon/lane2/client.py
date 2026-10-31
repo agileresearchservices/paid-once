@@ -7,7 +7,11 @@ import time
 
 from google.protobuf.duration_pb2 import Duration
 from temporalio.api.nexus.v1 import EndpointSpec, EndpointTarget
-from temporalio.api.operatorservice.v1 import CreateNexusEndpointRequest
+from temporalio.api.operatorservice.v1 import (
+    CreateNexusEndpointRequest,
+    ListNexusEndpointsRequest,
+    UpdateNexusEndpointRequest,
+)
 from temporalio.api.workflowservice.v1 import (
     DescribeNamespaceRequest,
     RegisterNamespaceRequest,
@@ -53,27 +57,29 @@ async def _ensure_setup() -> list[str]:
                 raise
             lines.append(f"namespace {ns}: already there")
         await _wait_usable(client, ns)
+    target = f"{config.PAYMENTS_NAMESPACE}/{config.PAYMENTS_TASK_QUEUE}"
+    spec = EndpointSpec(
+        name=NEXUS_ENDPOINT,
+        target=EndpointTarget(
+            worker=EndpointTarget.Worker(namespace=config.PAYMENTS_NAMESPACE, task_queue=config.PAYMENTS_TASK_QUEUE)
+        ),
+    )
     try:
-        await client.operator_service.create_nexus_endpoint(
-            CreateNexusEndpointRequest(
-                spec=EndpointSpec(
-                    name=NEXUS_ENDPOINT,
-                    target=EndpointTarget(
-                        worker=EndpointTarget.Worker(
-                            namespace=config.PAYMENTS_NAMESPACE,
-                            task_queue=config.PAYMENTS_TASK_QUEUE,
-                        )
-                    ),
-                )
-            )
-        )
-        lines.append(
-            f"nexus endpoint {NEXUS_ENDPOINT}: created -> {config.PAYMENTS_NAMESPACE}/{config.PAYMENTS_TASK_QUEUE}"
-        )
+        await client.operator_service.create_nexus_endpoint(CreateNexusEndpointRequest(spec=spec))
+        lines.append(f"nexus endpoint {NEXUS_ENDPOINT}: created -> {target}")
     except RPCError as e:
         if e.status != RPCStatusCode.ALREADY_EXISTS:
             raise
-        lines.append(f"nexus endpoint {NEXUS_ENDPOINT}: already there")
+        # An endpoint left by an older setup may point at a namespace that has since been renamed: retarget it.
+        found = await client.operator_service.list_nexus_endpoints(ListNexusEndpointsRequest(name=NEXUS_ENDPOINT))
+        current = found.endpoints[0]
+        if current.spec.target == spec.target:
+            lines.append(f"nexus endpoint {NEXUS_ENDPOINT}: already there")
+        else:
+            await client.operator_service.update_nexus_endpoint(
+                UpdateNexusEndpointRequest(id=current.id, version=current.version, spec=spec)
+            )
+            lines.append(f"nexus endpoint {NEXUS_ENDPOINT}: retargeted -> {target}")
     return lines
 
 

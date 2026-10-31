@@ -37,12 +37,12 @@ What makes it realistic, and what makes it fail:
 ```mermaid
 flowchart TB
     Approver([Human approver]) -->|"signal approve"| SupportWF
-    subgraph SupportNS["Namespace raccoon-support / task queue support-agent"]
+    subgraph SupportNS["Namespace support / task queue support-agent"]
         SupportWF["SupportTicketWorkflow, id ticket-{ticket_id}<br/>activity run_agent: LangGraph decide graph + Anthropic model"]
     end
     SupportWF -->|"PaymentsService.issue_refund"| Endpoint{{"Nexus endpoint payments-endpoint"}}
     Endpoint --> Handler
-    subgraph PaymentsNS["Namespace raccoon-payments / task queue payments-nexus"]
+    subgraph PaymentsNS["Namespace payments / task queue payments-nexus"]
         Handler["PaymentsServiceHandler<br/>workflow-run operation"] -->|"start refund-{ticket_id}<br/>conflict policy USE_EXISTING"| RefundWF["RefundWorkflow"]
         RefundWF -->|"activity post_refund<br/>Idempotency-Key refund-{ticket_id}"| Post["HTTP call to payments"]
     end
@@ -66,8 +66,8 @@ Payments commits the refund and the response never arrives. The caller cannot te
 sequenceDiagram
     autonumber
     participant Human as Human approver
-    participant S as SupportTicketWorkflow<br/>(raccoon-support)
-    participant H as Nexus handler<br/>(raccoon-payments)
+    participant S as SupportTicketWorkflow<br/>(support)
+    participant H as Nexus handler<br/>(payments)
     participant R as RefundWorkflow<br/>refund-{ticket_id}
     participant A as post_refund activity
     participant P as Payments service
