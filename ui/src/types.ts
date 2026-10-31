@@ -14,21 +14,30 @@ export interface LaneAudit {
   in_flight: number;
   unapproved: number;
   violations: number;
+  tickets?: Record<string, string>; // ledger state per ticket: ok | duplicate | in_flight | missing | waiting | unapproved
 }
 
 export interface ProcStatus {
   label: string;
   alive: boolean;
   starts: number;
-  kills: number;
 }
 
-export interface RaccoonEvent {
+export interface ShowEvent {
   ts: number;
-  kind: string; // boot | scene | human | raccoon | scene_done | reset | note | error
+  kind: string; // boot | scene | human | fault | scene_done | reset | note | error
   msg: string;
   scene?: string;
   ok?: boolean; // scene_done only
+  target?: string[]; // fault only: diagram node ids it lands on (process names, or "temporal")
+  effect?: "kill" | "duplicate" | "stall"; // fault only
+}
+
+// Where one stack thinks one ticket is: a diagram node id, a wire ("lane1_worker>payments") or "done".
+export interface FlowDot {
+  ticket: string;
+  at: string;
+  state: string;
 }
 
 // The payments side, read by the dashboard straight from the payments namespace. Support never sees it.
@@ -79,6 +88,7 @@ export interface SceneRun {
   started_at: number;
   finished_at: number | null;
   ok: boolean | null;
+  kills: Record<string, number>; // kill -9s during this run, by process
 }
 
 export interface Snapshot {
@@ -89,11 +99,13 @@ export interface Snapshot {
   scenes: { id: string; title: string }[];
   audit: Record<LaneId, LaneAudit>;
   processes: Record<string, ProcStatus>;
-  events: RaccoonEvent[];
+  events: ShowEvent[];
   nexus: NexusRow[];
   lane1_view: Record<string, number>;
   lane2_view: Record<string, number>;
   faults: Partial<Record<LaneId, FaultState>>;
+  flow: Record<LaneId, FlowDot[]>; // this scene's tickets only
   temporal_ui: string | null; // Temporal Web UI base URL, or null when it is not answering
   topology: Topology;
+  locked: string | null; // what owns the server's controls (`make scenario`), or null for a normal show
 }

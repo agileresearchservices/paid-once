@@ -14,7 +14,7 @@ What `make scenario` printed on the runs behind the case study. Everything here 
 
 - **Reproducible:** Lane 2 finishes every scene with every approved ticket refunded exactly once: 0 duplicate,
   0 missing, 0 stuck, 0 unapproved. `make scenario` exits non-zero if that stops being true.
-- **Not exactly reproducible:** Lane 1's counts. The seed fixes ticket amounts and messages, but the raccoon's
+- **Not exactly reproducible:** Lane 1's counts. The seed fixes ticket amounts and messages, but the fault injector's
   kills land at wall-clock times, so Lane 1 duplicates vary run to run (see `double_delivery` below). What repeats is
   the pattern: duplicates in `tip_over`, `double_delivery` and `payments_timeout`, lost tickets in `tip_over` and
   `deploy_wait`.

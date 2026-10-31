@@ -25,6 +25,9 @@ _load_dotenv(ROOT / ".env")
 DATA_DIR = Path(os.environ.get("RACCOON_DATA", ROOT / "data"))
 
 SHOW_PORT = int(os.environ.get("RACCOON_SHOW_PORT", "8100"))
+# Set by scripts/smoke.py: while `make scenario` owns the show server, only requests carrying this token
+# may start scenes, reset or kill. A browser left open on :8100 then can't wreck the run.
+SCENARIO_TOKEN = os.environ.get("RACCOON_SCENARIO_TOKEN") or None
 PAYMENTS_PORT = int(os.environ.get("RACCOON_PAYMENTS_PORT", "8101"))
 LANE1_PORT = int(os.environ.get("RACCOON_LANE1_PORT", "8102"))
 

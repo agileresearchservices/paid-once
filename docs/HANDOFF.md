@@ -5,12 +5,16 @@ server 1.32.0). Start with `README.md` for setup and `docs/architecture.md` for 
 whoever changes the code next.
 
 ## Verified
-- `make test`: 12 passed (payments service, ledger, audit, Lane 1; stub model).
+- `make test`: 19 passed (payments service, ledger, audit, Lane 1, the show server's guards; stub model).
 - `make test-temporal`: 4 passed (one refund through Nexus; duplicate approval signals ignored; commit-then-timeout
   gives one refund; an approval sent while no worker is running survives). It runs on its own throwaway Temporal
   server (`scripts/test-temporal.sh`, port 7299), and passed with `make demo` running.
 - `make scenario`: runs six scenes headless against both lanes and exits non-zero if Lane 2 breaks an invariant.
   Results, SHAs and caveats: `docs/scenario-results.md`. It also passed from a fresh clone with no `.env`.
+- Two guards on the show server, after a browser left open on :8100 wrecked two scenario runs. `make scenario` locks
+  the controls (`RACCOON_SCENARIO_TOKEN`: reset, run and kill answer 423 without it, and the UI shows a "not the demo"
+  banner). A second show server, or `make scenario` with the demo up, refuses to start while :8100 is taken: a second
+  instance used to run its whole startup, boot-time reset included, before the bind failed.
 - The Vite UI (`make ui`, then `make demo`) was clicked through in Chrome. The Nexus step was checked full screen at
   1512x945 (14-inch MacBook Pro): it fits without scrolling, including mid-kill with the worker-down banner, and a
   second run of the scene shows only the new run's rows.
@@ -40,8 +44,23 @@ whoever changes the code next.
 - **The show links into the Temporal Web UI** (`TEMPORAL_UI_URL`, default `http://127.0.0.1:8233`; the engine re-checks
   it every 10 seconds and hides the links while it doesn't answer). Each Nexus row links the caller's workflow history in `raccoon-support` and the
   handler's in `raccoon-payments`.
-- **The UI is a stepper** for a laptop browser, full screen (`#1`..`#7` in the URL, arrow keys, 1-7, R runs the
-  scene). Nothing is built for tablet or phone.
+- **The UI is a stepper** for a laptop browser, full screen (`#1`..`#8` in the URL, arrow keys, 1-8, R runs the
+  scene). Nothing is built for tablet or phone. Step 1 is the side-by-side architecture page (`ui/src/Architecture.tsx`):
+  every row of its table is what the code does, so keep it in step with `raccoon/lane1/` and `raccoon/lane2/`.
+- **Faults are drawn where they land.** One architecture diagram (`ui/src/Diagram.tsx`) on step 1 and the scene steps
+  replaces the old toast, payments strip and process tiles. Fault events carry `target` (diagram node ids: process
+  names or `temporal`) and `effect` (`kill`, `duplicate`, `stall`), set in `Engine.fault()`, so the UI never parses
+  message text. Latency is drawn as staging, not as a fault. Dots come from the snapshot's `flow`: where each stack
+  thinks each of this scene's tickets is, read from Lane 1's own table and Lane 2's `describe()` (no query, so it works
+  with the worker dead). The payments node's slots come from the ledger audit, never from a stack. The Nexus step keeps
+  its own panel and has no diagram; the event ticker shows only on the scoreboard step.
+- **On screen the demo is "Paid Once: refunds over Nexus"**, and faults are labelled plainly ("Fault: kill -9 on both
+  agent workers", event kind `fault`). The lanes are "Job queue" and "Temporal + Nexus" on screen (`LANE_NAMES` in the
+  engine, `LANES` in `ui/src/App.tsx`); code, docs, the ledger and ticket IDs still say lane1/lane2. The repo, the `raccoon` package, `RACCOON_*` settings and the `raccoon-*`
+  namespaces keep the working name; renaming them buys nothing on screen.
+- **Kill badges count the scene on screen.** The engine records kills per scene run (`scene_runs[...]["kills"]`), so a
+  step never shows kills from an earlier scene and Reset clears them. Before a lane has a ticket its invariants read
+  "Not tested yet", not "Holds".
 - **Temporal look, local only.** Palette and fonts (Inter, Noto Sans Mono, bundled) follow temporal.io. The wordmark and
   favicon go in `ui/public/brand/`, which is gitignored because they are trademarks; without them the header shows
   text.

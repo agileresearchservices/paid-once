@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Compare } from "./Architecture";
+import { Diagram } from "./Diagram";
 import { NexusPanel } from "./NexusPanel";
-import { PaymentsStrip, ProcTile } from "./Processes";
+import { ProcTile } from "./Processes";
 import { Scoreboard } from "./Scoreboard";
 import { STEPS } from "./steps";
 import { Ticker } from "./Ticker";
 import { post, useSnapshot } from "./useSnapshot";
 
 const LANES = [
-  { id: "lane1" as const, name: "Lane 1", subtitle: "Today: job queue, polling loop, plain HTTP", procs: ["lane1_api", "lane1_worker"] },
-  { id: "lane2" as const, name: "Lane 2", subtitle: "Temporal · support calls payments over Nexus", procs: ["support_worker", "payments_worker"] },
+  { id: "lane1" as const, name: "Job queue", subtitle: "What most teams run today: queue, polling worker, in-memory agent state, HTTP to payments", procs: ["lane1_api", "lane1_worker"] },
+  { id: "lane2" as const, name: "Temporal + Nexus", subtitle: "Durable workflow; support calls payments over Nexus", procs: ["support_worker", "payments_worker"] },
 ];
 
 function Chips({ counts, empty }: { counts: Record<string, number>; empty: string }) {
@@ -31,7 +33,7 @@ function Wordmark() {
   return <img className="wordmark" src="/brand/temporal-wordmark.svg" alt="Temporal" onError={() => setMissing(true)} />;
 }
 
-// The step lives in the URL hash (#1..#7), so a refresh mid-demo stays on the same step.
+// The step lives in the URL hash (#1..#8), so a refresh mid-demo stays on the same step.
 function stepFromHash(): number {
   const n = Number(window.location.hash.slice(1));
   return Number.isInteger(n) && n >= 1 && n <= STEPS.length ? n - 1 : 0;
@@ -45,6 +47,7 @@ export function App() {
   const resetTimer = useRef<number | undefined>(undefined);
   const step = STEPS[index];
   const running = snap?.running ?? true;
+  const locked = snap?.locked ?? null; // `make scenario` owns this server: look, don't touch
 
   const go = useCallback((delta: number) => {
     setIndex((i) => Math.min(STEPS.length - 1, Math.max(0, i + delta)));
@@ -69,18 +72,18 @@ export function App() {
     }
   }, []);
 
-  // Arrows step, 1-7 jump, R runs this step's scene.
+  // Arrows step, 1-8 jump, R runs this step's scene.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === "ArrowRight") go(1);
       else if (e.key === "ArrowLeft") go(-1);
       else if (/^[1-9]$/.test(e.key) && Number(e.key) <= STEPS.length) setIndex(Number(e.key) - 1);
-      else if ((e.key === "r" || e.key === "R") && step.scene && !running) void act(`/api/scenes/${step.scene}/run`);
+      else if ((e.key === "r" || e.key === "R") && step.scene && !running && !locked) void act(`/api/scenes/${step.scene}/run`);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [go, act, step.scene, running]);
+  }, [go, act, step.scene, running, locked]);
 
   const onReset = () => {
     if (!confirmReset) {
@@ -106,13 +109,12 @@ export function App() {
   if (finished && run?.ok === false) status = { text: "Scene failed: see the ticker", cls: "fail" };
   else if (finished && settling) status = { text: "Done, settling…", cls: "muted" };
   else if (finished) status = { text: "Done ✓", cls: "ok" };
-  const recentRaccoon = [...snap.events].reverse().find((e) => e.kind === "raccoon" && snap.now - e.ts < 6);
 
   return (
     <main>
       <header>
         <h1>
-          <Wordmark /> 🦝 refund-raccoon
+          <Wordmark /> Paid Once <span className="tagline">Refunds over Nexus</span>
         </h1>
         <nav aria-label="Steps">
           {STEPS.map((s, i) => (
@@ -124,6 +126,13 @@ export function App() {
         {!connected && <span className="chip warn">reconnecting…</span>}
       </header>
 
+      {locked && (
+        <p className="locked-banner" role="status">
+          <b>This is not the demo.</b> <code>{locked}</code> is running on this server, so Run and Reset are off. The demo
+          comes back when it ends.
+        </p>
+      )}
+
       <section className="story">
         <div className="story-text">
           <h2>{step.title}</h2>
@@ -133,8 +142,8 @@ export function App() {
         </div>
         <div className="controls">
           {step.scene && (
-            <button className="primary" disabled={running} onClick={() => void act(`/api/scenes/${step.scene}/run`)}>
-              {thisRunning ? `Running ${elapsed}s…` : running ? "Another scene is running" : finished ? "Run again (R)" : "Run this scene (R)"}
+            <button className="primary" disabled={running || !!locked} onClick={() => void act(`/api/scenes/${step.scene}/run`)}>
+              {locked ? "Locked by the test run" : thisRunning ? `Running ${elapsed}s…` : running ? "Another scene is running" : finished ? "Run again (R)" : "Run this scene (R)"}
             </button>
           )}
           {status && <p className={`scene-status ${status.cls}`} role="status">{status.text}</p>}
@@ -142,14 +151,12 @@ export function App() {
             <button onClick={() => go(-1)} disabled={index === 0}>← Back</button>
             <button onClick={() => go(1)} disabled={index === STEPS.length - 1}>Next →</button>
           </div>
-          <button className={confirmReset ? "danger" : ""} onClick={onReset}>
+          <button className={confirmReset ? "danger" : ""} onClick={onReset} disabled={!!locked}>
             {confirmReset ? "Click again to reset" : "Reset scoreboard"}
           </button>
           {error && <p className="fail" role="alert">{error}</p>}
         </div>
       </section>
-
-      {recentRaccoon && <div className="raccoon-banner" role="status">{recentRaccoon.msg}</div>}
 
       {step.nexus && (
         <NexusPanel
@@ -160,19 +167,21 @@ export function App() {
         />
       )}
 
-      <PaymentsStrip proc={snap.processes.payments} faults={snap.faults} />
+      {(step.arch || (step.scene && !step.nexus)) && <Diagram snap={snap} scene={step.scene} />}
 
-      {step.nexus ? (
-        // The Nexus scene only runs Lane 2, so the lanes shrink to one strip and the panel keeps the screen.
+      {step.arch ? (
+        <Compare />
+      ) : step.nexus ? (
+        // The Nexus scene only runs the Temporal lane, so the lanes shrink to one strip and the panel keeps the screen.
         <div className="lanes compact">
           <article className="lane lane-off">
-            <h2>Lane 1</h2>
+            <h2>Job queue</h2>
             <span className="muted">not part of this scene</span>
           </article>
           <article className="lane lane2">
-            <h2>Lane 2</h2>
+            <h2>Temporal + Nexus</h2>
             <div className="tiles">
-              {LANES[1].procs.map((p) => snap.processes[p] && <ProcTile key={p} p={snap.processes[p]} />)}
+              {LANES[1].procs.map((p) => snap.processes[p] && <ProcTile key={p} p={snap.processes[p]} kills={run?.kills?.[p]} />)}
             </div>
             <div className="believes">
               <span className="muted">Workflows:</span> <Chips counts={snap.lane2_view} empty="nothing yet" />
@@ -185,9 +194,6 @@ export function App() {
             <article key={l.id} className={`lane ${l.id}`}>
               <h2>{l.name}</h2>
               <p className="muted">{l.subtitle}</p>
-              <div className="tiles">
-                {l.procs.map((p) => snap.processes[p] && <ProcTile key={p} p={snap.processes[p]} />)}
-              </div>
               <div className="believes">
                 <span className="muted">{l.id === "lane1" ? "Its own job table:" : "Temporal workflow status (this scene):"}</span>{" "}
                 <Chips counts={l.id === "lane1" ? snap.lane1_view : snap.lane2_view} empty="nothing yet" />
@@ -198,7 +204,8 @@ export function App() {
         </div>
       )}
 
-      {!step.nexus && <Ticker events={snap.events} />}
+      {/* Scene steps show faults on the diagram, so the event log only appears on the scoreboard. */}
+      {!step.scene && !step.arch && <Ticker events={snap.events} />}
     </main>
   );
 }

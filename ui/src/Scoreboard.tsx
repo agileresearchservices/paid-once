@@ -4,9 +4,11 @@ import type { LaneAudit } from "./types";
 // colours carry state, and every segment also has an icon and a name so colour is never the only cue.
 // "Unapproved" shares the critical colour with "refunded twice", so it gets a striped texture, and
 // "never refunded" sits next to red in orange, so it gets dots: no two failure segments differ by hue alone.
+// Segments read "4 duplicated" rather than icon + count: a numeric icon next to a count ("×2 4") read as one number.
 interface Part {
   key: string;
   label: string;
+  short: string;
   icon: string;
   value: number;
   className: string;
@@ -14,22 +16,23 @@ interface Part {
 
 function parts(a: LaneAudit): Part[] {
   return [
-    { key: "ok", label: "Refunded once", icon: "✓", value: a.refunded_once, className: "good" },
-    { key: "dup", label: "Refunded more than once", icon: "×2", value: a.duplicates, className: "critical" },
-    { key: "unapproved", label: "Refunded without approval", icon: "!", value: a.unapproved, className: "critical striped" },
-    { key: "missing", label: "Approved, never refunded", icon: "∅", value: a.missing, className: "serious dotted" },
-    { key: "flight", label: "Still settling", icon: "…", value: a.in_flight, className: "warning" },
+    { key: "ok", label: "Refunded once", short: "once", icon: "✓", value: a.refunded_once, className: "good" },
+    { key: "dup", label: "Refunded more than once", short: "duplicated", icon: "⧉", value: a.duplicates, className: "critical" },
+    { key: "unapproved", label: "Refunded without approval", short: "unapproved", icon: "!", value: a.unapproved, className: "critical striped" },
+    { key: "missing", label: "Approved, never refunded", short: "missing", icon: "∅", value: a.missing, className: "serious dotted" },
+    { key: "flight", label: "Still settling", short: "settling", icon: "…", value: a.in_flight, className: "warning" },
   ];
 }
 
 const dollars = (cents: number) =>
   (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
 
-type Verdict = "holds" | "violated" | "settling";
+// "untested" before the lane has a ticket: an invariant over nothing would otherwise read "Holds".
+type Verdict = "holds" | "violated" | "settling" | "untested";
 
 function Invariant({ text, verdict, detail }: { text: string; verdict: Verdict; detail: string }) {
-  const icon = verdict === "holds" ? "✓" : verdict === "violated" ? "✕" : "…";
-  const word = verdict === "holds" ? "Holds" : verdict === "violated" ? "Violated" : "Settling";
+  const icon = { holds: "✓", violated: "✕", settling: "…", untested: "–" }[verdict];
+  const word = { holds: "Holds", violated: "Violated", settling: "Settling", untested: "Not tested yet" }[verdict];
   return (
     <li className={`invariant ${verdict}`}>
       <span className="inv-icon" aria-hidden="true">{icon}</span>
@@ -43,9 +46,11 @@ function Invariant({ text, verdict, detail }: { text: string; verdict: Verdict; 
 export function Scoreboard({ audit, name }: { audit: LaneAudit; name: string }) {
   const ps = parts(audit);
   const total = ps.reduce((n, p) => n + p.value, 0);
-  const exactlyOnce: Verdict =
-    audit.duplicates + audit.missing > 0 ? "violated" : audit.in_flight > 0 ? "settling" : "holds";
-  const lost: Verdict = audit.missing > 0 ? "violated" : audit.in_flight > 0 ? "settling" : "holds";
+  const untested = total === 0;
+  const exactlyOnce: Verdict = untested
+    ? "untested"
+    : audit.duplicates + audit.missing > 0 ? "violated" : audit.in_flight > 0 ? "settling" : "holds";
+  const lost: Verdict = untested ? "untested" : audit.missing > 0 ? "violated" : audit.in_flight > 0 ? "settling" : "holds";
 
   return (
     <section className="scoreboard" aria-label={`${name} scoreboard`}>
@@ -70,7 +75,7 @@ export function Scoreboard({ audit, name }: { audit: LaneAudit; name: string }) 
               tabIndex={0}
               data-tip={`${p.label}: ${p.value} of ${total}`}
             >
-              {p.value / total > 0.07 && <span>{p.icon} {p.value}</span>}
+              {p.value / total > 0.07 && <span>{p.value}{p.value / total > 0.15 && ` ${p.short}`}</span>}
             </div>
           ))}
         </div>
@@ -93,7 +98,7 @@ export function Scoreboard({ audit, name }: { audit: LaneAudit; name: string }) 
         />
         <Invariant
           text="No refund without an approval"
-          verdict={audit.unapproved > 0 ? "violated" : "holds"}
+          verdict={untested ? "untested" : audit.unapproved > 0 ? "violated" : "holds"}
           detail={`${audit.unapproved} unapproved`}
         />
         <Invariant

@@ -1,4 +1,6 @@
-# refund-raccoon
+# Paid Once: refunds over Nexus
+
+The repository and Python package keep their working name, `refund-raccoon` / `raccoon`.
 
 A small, runnable test of one migration assumption: **moving an agent's refund-approval process onto Temporal,
 with Nexus to the payments team, keeps every approved refund exactly-once and loses no ticket under worker
@@ -7,12 +9,12 @@ agent logic or the payments service.**
 
 Two copies of the same refund agent run the same tickets under the same chaos:
 
-- **Lane 1** is the stack a competent team ships today: a job queue with a visibility timeout, a LangGraph agent
+- **Lane 1** ("Job queue" on screen) is the stack a competent team ships today: a job queue with a visibility timeout, a LangGraph agent
   with the default in-memory checkpointer, and a plain HTTP call to payments.
-- **Lane 2** is the same agent logic on Temporal, with the refund exposed to the payments team as a Nexus operation
+- **Lane 2** ("Temporal + Nexus" on screen) is the same agent logic on Temporal, with the refund exposed to the payments team as a Nexus operation
   across two namespaces.
 
-A "refund raccoon" kills things. An independent audit then scores both lanes **from the payments ledger**, never
+A fault injector kills things. An independent audit then scores both lanes **from the payments ledger**, never
 from a lane's own records.
 
 Architecture and diagrams: [`docs/architecture.md`](docs/architecture.md).
@@ -63,6 +65,8 @@ Two things to know:
   (`raccoon-support`, `raccoon-payments`) and one Nexus endpoint (`payments-endpoint`) on it. To keep it separate, start
   your own on another port and point at it: `temporal server start-dev --port 7299` and
   `TEMPORAL_ADDRESS=127.0.0.1:7299 make scenario`.
+- It needs port 8100, so stop `make demo` first; it refuses to start if anything is listening there. While it runs,
+  a browser on :8100 shows a "not the demo" banner, and Run and Reset are locked to the test runner.
 - The seed fixes ticket amounts and messages, not the exact timing of the kills. The reproducible claim is the Lane 2
   outcome (zero violations). Lane 1's failure counts vary a little from run to run, most in `double_delivery`.
 
@@ -88,18 +92,20 @@ make ui                                 # builds the Vite UI (needs Node 22+)
 make demo                               # http://127.0.0.1:8100
 ```
 
-The page steps through seven scenes and shows both lanes' scoreboards plus the Nexus operations live. Arrow keys or
-1-7 move between steps, R runs the current scene, and the step is kept in the URL (`#6`), so a refresh stays put. It
+The page opens with the two architectures side by side, then steps through six scenes. An architecture diagram shows
+where each fault lands and where each stack thinks each ticket is, above both lanes' ledger-based scoreboards; the
+Nexus step shows the operations live. Arrow keys or 1-8 move between steps, R runs the current scene, and the step is kept in the URL (`#6`), so a refresh stays put. It
 is built for a laptop browser in full screen. The scoreboard resets whenever the show server starts.
 
 Run of show, about ten minutes:
-- **Step 1, Meet the system**: both lanes refund five tickets cleanly.
-- **Steps 2-5** (agent tipped over, double delivery, deploy mid-wait, payments goes quiet): the same chaos hits both
+- **Step 1, Two architectures**: the same refund flow built twice, and a side-by-side table of what differs.
+- **Step 2, Happy path**: both lanes refund five tickets cleanly.
+- **Steps 3-6** (agent crash, double delivery, deploy mid-wait, payments goes quiet): the same chaos hits both
   lanes; watch the ledger-based scoreboards diverge.
-- **Step 6, Nexus**: the raccoon kills the payments team's worker mid-refund. Support's side stays `STARTED` with no
+- **Step 7, Nexus**: the payments team's worker is killed mid-refund. Support's side stays `STARTED` with no
   failure while payments retries. Click a row's `history ↗` links to show both sides in the Temporal Web UI
   (http://127.0.0.1:8233), including the caller's Nexus Links tab.
-- **Step 7, Scoreboard**: the totals.
+- **Step 8, Scoreboard**: the totals.
 
 The Temporal wordmark and favicon are not in the repo. To show them, put `temporal-wordmark.svg` and `favicon.svg` in
 `ui/public/brand/` (gitignored) before `make ui`; otherwise the header shows text.

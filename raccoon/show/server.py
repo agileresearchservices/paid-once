@@ -6,17 +6,28 @@ import asyncio
 import json
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from raccoon import agent, audit, config
 from raccoon.lane2.client import ensure_setup
 from raccoon.show.engine import SCENES, Engine
-from raccoon.show.procs import ProcessManager
+from raccoon.show.procs import ProcessManager, port_open
 
 UI_DIST = config.ROOT / "ui" / "dist"
+SCENARIO_HEADER = "x-raccoon-scenario"
 state: dict = {}
+
+
+def guard(request: Request) -> None:
+    """While `make scenario` owns this server, only its runner may change the show."""
+    if config.SCENARIO_TOKEN and request.headers.get(SCENARIO_HEADER) != config.SCENARIO_TOKEN:
+        raise HTTPException(423, "make scenario is running on this server; the controls are locked until it ends")
+
+
+def snapshot() -> dict:
+    return {**state["engine"].snapshot(), "locked": "make scenario" if config.SCENARIO_TOKEN else None}
 
 
 @asynccontextmanager
@@ -52,26 +63,27 @@ async def lifespan(_: FastAPI):
         procs.stop_all()
 
 
-app = FastAPI(title="refund-raccoon", lifespan=lifespan)
+app = FastAPI(title="Paid Once", lifespan=lifespan)
 
 
 @app.get("/api/state")
 def get_state() -> dict:
-    return state["engine"].snapshot()
+    return snapshot()
 
 
 @app.get("/api/stream")
 async def stream() -> StreamingResponse:
     async def gen():
         while True:
-            yield f"data: {json.dumps(state['engine'].snapshot())}\n\n"
+            yield f"data: {json.dumps(snapshot())}\n\n"
             await asyncio.sleep(0.7)
 
     return StreamingResponse(gen(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
 
 
 @app.post("/api/scenes/{scene_id}/run")
-async def run_scene(scene_id: str) -> dict:
+async def run_scene(scene_id: str, request: Request) -> dict:
+    guard(request)
     if scene_id not in {s.id for s in SCENES}:
         raise HTTPException(404, "unknown scene")
     started = await state["engine"].run_scene(scene_id)
@@ -81,13 +93,15 @@ async def run_scene(scene_id: str) -> dict:
 
 
 @app.post("/api/reset")
-async def reset() -> dict:
+async def reset(request: Request) -> dict:
+    guard(request)
     await state["engine"].reset()
     return {"ok": True}
 
 
 @app.post("/api/raccoon/kill/{proc}")
-async def kill(proc: str) -> dict:
+async def kill(proc: str, request: Request) -> dict:
+    guard(request)
     procs: ProcessManager = state["procs"]
     if proc not in procs.procs:
         raise HTTPException(404, "unknown process")
@@ -106,6 +120,13 @@ if UI_DIST.exists():
 def main() -> None:
     import uvicorn
 
+    # A second instance runs its whole startup before the bind fails: it spawns duplicate workers and its
+    # boot-time reset wipes the running show's ledger. Refuse before any of that.
+    if port_open(config.SHOW_PORT):
+        raise SystemExit(
+            f"Port {config.SHOW_PORT} is already serving (a show server or `make scenario`?). Not starting a "
+            f"second one: its startup would reset the running show. See: lsof -nP -iTCP:{config.SHOW_PORT} -sTCP:LISTEN"
+        )
     uvicorn.run(
         app,
         host="127.0.0.1",

@@ -101,8 +101,8 @@ the running workflow instead of starting another.
 
 ```mermaid
 flowchart LR
-    Raccoon([Refund raccoon<br/>kills, stalls, redelivers]) -.-> Lane1[Lane 1]
-    Raccoon -.-> Lane2[Lane 2]
+    Faults([Fault injector<br/>kills, stalls, redelivers]) -.-> Lane1[Lane 1]
+    Faults -.-> Lane2[Lane 2]
     Lane1 --> Ledger[(Payments ledger)]
     Lane2 --> Ledger
     Intake([Ticket and approval record<br/>written by the show harness]) --> Audit

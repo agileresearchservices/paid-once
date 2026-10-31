@@ -90,7 +90,7 @@ export function NexusPanel({
         </div>
         {workerDown && (
           <p className="worker-down" role="status">
-            🦝 Payments worker down. Accepted refunds wait and retry inside {topology.payments.namespace}.
+            ⚡ Payments worker down. Accepted refunds wait and retry inside {topology.payments.namespace}.
           </p>
         )}
         {rows.length === 0 ? (
