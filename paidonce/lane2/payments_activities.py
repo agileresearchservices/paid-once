@@ -4,8 +4,8 @@ import httpx
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
-from raccoon import config
-from raccoon.models import RefundRequest, RefundResult
+from paidonce import config
+from paidonce.models import RefundRequest, RefundResult
 
 
 @activity.defn

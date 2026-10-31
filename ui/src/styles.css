@@ -88,7 +88,18 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .lg.failed { background: var(--critical); }
 .lg.closed { background: var(--muted); }
 .lg-stage { color: var(--warning); }
-.lg-slots { color: var(--ink-2); }
+.legend .lg-group { gap: 14px; }
+.lg-group b { color: var(--ink); font-weight: 600; }
+.lg-group + .lg-group { padding-left: 22px; border-left: 1px solid var(--axis); }
+/* Ledger keys: the same box, colours and glyph as the ledger slots in the diagram. */
+.lg-slot {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 18px; padding: 0 3px;
+  border: 1px solid var(--muted); border-radius: 4px; font-style: normal; font-size: 12px; font-weight: 700; box-sizing: border-box;
+}
+.lg-slot.ok { background: #0b3a22; border-color: var(--good); color: var(--good-ink); }
+.lg-slot.missing { background: #4a2306; border-color: var(--serious); color: var(--serious); }
+.lg-slot.bad { background: var(--critical-wash); border-color: var(--critical); color: var(--critical-ink); }
+.lg-slot.none { color: var(--ink-2); }
 .fault-caption {
   background: var(--critical-wash); border: 1px solid var(--critical); color: var(--ink); border-radius: 8px;
   padding: 3px 12px; font-size: 16px; animation: flash 0.9s ease-in-out 2;

@@ -7,7 +7,7 @@ import type { LaneAudit } from "./types";
 // is solid orange; its name and glyph set it apart from red.
 // Segments read "4 duplicated" rather than icon + count: a numeric icon next to a count ("×2 4") read as one number.
 // The legend's icons are the diagram's ledger glyphs (outcomes.ts); there the count comes after the label, so they don't merge.
-// "No refund owed, none paid" is neutral grey: a denied ticket with no money moved is the correct outcome, not a win
+// "Denied, nothing owed" is neutral grey: a denied ticket with no money moved is the correct outcome, not a win
 // or a loss.
 interface Part {
   key: string;
@@ -21,7 +21,7 @@ interface Part {
 function parts(a: LaneAudit): Part[] {
   return [
     { key: "ok", label: "Refunded once", short: "once", icon: OUTCOME_GLYPH.ok, value: a.refunded_once, className: "good" },
-    { key: "none", label: "No refund owed, none paid", short: "none owed", icon: OUTCOME_GLYPH.denied, value: a.rejected + a.declined, className: "neutral" },
+    { key: "none", label: "Denied, nothing owed", short: "denied", icon: OUTCOME_GLYPH.denied, value: a.rejected + a.declined, className: "neutral" },
     { key: "dup", label: "Refunded more than once", short: "duplicated", icon: OUTCOME_GLYPH.duplicate, value: a.duplicates, className: "critical" },
     { key: "unapproved", label: "Refunded without approval", short: "unapproved", icon: OUTCOME_GLYPH.unapproved, value: a.unapproved, className: "critical striped" },
     { key: "missing", label: "Approved, never refunded", short: "missing", icon: OUTCOME_GLYPH.missing, value: a.missing, className: "serious" },

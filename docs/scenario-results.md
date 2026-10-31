@@ -1,11 +1,11 @@
 # Scenario results
 
 What `make scenario` printed on the runs behind the case study. Everything here is scored from the payments ledger
-(`raccoon/audit.py`), never from a lane's own state.
+(`paidonce/audit.py`), never from a lane's own state.
 
 - **Date:** 2026-10-30
 - **Code:** the two default runs and the flagged run used commit `c57210e` (the flagged run adds the off-by-default
-  `RACCOON_L1_STABLE_KEY` switch, then uncommitted). Two more default runs from fresh clones are below: `a5f62d6` (the commit that
+  `PAIDONCE_L1_STABLE_KEY` switch, then uncommitted). Two more default runs from fresh clones are below: `a5f62d6` (the commit that
   contains the switch) and `main` at `9d77b11`.
 - **Command:** `make scenario` (stub model, no API key, local Temporal dev server, about 4 minutes)
 - **Machine:** one laptop, all services as local processes
@@ -14,13 +14,13 @@ What `make scenario` printed on the runs behind the case study. Everything here 
 
 Each scene's cohort now adds one ticket outside the agent's policy and one a human denies (7 tickets per scene, 8 in
 `tip_over`). Both runs used side ports and their own data directory and Temporal server
-(`RACCOON_SHOW_PORT=8200 RACCOON_PAYMENTS_PORT=8201 RACCOON_LANE1_PORT=8202 RACCOON_DATA=… TEMPORAL_ADDRESS=127.0.0.1:7399`),
+(`PAIDONCE_SHOW_PORT=8200 PAIDONCE_PAYMENTS_PORT=8201 PAIDONCE_LANE1_PORT=8202 PAIDONCE_DATA=… TEMPORAL_ADDRESS=127.0.0.1:7399`),
 so they ran beside the demo. Both ended `SCENARIO PASSED`.
 
 Per scene, Lane 1 duplicates / missing (default run, then stable key). In every scene both lanes closed the two "no"
 tickets with no refund, and Lane 2 was `ok = approved`, 0 elsewhere.
 
-| Scene | Tickets (approved) | Default | `RACCOON_L1_STABLE_KEY=1` |
+| Scene | Tickets (approved) | Default | `PAIDONCE_L1_STABLE_KEY=1` |
 |---|---|---|---|
 | `intro` | 7 (5) | 0 / 0 | 0 / 0 |
 | `tip_over` | 8 (6) | 4 / 2 | 0 / 2 |
@@ -107,7 +107,7 @@ After the work was merged, a clone of `main` from GitHub (no `.env`, no `ANTHROP
 
 ## One run with Lane 1's key fixed
 
-`RACCOON_L1_STABLE_KEY=1 make scenario` makes Lane 1 derive its idempotency key from the ticket
+`PAIDONCE_L1_STABLE_KEY=1 make scenario` makes Lane 1 derive its idempotency key from the ticket
 (`l1-{ticket_id}`) instead of from the attempt. Nothing else changes.
 
 | | Submitted | Refunded once | Duplicates | Missing | Stuck | Unapproved |

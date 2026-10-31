@@ -17,9 +17,9 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
-from raccoon import agent, config
-from raccoon.lane1 import store
-from raccoon.models import Proposal, Ticket
+from paidonce import agent, config
+from paidonce.lane1 import store
+from paidonce.models import Proposal, Ticket
 
 ATTEMPTS = 3
 
@@ -42,7 +42,7 @@ def call_payments(ticket_id: str, amount_cents: int) -> str:
     last: Exception | None = None
     for attempt in range(1, ATTEMPTS + 1):
         key = (
-            f"l1-{ticket_id}"  # RACCOON_L1_STABLE_KEY=1: the one-line fix, measured in the write-up
+            f"l1-{ticket_id}"  # PAIDONCE_L1_STABLE_KEY=1: the one-line fix, measured in the write-up
             if config.L1_STABLE_KEY
             else f"l1-{ticket_id}-{uuid.uuid4().hex[:8]}"
         )

@@ -10,8 +10,8 @@ from __future__ import annotations
 import time
 import uuid
 
-from raccoon import config
-from raccoon.db import connect
+from paidonce import config
+from paidonce.db import connect
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS refunds (

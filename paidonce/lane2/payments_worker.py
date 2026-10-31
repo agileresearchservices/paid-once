@@ -4,10 +4,10 @@ import asyncio
 
 from temporalio.worker import Worker
 
-from raccoon import config
-from raccoon.lane2.client import connect
-from raccoon.lane2.payments_activities import post_refund
-from raccoon.lane2.payments_side import PaymentsServiceHandler, RefundWorkflow
+from paidonce import config
+from paidonce.lane2.client import connect
+from paidonce.lane2.payments_activities import post_refund
+from paidonce.lane2.payments_side import PaymentsServiceHandler, RefundWorkflow
 
 
 async def _run() -> None:

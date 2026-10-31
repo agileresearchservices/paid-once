@@ -14,9 +14,9 @@ from __future__ import annotations
 
 import time
 
-from raccoon import config
-from raccoon.db import connect
-from raccoon.payments import ledger
+from paidonce import config
+from paidonce.db import connect
+from paidonce.payments import ledger
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS tickets (

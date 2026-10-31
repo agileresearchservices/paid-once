@@ -6,8 +6,8 @@ import pytest
 import uvicorn
 from fastapi.testclient import TestClient
 
-from raccoon import config
-from raccoon.show import server
+from paidonce import config
+from paidonce.show import server
 
 
 @pytest.fixture
@@ -15,7 +15,7 @@ def locked(monkeypatch):
     monkeypatch.setattr(config, "SCENARIO_TOKEN", "tok")
 
 
-@pytest.mark.parametrize("path", ["/api/reset", "/api/scenes/intro/run", "/api/raccoon/kill/payments"])
+@pytest.mark.parametrize("path", ["/api/reset", "/api/scenes/intro/run", "/api/faults/kill/payments"])
 def test_locked_server_refuses_controls_without_the_token(locked, path):
     # No lifespan runs here: the guard must answer before anything touches the engine.
     r = TestClient(server.app).post(path)

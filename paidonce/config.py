@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-ROOT = Path(os.environ.get("RACCOON_ROOT", Path(__file__).resolve().parent.parent))
+ROOT = Path(os.environ.get("PAIDONCE_ROOT", Path(__file__).resolve().parent.parent))
 
 
 def _load_dotenv(path: Path) -> None:
@@ -22,38 +22,38 @@ def _load_dotenv(path: Path) -> None:
 
 
 _load_dotenv(ROOT / ".env")
-DATA_DIR = Path(os.environ.get("RACCOON_DATA", ROOT / "data"))
+DATA_DIR = Path(os.environ.get("PAIDONCE_DATA", ROOT / "data"))
 
-SHOW_PORT = int(os.environ.get("RACCOON_SHOW_PORT", "8100"))
+SHOW_PORT = int(os.environ.get("PAIDONCE_SHOW_PORT", "8100"))
 # Set by scripts/smoke.py: while `make scenario` owns the show server, only requests carrying this token
 # may start scenes, reset or kill. A browser left open on :8100 then can't wreck the run.
-SCENARIO_TOKEN = os.environ.get("RACCOON_SCENARIO_TOKEN") or None
-PAYMENTS_PORT = int(os.environ.get("RACCOON_PAYMENTS_PORT", "8101"))
-LANE1_PORT = int(os.environ.get("RACCOON_LANE1_PORT", "8102"))
+SCENARIO_TOKEN = os.environ.get("PAIDONCE_SCENARIO_TOKEN") or None
+PAYMENTS_PORT = int(os.environ.get("PAIDONCE_PAYMENTS_PORT", "8101"))
+LANE1_PORT = int(os.environ.get("PAIDONCE_LANE1_PORT", "8102"))
 
-PAYMENTS_URL = os.environ.get("RACCOON_PAYMENTS_URL", f"http://127.0.0.1:{PAYMENTS_PORT}")
-LANE1_URL = os.environ.get("RACCOON_LANE1_URL", f"http://127.0.0.1:{LANE1_PORT}")
+PAYMENTS_URL = os.environ.get("PAIDONCE_PAYMENTS_URL", f"http://127.0.0.1:{PAYMENTS_PORT}")
+LANE1_URL = os.environ.get("PAIDONCE_LANE1_URL", f"http://127.0.0.1:{LANE1_PORT}")
 
 TEMPORAL_ADDRESS = os.environ.get("TEMPORAL_ADDRESS", "127.0.0.1:7233")
 TEMPORAL_UI_URL = os.environ.get("TEMPORAL_UI_URL", "http://127.0.0.1:8233")
-SUPPORT_NAMESPACE = os.environ.get("RACCOON_SUPPORT_NS", "support")
-PAYMENTS_NAMESPACE = os.environ.get("RACCOON_PAYMENTS_NS", "payments")
+SUPPORT_NAMESPACE = os.environ.get("PAIDONCE_SUPPORT_NS", "support")
+PAYMENTS_NAMESPACE = os.environ.get("PAIDONCE_PAYMENTS_NS", "payments")
 SUPPORT_TASK_QUEUE = "support-agent"
 PAYMENTS_TASK_QUEUE = "payments-nexus"
-NEXUS_ENDPOINT = "payments-endpoint"  # keep in sync with raccoon.lane2.contract.NEXUS_ENDPOINT
+NEXUS_ENDPOINT = "payments-endpoint"  # keep in sync with paidonce.lane2.contract.NEXUS_ENDPOINT
 
-# The model is a real Anthropic model by default. Tests set RACCOON_STUB_LLM=1.
-MODEL = os.environ.get("RACCOON_MODEL", "claude-sonnet-5-5")
-STUB_LLM = os.environ.get("RACCOON_STUB_LLM", "") == "1"
+# The model is a real Anthropic model by default. Tests set PAIDONCE_STUB_LLM=1.
+MODEL = os.environ.get("PAIDONCE_MODEL", "claude-sonnet-5-5")
+STUB_LLM = os.environ.get("PAIDONCE_STUB_LLM", "") == "1"
 
 # Off by default. Turns on the one-line Lane 1 fix (derive the idempotency key from the ticket, not the
 # attempt) so the write-up can measure what that fix does and does not close. Lane 1 stays as shipped otherwise.
-L1_STABLE_KEY = os.environ.get("RACCOON_L1_STABLE_KEY", "") == "1"
+L1_STABLE_KEY = os.environ.get("PAIDONCE_L1_STABLE_KEY", "") == "1"
 
 # Lane 1 queue: a visibility timeout like SQS or Pub/Sub ack deadlines.
-VISIBILITY_TIMEOUT_S = float(os.environ.get("RACCOON_VISIBILITY_S", "10"))
+VISIBILITY_TIMEOUT_S = float(os.environ.get("PAIDONCE_VISIBILITY_S", "10"))
 # What a typical client does against a slow downstream.
-PAYMENTS_CLIENT_TIMEOUT_S = float(os.environ.get("RACCOON_PAYMENTS_TIMEOUT_S", "3"))
+PAYMENTS_CLIENT_TIMEOUT_S = float(os.environ.get("PAIDONCE_PAYMENTS_TIMEOUT_S", "3"))
 
 LEDGER_DB = DATA_DIR / "ledger.db"
 LANE1_DB = DATA_DIR / "lane1.db"

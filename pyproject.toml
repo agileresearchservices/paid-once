@@ -1,5 +1,5 @@
 [project]
-name = "refund-raccoon"
+name = "paid-once"
 version = "0.1.0"
 description = "Brownfield-to-Temporal demo: a refund agent under chaos, before and after (Temporal + Nexus)"
 requires-python = ">=3.11"
@@ -29,7 +29,7 @@ asyncio_default_fixture_loop_scope = "function"
 markers = ["temporal: Lane 2 + Nexus integration tests; run with `make test-temporal` (own throwaway server)"]
 
 [tool.setuptools.packages.find]
-include = ["raccoon*"]
+include = ["paidonce*"]
 
 [tool.ruff]
 line-length = 120

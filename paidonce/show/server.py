@@ -12,13 +12,13 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from raccoon import agent, audit, config
-from raccoon.lane2.client import ensure_setup
-from raccoon.show.engine import SCENES, Engine
-from raccoon.show.procs import ProcessManager, port_open
+from paidonce import agent, audit, config
+from paidonce.lane2.client import ensure_setup
+from paidonce.show.engine import SCENES, Engine
+from paidonce.show.procs import ProcessManager, port_open
 
 UI_DIST = config.ROOT / "ui" / "dist"
-SCENARIO_HEADER = "x-raccoon-scenario"
+SCENARIO_HEADER = "x-paidonce-scenario"
 state: dict = {}
 
 
@@ -101,7 +101,7 @@ async def reset(request: Request) -> dict:
     return {"ok": True}
 
 
-@app.post("/api/raccoon/kill/{proc}")
+@app.post("/api/faults/kill/{proc}")
 async def kill(proc: str, request: Request) -> dict:
     guard(request)
     procs: ProcessManager = state["procs"]

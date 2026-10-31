@@ -19,8 +19,8 @@ from temporalio.api.workflowservice.v1 import (
 from temporalio.client import Client
 from temporalio.service import RPCError, RPCStatusCode
 
-from raccoon import config
-from raccoon.lane2.contract import NEXUS_ENDPOINT
+from paidonce import config
+from paidonce.lane2.contract import NEXUS_ENDPOINT
 
 
 async def connect(namespace: str) -> Client:

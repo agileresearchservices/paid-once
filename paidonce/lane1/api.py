@@ -7,8 +7,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from raccoon import config
-from raccoon.lane1 import store
+from paidonce import config
+from paidonce.lane1 import store
 
 
 @asynccontextmanager

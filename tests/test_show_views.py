@@ -2,8 +2,8 @@
 
 from types import SimpleNamespace
 
-from raccoon.models import TicketOutcome
-from raccoon.show.engine import LANE1_STAGES, _lane2_stage, _scene_calls, _unsettled
+from paidonce.models import TicketOutcome
+from paidonce.show.engine import LANE1_STAGES, _lane2_stage, _scene_calls, _unsettled
 
 
 def test_unapproved_parked_workflow_waits_for_a_human():

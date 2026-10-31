@@ -14,7 +14,7 @@ whoever changes the code next.
 - `make scenario`: runs six scenes headless against both lanes and exits non-zero if Lane 2 breaks an invariant.
   Results, SHAs and caveats: `docs/scenario-results.md`. It also passed from a fresh clone with no `.env`.
 - Two guards on the show server, after a browser left open on :8100 wrecked two scenario runs. `make scenario` locks
-  the controls (`RACCOON_SCENARIO_TOKEN`: reset, run and kill answer 423 without it, and the UI shows a "not the demo"
+  the controls (`PAIDONCE_SCENARIO_TOKEN`: reset, run and kill answer 423 without it, and the UI shows a "not the demo"
   banner). A second show server, or `make scenario` with the demo up, refuses to start while :8100 is taken: a second
   instance used to run its whole startup, boot-time reset included, before the bind failed.
 - The Vite UI (`make ui`, then `make demo`) was clicked through in Chrome. The Nexus step was checked full screen at
@@ -29,7 +29,7 @@ whoever changes the code next.
 - The model path in `make scenario`: scored runs use the stub model. The live model is checked by `make demo`.
 
 ## Decisions worth knowing
-- **Scoring reads only the payments ledger** (`raccoon/audit.py`). It iterates tickets the harness recorded, so
+- **Scoring reads only the payments ledger** (`paidonce/audit.py`). It iterates tickets the harness recorded, so
   ledger rows for unrecorded tickets are ignored; "no refund without an approval" covers recorded tickets only.
 - **The agent checks policy in code before it asks the model.** `agent.check_policy` denies refunds over $200
   (`POLICY_LIMIT_CENTS`) and orders older than 30 days (`RETURN_WINDOW_DAYS`, from `Ticket.order_age_days`). Both
@@ -43,13 +43,13 @@ whoever changes the code next.
   ticket, no refund) and `waiting` (no decision, no refund). Any of these with a refund is `unapproved`.
 - **The key comes from the business operation.** Lane 2 uses `refund-<ticket_id>` for both the idempotency key and the
   refund workflow ID. The ledger is UNIQUE on the key only, not on the ticket. Do not weaken this.
-- **Model:** the demo agent defaults to `claude-sonnet-5-5` (`RACCOON_MODEL` overrides). Forced `tool_choice` is
-  rejected by that model, so `raccoon/agent.py` uses `auto` with a strict tool schema. Sampling parameters such as
+- **Model:** the demo agent defaults to `claude-sonnet-5-5` (`PAIDONCE_MODEL` overrides). Forced `tool_choice` is
+  rejected by that model, so `paidonce/agent.py` uses `auto` with a strict tool schema. Sampling parameters such as
   `temperature` are rejected on current models, so the agent does not set any. Strict schemas reject `minimum` on
   integers; the amount floor is applied in code.
 - **For a workflow-run Nexus operation the caller's operation stays `STARTED, attempt 1`** while the payments-side
   activity retries. The UI reads retry state from pending-activity data, because retry attempts are not in workflow
-  history. `raccoon/show/engine.py` keeps each row (and the peak activity attempt) after the operation completes, so
+  history. `paidonce/show/engine.py` keeps each row (and the peak activity attempt) after the operation completes, so
   the evidence stays on screen when the scene ends.
 - **Ticket IDs carry a scene-run number** (`<reset id>-<scene>-r<n>-<i>-<lane>`), so re-running a scene starts new
   workflows instead of colliding with the last run's IDs. The idempotency key is still `refund-<ticket_id>`.
@@ -58,7 +58,7 @@ whoever changes the code next.
   handler's in `payments`.
 - **The UI is a stepper** for a laptop browser, full screen (`#1`..`#8` in the URL, arrow keys, 1-8, R runs the
   scene). Nothing is built for tablet or phone. Step 1 is the side-by-side architecture page (`ui/src/Architecture.tsx`):
-  every row of its table is what the code does, so keep it in step with `raccoon/lane1/` and `raccoon/lane2/`.
+  every row of its table is what the code does, so keep it in step with `paidonce/lane1/` and `paidonce/lane2/`.
 - **Faults are drawn where they land.** One architecture diagram (`ui/src/Diagram.tsx`) on step 1 and the scene steps
   replaces the old toast, payments strip and process tiles. Fault events carry `target` (diagram node ids: process
   names or `temporal`) and `effect` (`kill`, `duplicate`, `stall`), set in `Engine.fault()`, so the UI never parses
@@ -69,9 +69,9 @@ whoever changes the code next.
 - **On screen the demo is "Paid Once: refunds over Nexus"**, and faults are labelled plainly ("Fault: kill -9 on both
   agent workers", event kind `fault`). The lanes are "Job queue" and "Temporal + Nexus" on screen (`LANE_NAMES` in the
   engine, `LANES` in `ui/src/App.tsx`); code, docs, the ledger and ticket IDs still say lane1/lane2. The Temporal namespaces show
-  on screen and in the Web UI links, so they are named for the teams, `support` and `payments` (`RACCOON_SUPPORT_NS`,
-  `RACCOON_PAYMENTS_NS`). Setup retargets an existing `payments-endpoint` that still points at an old namespace. The
-  repo, the `raccoon` package and `RACCOON_*` settings keep the working name; renaming them buys nothing on screen.
+  on screen and in the Web UI links, so they are named for the teams, `support` and `payments` (`PAIDONCE_SUPPORT_NS`,
+  `PAIDONCE_PAYMENTS_NS`). Setup retargets an existing `payments-endpoint` that still points at an old namespace. The
+  repo (`paid-once`), the `paidonce` package and `PAIDONCE_*` settings carry the same name as the screen.
 - **Kill badges count the scene on screen.** The engine records kills per scene run (`scene_runs[...]["kills"]`), so a
   step never shows kills from an earlier scene and Reset clears them. Before a lane has a ticket its invariants read
   "Not tested yet", not "Holds".
@@ -79,7 +79,7 @@ whoever changes the code next.
   only the current scene's tickets, and the UI shows Nexus rows and lane chips only when `snap.current` is the step's
   scene, so step 7 reads "Not run yet" instead of step 6's rows. `lane1_view_all` (every ticket since reset) feeds the
   scoreboard's "its own job table says N done" line; it is the queue's claim, shown next to the ledger, never scored.
-- **Payments counts its calls** (`CALLS` in `raccoon/payments/service.py`, `GET /admin/calls`, cleared by
+- **Payments counts its calls** (`CALLS` in `paidonce/payments/service.py`, `GET /admin/calls`, cleared by
   `/admin/reset`): per lane and ticket, calls and how many the ledger answered from an existing key. The engine sums
   them per scene into the snapshot's `payments_calls` (`booked` = calls − replays). It observes only; the ledger and
   the audit don't read it.
@@ -93,7 +93,7 @@ whoever changes the code next.
 - **Temporal look, local only.** Palette and fonts (Inter, Noto Sans Mono, bundled) follow temporal.io. The wordmark and
   favicon go in `ui/public/brand/`, which is gitignored because they are trademarks; without them the header shows
   text.
-- `raccoon/show/server.py` resets the scoreboard at boot and sets uvicorn `timeout_graceful_shutdown=2`, because an
+- `paidonce/show/server.py` resets the scoreboard at boot and sets uvicorn `timeout_graceful_shutdown=2`, because an
   open SSE tab otherwise blocks shutdown and orphans the child services on 8101 and 8102.
 - The show reuses any Temporal server already listening on `TEMPORAL_ADDRESS` and will create its two namespaces
   and the Nexus endpoint there. Point `TEMPORAL_ADDRESS` somewhere else if that server belongs to something else.
@@ -106,15 +106,15 @@ whoever changes the code next.
   redelivery and the recovery path (both of which touch only execute jobs) never see it. That is how a team would
   build it; it is not weakened to make Lane 1 refund denied tickets.
 - A careful dedupe check exists for finished tickets, so redelivery after completion is a no-op. Duplicates only arise for in-flight work.
-- `RACCOON_L1_STABLE_KEY=1` (off by default) makes Lane 1 derive its idempotency key from the ticket instead of the attempt. It exists only so the write-up can measure the one-line fix (duplicates drop to 0, the 7 lost tickets remain). Default runs, the UI and the demo are unchanged, so Lane 1 is still the competent-team-today system described above.
+- `PAIDONCE_L1_STABLE_KEY=1` (off by default) makes Lane 1 derive its idempotency key from the ticket instead of the attempt. It exists only so the write-up can measure the one-line fix (duplicates drop to 0, the 7 lost tickets remain). Default runs, the UI and the demo are unchanged, so Lane 1 is still the competent-team-today system described above.
 - "Improve the current implementation" (outbox, sweeper, durable checkpointer) is argued in the write-up, not built as a third lane.
 
 ## Constraints that bite
-- Workflow modules (`lane2/support_side.py`, `lane2/payments_side.py`) must not import `raccoon.config`,
-  `raccoon.agent`, httpx or anything that touches the filesystem at import time: the Temporal workflow sandbox rejects
+- Workflow modules (`lane2/support_side.py`, `lane2/payments_side.py`) must not import `paidonce.config`,
+  `paidonce.agent`, httpx or anything that touches the filesystem at import time: the Temporal workflow sandbox rejects
   it. Activities live in `*_activities.py` and are called by name.
 - Workflow code must stay deterministic and replay-safe.
 - Lane 1's counts vary run to run because kills land at wall-clock times. Assert on Lane 2 only.
 - The integration tests must not share a Temporal server with the show. The show's workers poll the same task queues
   and would take the tests' workflows, so the tests would see no refund. `make test-temporal` starts its own server
-  and tells the tests its address (`RACCOON_TEST_TEMPORAL`); the tests refuse to run on any other server.
+  and tells the tests its address (`PAIDONCE_TEST_TEMPORAL`); the tests refuse to run on any other server.

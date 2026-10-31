@@ -4,12 +4,12 @@
 # the tests' workflows and the tests would see no refund. Their own server keeps them isolated from `make demo`.
 set -euo pipefail
 
-PORT="${RACCOON_TEST_TEMPORAL_PORT:-7299}"
+PORT="${PAIDONCE_TEST_TEMPORAL_PORT:-7299}"
 ADDRESS="127.0.0.1:${PORT}"
 
 command -v temporal >/dev/null || { echo "temporal CLI not found: install it (see README Setup)" >&2; exit 1; }
 if temporal operator cluster health --address "$ADDRESS" >/dev/null 2>&1; then
-  echo "something is already serving Temporal on $ADDRESS; set RACCOON_TEST_TEMPORAL_PORT to a free port" >&2
+  echo "something is already serving Temporal on $ADDRESS; set PAIDONCE_TEST_TEMPORAL_PORT to a free port" >&2
   exit 1
 fi
 
@@ -25,6 +25,6 @@ done
 temporal operator cluster health --address "$ADDRESS" >/dev/null 2>&1 || { echo "temporal dev server on $ADDRESS never became healthy" >&2; exit 1; }
 
 export TEMPORAL_ADDRESS="$ADDRESS"
-export RACCOON_TEST_TEMPORAL="$ADDRESS"  # the tests refuse any server but this one
-uv run python -m raccoon.lane2.client
-RACCOON_STUB_LLM=1 uv run pytest -q -m temporal "$@"
+export PAIDONCE_TEST_TEMPORAL="$ADDRESS"  # the tests refuse any server but this one
+uv run python -m paidonce.lane2.client
+PAIDONCE_STUB_LLM=1 uv run pytest -q -m temporal "$@"

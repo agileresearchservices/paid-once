@@ -12,15 +12,15 @@ import httpx
 import pytest
 from temporalio.worker import Worker
 
-from raccoon import config
-from raccoon.lane2.client import connect
-from raccoon.lane2.payments_activities import post_refund
-from raccoon.lane2.payments_side import PaymentsServiceHandler, RefundWorkflow
-from raccoon.lane2.support_activities import run_agent
-from raccoon.lane2.support_side import SupportTicketWorkflow, ticket_workflow_id
-from raccoon.models import ApprovalDecision, Ticket
-from raccoon.payments import ledger
-from raccoon.payments.service import app as payments_app
+from paidonce import config
+from paidonce.lane2.client import connect
+from paidonce.lane2.payments_activities import post_refund
+from paidonce.lane2.payments_side import PaymentsServiceHandler, RefundWorkflow
+from paidonce.lane2.support_activities import run_agent
+from paidonce.lane2.support_side import SupportTicketWorkflow, ticket_workflow_id
+from paidonce.models import ApprovalDecision, Ticket
+from paidonce.payments import ledger
+from paidonce.payments.service import app as payments_app
 from tests.helpers import Server
 
 pytestmark = pytest.mark.temporal
@@ -30,7 +30,7 @@ pytestmark = pytest.mark.temporal
 def own_temporal_server():
     # scripts/test-temporal.sh names the throwaway server it started. On any other server (the show's, say) another
     # worker may poll these task queues and take the tests' workflows, so refuse rather than fail mysteriously.
-    if os.environ.get("RACCOON_TEST_TEMPORAL") != config.TEMPORAL_ADDRESS:
+    if os.environ.get("PAIDONCE_TEST_TEMPORAL") != config.TEMPORAL_ADDRESS:
         pytest.fail(
             f"refusing to run on {config.TEMPORAL_ADDRESS}: use `make test-temporal`, which starts its own server",
             pytrace=False,
