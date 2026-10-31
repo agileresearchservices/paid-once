@@ -40,8 +40,16 @@ whoever changes the code next.
 - **The show links into the Temporal Web UI** (`TEMPORAL_UI_URL`, default `http://127.0.0.1:8233`; the engine re-checks
   it every 10 seconds and hides the links while it doesn't answer). Each Nexus row links the caller's workflow history in `raccoon-support` and the
   handler's in `raccoon-payments`.
-- **The UI is a stepper** for a laptop browser, full screen (`#1`..`#7` in the URL, arrow keys, 1-7, R runs the
-  scene). Nothing is built for tablet or phone.
+- **The UI is a stepper** for a laptop browser, full screen (`#1`..`#8` in the URL, arrow keys, 1-8, R runs the
+  scene). Nothing is built for tablet or phone. Step 1 is the side-by-side architecture page (`ui/src/Architecture.tsx`):
+  every row of its table is what the code does, so keep it in step with `raccoon/lane1/` and `raccoon/lane2/`.
+- **Faults are drawn where they land.** One architecture diagram (`ui/src/Diagram.tsx`) on step 1 and the scene steps
+  replaces the old toast, payments strip and process tiles. Fault events carry `target` (diagram node ids: process
+  names or `temporal`) and `effect` (`kill`, `duplicate`, `stall`), set in `Engine.fault()`, so the UI never parses
+  message text. Latency is drawn as staging, not as a fault. Dots come from the snapshot's `flow`: where each stack
+  thinks each of this scene's tickets is, read from Lane 1's own table and Lane 2's `describe()` (no query, so it works
+  with the worker dead). The payments node's slots come from the ledger audit, never from a stack. The Nexus step keeps
+  its own panel and has no diagram; the event ticker shows only on the scoreboard step.
 - **On screen the demo is "Paid Once: refunds over Nexus"**, and faults are labelled plainly ("Fault: kill -9 on both
   agent workers", event kind `fault`). The lanes are "Job queue" and "Temporal + Nexus" on screen (`LANE_NAMES` in the
   engine, `LANES` in `ui/src/App.tsx`); code, docs, the ledger and ticket IDs still say lane1/lane2. The repo, the `raccoon` package, `RACCOON_*` settings and the `raccoon-*`

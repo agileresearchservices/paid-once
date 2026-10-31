@@ -90,18 +90,20 @@ make ui                                 # builds the Vite UI (needs Node 22+)
 make demo                               # http://127.0.0.1:8100
 ```
 
-The page steps through seven scenes and shows both lanes' scoreboards plus the Nexus operations live. Arrow keys or
-1-7 move between steps, R runs the current scene, and the step is kept in the URL (`#6`), so a refresh stays put. It
+The page opens with the two architectures side by side, then steps through six scenes. An architecture diagram shows
+where each fault lands and where each stack thinks each ticket is, above both lanes' ledger-based scoreboards; the
+Nexus step shows the operations live. Arrow keys or 1-8 move between steps, R runs the current scene, and the step is kept in the URL (`#6`), so a refresh stays put. It
 is built for a laptop browser in full screen. The scoreboard resets whenever the show server starts.
 
 Run of show, about ten minutes:
-- **Step 1, Meet the system**: both lanes refund five tickets cleanly.
-- **Steps 2-5** (agent tipped over, double delivery, deploy mid-wait, payments goes quiet): the same chaos hits both
+- **Step 1, Two architectures**: the same refund flow built twice, and a side-by-side table of what differs.
+- **Step 2, Happy path**: both lanes refund five tickets cleanly.
+- **Steps 3-6** (agent crash, double delivery, deploy mid-wait, payments goes quiet): the same chaos hits both
   lanes; watch the ledger-based scoreboards diverge.
-- **Step 6, Nexus**: the payments team's worker is killed mid-refund. Support's side stays `STARTED` with no
+- **Step 7, Nexus**: the payments team's worker is killed mid-refund. Support's side stays `STARTED` with no
   failure while payments retries. Click a row's `history ↗` links to show both sides in the Temporal Web UI
   (http://127.0.0.1:8233), including the caller's Nexus Links tab.
-- **Step 7, Scoreboard**: the totals.
+- **Step 8, Scoreboard**: the totals.
 
 The Temporal wordmark and favicon are not in the repo. To show them, put `temporal-wordmark.svg` and `favicon.svg` in
 `ui/public/brand/` (gitignored) before `make ui`; otherwise the header shows text.
