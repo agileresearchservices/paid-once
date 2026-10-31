@@ -10,6 +10,36 @@ What `make scenario` printed on the runs behind the case study. Everything here 
 - **Command:** `make scenario` (stub model, no API key, local Temporal dev server, about 4 minutes)
 - **Machine:** one laptop, all services as local processes
 
+## Latest: every scene with two tickets owed nothing (2026-10-31, `c085fb9`)
+
+Each scene's cohort now adds one ticket outside the agent's policy and one a human denies (7 tickets per scene, 8 in
+`tip_over`). Both runs used side ports and their own data directory and Temporal server
+(`RACCOON_SHOW_PORT=8200 RACCOON_PAYMENTS_PORT=8201 RACCOON_LANE1_PORT=8202 RACCOON_DATA=… TEMPORAL_ADDRESS=127.0.0.1:7399`),
+so they ran beside the demo. Both ended `SCENARIO PASSED`.
+
+Per scene, Lane 1 duplicates / missing (default run, then stable key). In every scene both lanes closed the two "no"
+tickets with no refund, and Lane 2 was `ok = approved`, 0 elsewhere.
+
+| Scene | Tickets (approved) | Default | `RACCOON_L1_STABLE_KEY=1` |
+|---|---|---|---|
+| `intro` | 7 (5) | 0 / 0 | 0 / 0 |
+| `tip_over` | 8 (6) | 4 / 2 | 0 / 2 |
+| `double_delivery` | 7 (5) | 2 / 0 | 0 / 0 |
+| `deploy_wait` | 7 (5) | 0 / 5 | 0 / 5 |
+| `payments_timeout` | 7 (5) | 4 / 0 | 0 / 0 |
+| `nexus_kill` | 7 (5), Lane 2 only | n/a | n/a |
+
+| | Submitted | Refunded once | Duplicates | Missing | Stuck | Unapproved | Denied, none paid (policy / human) |
+|---|---|---|---|---|---|---|---|
+| Lane 1, default | 36 | 9 | 10 | 7 | 0 | 0 | 5 / 5 |
+| Lane 1, stable key | 36 | 19 | 0 | 7 | 0 | 0 | 5 / 5 |
+| Lane 2, both runs | 43 | 31 | 0 | 0 | 0 | 0 | 6 / 6 |
+
+Invariant 2 ("no refund without an approval") now has 10 to 12 tickets per lane per run that must not be paid,
+under the same kills, redeliveries and stalls as the approved ones; neither lane paid one. In `nexus_kill` the
+payments-side activity attempt again peaked at 2 while the caller's operation stayed at attempt 1. The earlier runs
+below had approved tickets only.
+
 ## What is and is not reproducible
 
 - **Reproducible:** Lane 2 finishes every scene with every approved ticket refunded exactly once: 0 duplicate,

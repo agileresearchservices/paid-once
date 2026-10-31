@@ -5,8 +5,10 @@ ledger, so neither lane grades itself. Names below are the real ones from the co
 
 ## The process, in one paragraph
 
-A support agent (LangGraph plus an Anthropic model) reads a ticket and proposes `refund` or `deny`. A refund
-needs a human approval, which can take hours or days. After approval, the payments team's service moves the
+A helpdesk ticket asks for a refund. The support agent (LangGraph plus an Anthropic model) first checks two
+policy rules in code: at most $200, and an order at most 30 days old. A ticket that breaks one is denied without
+calling the model and closes with no refund. Otherwise the model proposes `refund` or `deny`. A proposed refund
+needs a human decision, which can take hours or days; the human approves it or says no. After approval, the payments team's service moves the
 money. Lane 1 is the stack a competent team ships today. Lane 2 runs the same agent logic on Temporal and
 reaches the payments team through a Nexus operation.
 
@@ -14,11 +16,11 @@ reaches the payments team through a Nexus operation.
 
 ```mermaid
 flowchart LR
-    Approver([Human approver]) -->|approve| API[Lane 1 API]
+    Approver([Human approver]) -->|"approve, or reject: row closed, no job"| API[Lane 1 API]
     Helpdesk([Ticket intake]) -->|new ticket| API
     API --> Jobs[(SQLite jobs table<br/>visibility timeout 10s)]
     Jobs -->|claim job| Worker["Lane 1 worker<br/>4 threads + LangGraph<br/>MemorySaver in process memory"]
-    Worker -->|decide| Model[Anthropic model]
+    Worker -->|"policy rules, then decide<br/>(policy hit: row denied)"| Model[Anthropic model]
     Worker -->|"POST /refunds<br/>new Idempotency-Key every attempt"| Payments[Payments service]
     Payments --> Ledger[(Refund ledger<br/>SQLite)]
 ```
@@ -36,9 +38,10 @@ What makes it realistic, and what makes it fail:
 
 ```mermaid
 flowchart TB
-    Approver([Human approver]) -->|"signal approve"| SupportWF
+    Helpdesk([Ticket intake]) -->|start workflow| SupportWF
+    Approver([Human approver]) -->|"signal approve(true or false)"| SupportWF
     subgraph SupportNS["Namespace support / task queue support-agent"]
-        SupportWF["SupportTicketWorkflow, id ticket-{ticket_id}<br/>activity run_agent: LangGraph decide graph + Anthropic model"]
+        SupportWF["SupportTicketWorkflow, id ticket-{ticket_id}<br/>activity run_agent: policy rules, then LangGraph decide graph + Anthropic model<br/>ends denied (policy) or rejected (human) with no Nexus call"]
     end
     SupportWF -->|"PaymentsService.issue_refund"| Endpoint{{"Nexus endpoint payments-endpoint"}}
     Endpoint --> Handler
@@ -105,13 +108,15 @@ flowchart LR
     Faults -.-> Lane2[Lane 2]
     Lane1 --> Ledger[(Payments ledger)]
     Lane2 --> Ledger
-    Intake([Ticket and approval record<br/>written by the show harness]) --> Audit
+    Intake([Ticket and decision record<br/>written by the show harness]) --> Audit
     Ledger --> Audit{{"Audit<br/>raccoon/audit.py"}}
     Audit --> Board["Scoreboard<br/>3 invariants per lane"]
 ```
 
 The three invariants: every approved ticket is refunded exactly once, no refund without an approval, and no
-ticket is lost or stuck. The audit compares the harness's record of tickets and approvals with the ledger. It does
+ticket is lost or stuck. The audit compares the harness's record of tickets and human decisions with the ledger.
+Tickets owed nothing (outside the policy, or a human said no) must have no refund; one with a refund counts as
+"refunded without approval". It does
 not read either lane's own state. It only scores tickets the harness recorded, so a refund for an unrecorded
 ticket would not be counted.
 

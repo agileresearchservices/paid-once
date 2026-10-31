@@ -1,4 +1,4 @@
-"""The refund agent: a small LangGraph graph around one Anthropic call.
+"""The refund agent: policy rules in code, then a small LangGraph graph around one Anthropic call.
 
 Both lanes use the same decision logic. Lane 1 wraps it with an approval interrupt
 (see lane1/graph.py); Lane 2 runs it inside a Temporal activity.
@@ -38,6 +38,20 @@ TOOL = {
 }
 
 
+# The store's refund policy. Checked in code before the model is asked, so a rule always holds and costs no call.
+POLICY_LIMIT_CENTS = 20000
+RETURN_WINDOW_DAYS = 30
+
+
+def check_policy(ticket: Ticket) -> str | None:
+    """The rule this ticket breaks, or None. A broken rule closes the ticket before a human sees it."""
+    if ticket.amount_cents > POLICY_LIMIT_CENTS:
+        return f"over the ${POLICY_LIMIT_CENTS // 100} agent limit"
+    if ticket.order_age_days > RETURN_WINDOW_DAYS:
+        return f"order is {ticket.order_age_days} days old, past the {RETURN_WINDOW_DAYS}-day window"
+    return None
+
+
 def _wrap_untrusted(text: str) -> str:
     return f"<untrusted_ticket_text>\n{text}\n</untrusted_ticket_text>"
 
@@ -47,7 +61,10 @@ def _stub_decide(ticket: Ticket) -> Proposal:
 
 
 def decide(ticket: Ticket) -> Proposal:
-    """Ask the model what to do. Real Anthropic call unless RACCOON_STUB_LLM=1 (tests only)."""
+    """Check policy, then ask the model. Real Anthropic call unless RACCOON_STUB_LLM=1 (tests only)."""
+    broken = check_policy(ticket)
+    if broken:
+        return Proposal(action="deny", amount_cents=0, reason=f"policy: {broken}")
     if config.STUB_LLM:
         return _stub_decide(ticket)
 

@@ -6,7 +6,8 @@ Set RACCOON_STUB_LLM=1 to avoid real model calls (`make scenario` does).
 The scoreboard is reset first, so each run starts from zero. Chaos is seeded (the engine's seed);
 ticket IDs carry a per-run prefix, so reruns never collide with earlier tickets.
 
---check exits non-zero if Lane 2 has any ledger violation (duplicate, missing, unapproved, stuck),
+--check exits non-zero if Lane 2 has any ledger violation (duplicate, missing, unapproved, stuck), if a ticket
+the human or the policy said no to was not closed unpaid, if a ticket is still waiting at the end,
 or if the nexus_kill scene never showed the payments-side retry it exists to show.
 Lane 1 is printed for contrast but never gates the result.
 """
@@ -20,9 +21,11 @@ import time
 
 import httpx
 
+from raccoon import config
 from raccoon.show.procs import port_open
 
-PORT = 8100
+# RACCOON_SHOW_PORT. With the other RACCOON_*_PORT, RACCOON_DATA and TEMPORAL_ADDRESS a run can sit beside the demo.
+PORT = config.SHOW_PORT
 BASE = f"http://127.0.0.1:{PORT}"
 MUST_HAVE = [
     "intro",
@@ -32,7 +35,21 @@ MUST_HAVE = [
     "payments_timeout",
     "nexus_kill",
 ]
-FIELDS = ("submitted", "approved", "refunded_once", "duplicates", "missing", "in_flight", "unapproved")
+FIELDS = (
+    "submitted",
+    "approved",
+    "refunded_once",
+    "duplicates",
+    "missing",
+    "in_flight",
+    "unapproved",
+    "rejected",
+    "declined",
+    "waiting",
+)
+# Each cohort carries one ticket outside the refund policy and one the human denies (Engine.submit_cohort).
+NO_PER_COHORT = 2
+COHORTS = {"free_roam": 4}
 
 
 def wait_api(proc, timeout=90):
@@ -53,7 +70,8 @@ def line(lane, a, prev):
     return (
         f"  {lane}: submitted={d['submitted']} approved={d['approved']} ok={d['refunded_once']} "
         f"dup={d['duplicates']} (${a['duplicate_cents'] / 100:.2f} total) "
-        f"missing={d['missing']} stuck={d['in_flight']} unapproved={d['unapproved']}"
+        f"missing={d['missing']} stuck={d['in_flight']} unapproved={d['unapproved']} "
+        f"none-owed: policy={d['declined']} human-no={d['rejected']}"
     )
 
 
@@ -70,7 +88,7 @@ def main(scenes, check):
     # Checked here too: until our server exits, wait_api could get its answer from the one already running.
     if port_open(PORT):
         raise SystemExit(f"Port {PORT} is busy: stop `make demo` (or the other show server) first.")
-    # Locks the server's controls to this runner, so a browser left open on :8100 can't reset or run scenes.
+    # Locks the server's controls to this runner, so a browser left open on the show's port can't reset or run scenes.
     token = secrets.token_hex(8)
     headers = {"x-raccoon-scenario": token}
     srv = subprocess.Popen([sys.executable, "-m", "raccoon.show"], env={**os.environ, "RACCOON_SCENARIO_TOKEN": token})
@@ -97,6 +115,12 @@ def main(scenes, check):
             for lane in ("lane1", "lane2"):
                 if snap["audit"][lane]["in_flight"]:
                     failures.append(f"{scene}: {lane} still in flight when the scene ended")
+            l2 = snap["audit"]["lane2"]
+            closed_unpaid = (
+                l2["rejected"] + l2["declined"] - prev["lane2"].get("rejected", 0) - prev["lane2"].get("declined", 0)
+            )
+            if closed_unpaid != NO_PER_COHORT * COHORTS.get(scene, 1):
+                failures.append(f"{scene}: Lane 2 closed {closed_unpaid} denied tickets unpaid")
             for lane in ("lane1", "lane2"):
                 print(line(lane, snap["audit"][lane], prev[lane]))
                 prev[lane] = {k: snap["audit"][lane][k] for k in FIELDS}
@@ -118,10 +142,13 @@ def main(scenes, check):
             print(
                 f"  {lane}: submitted={x['submitted']} refunded_once={x['refunded_once']} "
                 f"duplicates={x['duplicates']} missing={x['missing']} stuck={x['in_flight']} "
-                f"unapproved={x['unapproved']}"
+                f"unapproved={x['unapproved']} rejected={x['rejected']} declined={x['declined']} "
+                f"waiting={x['waiting']}"
             )
         if a["duplicates"] or a["missing"] or a["in_flight"] or a["unapproved"]:
             failures.append("Lane 2 ledger violations")
+        if a["waiting"]:
+            failures.append("Lane 2: tickets still waiting for a decision")
         if a["refunded_once"] != a["approved"]:
             failures.append("Lane 2: refunded_once != approved")
     finally:

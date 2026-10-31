@@ -20,7 +20,7 @@ export const STEPS: Step[] = [
     short: "Architectures",
     title: "Two ways to build the same refund",
     story:
-      "A support agent proposes refunds, a human approves, and the payments team moves the money. Both stacks run that flow and call the same payments service.",
+      "Helpdesk tickets ask for refunds. The agent checks the refund policy, proposes the rest, a human approves or denies, and the payments team moves the money. Both stacks run that flow against the same payments service.",
     watch: "Where each one keeps a ticket's progress, and how it reaches payments.",
     arch: true,
   },
@@ -30,9 +30,10 @@ export const STEPS: Step[] = [
     short: "Happy path",
     title: "Happy path: nothing goes wrong",
     story:
-      "Both stacks get the same five tickets and a human approves them all. Temporal keeps each ticket's progress through crashes; Nexus is how support calls payments without owning payments' retries.",
-    watch: "Both lanes get the same five tickets, with no trouble yet.",
-    result: "Both lanes agree: five approved, five refunded once. The differences only show up under failure.",
+      "Both stacks get the same seven tickets. The agent's policy check denies one, and the human approves five and denies one. Temporal keeps each ticket's progress through crashes; Nexus is how support calls payments without owning payments' retries.",
+    watch: "Both lanes get the same seven tickets, with no trouble yet. The two denied tickets go back to the helpdesk.",
+    result:
+      "Both lanes agree: five approved, five refunded once, and the two denied tickets got no money. The differences only show up under failure.",
   },
   {
     id: "tip_over",
@@ -50,10 +51,10 @@ export const STEPS: Step[] = [
     scene: "double_delivery",
     short: "Redelivery",
     title: "The same message arrives twice",
-    story: "The same work is delivered twice: the queue redelivers its jobs, and Temporal receives the approval signal a second time.",
+    story: "The same work is delivered twice: the queue redelivers its jobs, and Temporal receives each human decision signal again.",
     watch: "The duplicate count, and dollars refunded twice.",
     result:
-      "The queue refunded some tickets twice. The workflow took the first approval and counted the repeats without acting on them.",
+      "The queue refunded some tickets twice. Each workflow took the first decision and counted the repeats without acting on them.",
   },
   {
     id: "deploy_wait",

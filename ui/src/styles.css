@@ -86,6 +86,7 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .lg.waiting { border: 2px solid var(--ink-2); }
 .lg.paying { background: var(--violet); }
 .lg.failed { background: var(--critical); }
+.lg.closed { background: var(--muted); }
 .lg-stage { color: var(--warning); }
 .lg-slots { color: var(--ink-2); }
 .fault-caption {
@@ -128,13 +129,17 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .diagram .packet rect { fill: var(--critical-wash); stroke: var(--critical); }
 .diagram .packet text { fill: var(--critical-ink); font-size: 13px; font-weight: 700; }
 .diagram .packet { animation: travel 1.8s ease-in 3; }
-@keyframes travel { from { transform: translateX(0); opacity: 0; } 20% { opacity: 1; } to { transform: translateX(var(--dx)); opacity: 0; } }
+@keyframes travel { from { transform: translate(0, 0); opacity: 0; } 20% { opacity: 1; } to { transform: translate(var(--dx, 0px), var(--dy, 0px)); opacity: 0; } }
 /* Slow enough to follow a ticket by eye; the scenes' own timing is server-side and unchanged */
 .diagram .tdot { transition: transform 1.8s cubic-bezier(0.4, 0, 0.2, 1), opacity 1.4s ease-in; fill: var(--sky); }
 .diagram .tdot.waiting { fill: var(--page); stroke: var(--ink-2); stroke-width: 2; }
 .diagram .tdot.paying { fill: var(--violet); }
 .diagram .tdot.done { fill: var(--good); }
 .diagram .tdot.failed { fill: var(--critical); }
+.diagram .tdot.closed { fill: var(--muted); }
+.diagram .human rect { fill: var(--page); stroke: var(--ink-2); stroke-width: 1.5; transition: stroke 0.3s; }
+.diagram .human text { fill: var(--ink); font-size: 13px; font-weight: 600; }
+.diagram .human.now rect { stroke: var(--sky); stroke-width: 2.5; }
 .diagram .slot rect { fill: none; stroke: var(--axis); stroke-dasharray: 3 3; }
 .diagram .slot text { font-size: 12px; font-weight: 700; }
 .diagram .slot.ok rect { fill: #0b3a22; stroke: var(--good); stroke-dasharray: none; }
@@ -143,6 +148,8 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .diagram .slot.missing text { fill: var(--serious); }
 .diagram .slot.bad rect { fill: var(--critical-wash); stroke: var(--critical); stroke-dasharray: none; }
 .diagram .slot.bad text { fill: var(--critical-ink); }
+.diagram .slot.none rect { stroke: var(--muted); stroke-dasharray: none; }
+.diagram .slot.none text { fill: var(--ink-2); }
 @media (prefers-reduced-motion: reduce) {
   .diagram *, .fault-caption { animation: none !important; transition: none !important; }
 }
@@ -198,7 +205,7 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
   position: relative; display: flex; align-items: center; justify-content: center; min-width: 8px;
   border-radius: 4px; color: #fff; font-weight: 700; font-size: 14px; transition: flex-grow 0.4s;
 }
-.seg.good, .seg.warning, .seg.serious { color: #0b0b0b; }
+.seg.good, .seg.warning, .seg.serious, .seg.neutral { color: #0b0b0b; }
 .seg[data-tip]:hover::after, .seg[data-tip]:focus-visible::after {
   content: attr(data-tip); position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
   background: #000; border: 1px solid var(--axis); color: var(--ink); padding: 4px 8px; border-radius: 6px;
@@ -208,6 +215,7 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .warning { background: var(--warning); }
 .serious { background: var(--serious); }
 .critical { background: var(--critical); }
+.neutral { background: var(--muted); }
 .striped { background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.35) 0 3px, transparent 3px 7px); }
 /* The label sits on a solid patch of the segment's own colour, so the texture never runs through the text. */
 .seg.striped > span { background-color: inherit; padding: 1px 6px; border-radius: 4px; }

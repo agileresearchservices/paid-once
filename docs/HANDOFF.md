@@ -5,10 +5,11 @@ server 1.32.0). Start with `README.md` for setup and `docs/architecture.md` for 
 whoever changes the code next.
 
 ## Verified
-- `make test`: 27 passed (payments service and its call counts, ledger, audit, Lane 1, the show server's guards, the
-  engine's scene views and scene settling; stub model).
-- `make test-temporal`: 4 passed (one refund through Nexus; duplicate approval signals ignored; commit-then-timeout
-  gives one refund; an approval sent while no worker is running survives). It runs on its own throwaway Temporal
+- `make test`: 38 passed (payments service and its call counts, ledger, audit, the agent's policy rules, Lane 1, the
+  show server's guards, the engine's scene views and scene settling; stub model).
+- `make test-temporal`: 6 passed (one refund through Nexus; duplicate approval signals ignored; commit-then-timeout
+  gives one refund; an approval sent while no worker is running survives; a human "no" ends `rejected` with no ledger
+  row; a policy denial ends `denied` with no Nexus operation in its history). It runs on its own throwaway Temporal
   server (`scripts/test-temporal.sh`, port 7299), and passed with `make demo` running.
 - `make scenario`: runs six scenes headless against both lanes and exits non-zero if Lane 2 breaks an invariant.
   Results, SHAs and caveats: `docs/scenario-results.md`. It also passed from a fresh clone with no `.env`.
@@ -30,6 +31,16 @@ whoever changes the code next.
 ## Decisions worth knowing
 - **Scoring reads only the payments ledger** (`raccoon/audit.py`). It iterates tickets the harness recorded, so
   ledger rows for unrecorded tickets are ignored; "no refund without an approval" covers recorded tickets only.
+- **The agent checks policy in code before it asks the model.** `agent.check_policy` denies refunds over $200
+  (`POLICY_LIMIT_CENTS`) and orders older than 30 days (`RETURN_WINDOW_DAYS`, from `Ticket.order_age_days`). Both
+  lanes reach it through `agent.decide`, so a policy ticket is denied identically in both, with the stub model too.
+  A denied ticket never reaches the human: Lane 1 marks the row `denied`, Lane 2's workflow returns `denied`.
+- **Every scene's cohort has two tickets owed nothing**: one outside the policy (alternating per scene run between an
+  amount over the cap and a 45-day-old order) and one the human denies. They exercise invariant 2 under the same
+  chaos. The harness records what it planned for each ticket (`tickets.expect` in `audit.db`: `refund` or `policy`)
+  and every human decision (`decisions`, first decision wins). Those are the harness's own records, not a lane's
+  state; the audit reads them with the ledger to score `rejected` (a human said no, no refund), `declined` (policy
+  ticket, no refund) and `waiting` (no decision, no refund). Any of these with a refund is `unapproved`.
 - **The key comes from the business operation.** Lane 2 uses `refund-<ticket_id>` for both the idempotency key and the
   refund workflow ID. The ledger is UNIQUE on the key only, not on the ticket. Do not weaken this.
 - **Model:** the demo agent defaults to `claude-sonnet-5-5` (`RACCOON_MODEL` overrides). Forced `tool_choice` is
@@ -72,9 +83,13 @@ whoever changes the code next.
   `/admin/reset`): per lane and ticket, calls and how many the ledger answered from an existing key. The engine sums
   them per scene into the snapshot's `payments_calls` (`booked` = calls − replays). It observes only; the ledger and
   the audit don't read it.
-- **An approved Lane 2 ticket with nothing pending reads "approved, queued in Temporal for a worker"**, drawn as a
-  position dot, not the "waiting for a human" ring. The engine remembers approvals it sent (`Engine.approved`) because
-  `describe()` can't tell a waiting workflow from one whose worker is down.
+- **A decided Lane 2 ticket with nothing pending reads "approved (or denied), queued in Temporal for a worker"**,
+  drawn as a position dot, not the "waiting for a human" ring. The engine remembers the decisions it sent
+  (`Engine.decisions`) because `describe()` can't tell a waiting workflow from one whose worker is down. The replay in
+  `double_delivery` resends each ticket's actual decision, never an approval the human didn't give.
+- **`describe()` shows a refunded and a denied workflow both as `COMPLETED`.** The engine reads each completed
+  workflow's result once (from history, so no worker is needed) and caches it in `Engine.lane2_outcomes`; denied and
+  rejected tickets are drawn as grey dots back at the helpdesk, refunded ones at payments.
 - **Temporal look, local only.** Palette and fonts (Inter, Noto Sans Mono, bundled) follow temporal.io. The wordmark and
   favicon go in `ui/public/brand/`, which is gitignored because they are trademarks; without them the header shows
   text.
@@ -87,6 +102,9 @@ whoever changes the code next.
 - Per-attempt idempotency key in the client (fresh uuid each try). Very common bug; fixing it (derive the key from the ticket) is a one-line change that fixes the double-delivery and timeout scenes. The write-up measures this.
 - LangGraph `MemorySaver` (the tutorial default). Approval interrupt state is lost when the worker restarts.
 - At-least-once queue with a visibility timeout. A recovery path re-drives "executing" tickets from the DB after a crash, which is what turns a crash-after-commit into a second refund.
+- A human "no" is handled at the API: `POST /tickets/{id}/reject` marks the row `rejected` and queues no job, so
+  redelivery and the recovery path (both of which touch only execute jobs) never see it. That is how a team would
+  build it; it is not weakened to make Lane 1 refund denied tickets.
 - A careful dedupe check exists for finished tickets, so redelivery after completion is a no-op. Duplicates only arise for in-flight work.
 - `RACCOON_L1_STABLE_KEY=1` (off by default) makes Lane 1 derive its idempotency key from the ticket instead of the attempt. It exists only so the write-up can measure the one-line fix (duplicates drop to 0, the 7 lost tickets remain). Default runs, the UI and the demo are unchanged, so Lane 1 is still the competent-team-today system described above.
 - "Improve the current implementation" (outbox, sweeper, durable checkpointer) is argued in the write-up, not built as a third lane.

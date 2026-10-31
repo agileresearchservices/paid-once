@@ -13,8 +13,12 @@ export interface LaneAudit {
   missing: number;
   in_flight: number;
   unapproved: number;
+  rejected: number; // a human said no, and no money moved
+  declined: number; // broke the refund policy, and no money moved
+  waiting: number; // no decision yet, no money moved
   violations: number;
-  tickets?: Record<string, string>; // ledger state per ticket: ok | duplicate | in_flight | missing | waiting | unapproved
+  // ledger state per ticket: ok | duplicate | in_flight | missing | waiting | unapproved | rejected | declined
+  tickets?: Record<string, string>;
 }
 
 export interface ProcStatus {

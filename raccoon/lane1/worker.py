@@ -40,6 +40,7 @@ class Worker:
                     ticket["order_id"],
                     ticket["amount_cents"],
                     ticket["message"],
+                    ticket["order_age_days"],
                 )
             },
             cfg,
