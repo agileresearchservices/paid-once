@@ -107,4 +107,5 @@ export interface Snapshot {
   flow: Record<LaneId, FlowDot[]>; // this scene's tickets only
   temporal_ui: string | null; // Temporal Web UI base URL, or null when it is not answering
   topology: Topology;
+  locked: string | null; // what owns the server's controls (`make scenario`), or null for a normal show
 }

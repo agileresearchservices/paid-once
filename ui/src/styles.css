@@ -89,6 +89,10 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
   padding: 3px 12px; font-size: 16px; animation: flash 0.9s ease-in-out 2;
 }
 @keyframes flash { 50% { background: #5a1f19; } }
+.locked-banner {
+  margin: 0 0 12px; padding: 10px 16px; border-radius: 10px; font-size: 16px;
+  background: #3a2c05; border: 1px solid var(--warning); color: var(--ink);
+}
 
 .diagram .team { fill: none; stroke: var(--axis); stroke-dasharray: 6 6; }
 .diagram .row-label { fill: var(--muted); font-size: 12px; letter-spacing: 0.08em; font-weight: 600; }

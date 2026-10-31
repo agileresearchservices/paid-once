@@ -12,6 +12,8 @@ Lane 1 is printed for contrast but never gates the result.
 """
 
 import json
+import os
+import secrets
 import subprocess
 import sys
 import time
@@ -19,8 +21,10 @@ import time
 import httpx
 
 from raccoon.show.engine import SETTLE_S
+from raccoon.show.procs import port_open
 
-BASE = "http://127.0.0.1:8100"
+PORT = 8100
+BASE = f"http://127.0.0.1:{PORT}"
 MUST_HAVE = [
     "intro",
     "tip_over",
@@ -64,15 +68,21 @@ def handler_attempts(snap):
 
 
 def main(scenes, check):
-    srv = subprocess.Popen([sys.executable, "-m", "raccoon.show"])
+    # Checked here too: until our server exits, wait_api could get its answer from the one already running.
+    if port_open(PORT):
+        raise SystemExit(f"Port {PORT} is busy: stop `make demo` (or the other show server) first.")
+    # Locks the server's controls to this runner, so a browser left open on :8100 can't reset or run scenes.
+    token = secrets.token_hex(8)
+    headers = {"x-raccoon-scenario": token}
+    srv = subprocess.Popen([sys.executable, "-m", "raccoon.show"], env={**os.environ, "RACCOON_SCENARIO_TOKEN": token})
     failures: list[str] = []
     try:
         wait_api(srv)
         time.sleep(1)
-        httpx.post(f"{BASE}/api/reset", timeout=10).raise_for_status()
+        httpx.post(f"{BASE}/api/reset", headers=headers, timeout=10).raise_for_status()
         prev = {"lane1": {}, "lane2": {}}
         for scene in scenes:
-            httpx.post(f"{BASE}/api/scenes/{scene}/run", timeout=5).raise_for_status()
+            httpx.post(f"{BASE}/api/scenes/{scene}/run", headers=headers, timeout=5).raise_for_status()
             t0 = time.time()
             peak_handler = peak_caller = 0
             while True:

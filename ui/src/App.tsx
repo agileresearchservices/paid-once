@@ -47,6 +47,7 @@ export function App() {
   const resetTimer = useRef<number | undefined>(undefined);
   const step = STEPS[index];
   const running = snap?.running ?? true;
+  const locked = snap?.locked ?? null; // `make scenario` owns this server: look, don't touch
 
   const go = useCallback((delta: number) => {
     setIndex((i) => Math.min(STEPS.length - 1, Math.max(0, i + delta)));
@@ -78,11 +79,11 @@ export function App() {
       if (e.key === "ArrowRight") go(1);
       else if (e.key === "ArrowLeft") go(-1);
       else if (/^[1-9]$/.test(e.key) && Number(e.key) <= STEPS.length) setIndex(Number(e.key) - 1);
-      else if ((e.key === "r" || e.key === "R") && step.scene && !running) void act(`/api/scenes/${step.scene}/run`);
+      else if ((e.key === "r" || e.key === "R") && step.scene && !running && !locked) void act(`/api/scenes/${step.scene}/run`);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [go, act, step.scene, running]);
+  }, [go, act, step.scene, running, locked]);
 
   const onReset = () => {
     if (!confirmReset) {
@@ -125,6 +126,13 @@ export function App() {
         {!connected && <span className="chip warn">reconnecting…</span>}
       </header>
 
+      {locked && (
+        <p className="locked-banner" role="status">
+          <b>This is not the demo.</b> <code>{locked}</code> is running on this server, so Run and Reset are off. The demo
+          comes back when it ends.
+        </p>
+      )}
+
       <section className="story">
         <div className="story-text">
           <h2>{step.title}</h2>
@@ -134,8 +142,8 @@ export function App() {
         </div>
         <div className="controls">
           {step.scene && (
-            <button className="primary" disabled={running} onClick={() => void act(`/api/scenes/${step.scene}/run`)}>
-              {thisRunning ? `Running ${elapsed}s…` : running ? "Another scene is running" : finished ? "Run again (R)" : "Run this scene (R)"}
+            <button className="primary" disabled={running || !!locked} onClick={() => void act(`/api/scenes/${step.scene}/run`)}>
+              {locked ? "Locked by the test run" : thisRunning ? `Running ${elapsed}s…` : running ? "Another scene is running" : finished ? "Run again (R)" : "Run this scene (R)"}
             </button>
           )}
           {status && <p className={`scene-status ${status.cls}`} role="status">{status.text}</p>}
@@ -143,7 +151,7 @@ export function App() {
             <button onClick={() => go(-1)} disabled={index === 0}>← Back</button>
             <button onClick={() => go(1)} disabled={index === STEPS.length - 1}>Next →</button>
           </div>
-          <button className={confirmReset ? "danger" : ""} onClick={onReset}>
+          <button className={confirmReset ? "danger" : ""} onClick={onReset} disabled={!!locked}>
             {confirmReset ? "Click again to reset" : "Reset scoreboard"}
           </button>
           {error && <p className="fail" role="alert">{error}</p>}
