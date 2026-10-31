@@ -1,19 +1,8 @@
 import type { ReactNode } from "react";
-import type { NexusRow, ProcStatus, Topology } from "./types";
-
-// Ticket IDs look like <run>-<scene>-r<n>-<i>-lane2; the scene is on screen already, so show the index.
-const shortTicket = (t: string) => {
-  const m = t.match(/-(\d+)-lane2$/);
-  return m ? `#${m[1]}` : t;
-};
-
-// Temporal Web UI links. With a run ID the link opens the history; without one, a list filtered to the workflow.
-function workflowLink(ui: string, ns: string, wid: string, run?: string) {
-  const base = `${ui}/namespaces/${encodeURIComponent(ns)}/workflows`;
-  return run
-    ? `${base}/${encodeURIComponent(wid)}/${encodeURIComponent(run)}/history`
-    : `${base}?query=${encodeURIComponent(`WorkflowId="${wid}"`)}`;
-}
+import { NexusTimeline } from "./NexusTimeline";
+import { shortTicket } from "./nexusLinks";
+import { ProcTile } from "./Processes";
+import type { FaultWindow, NexusRow, ProcStatus, SceneRun, Topology } from "./types";
 
 function Ext({ href, children }: { href: string; children: ReactNode }) {
   return (
@@ -23,42 +12,111 @@ function Ext({ href, children }: { href: string; children: ReactNode }) {
   );
 }
 
-// Who owns what: support's code names only the endpoint, and the endpoint maps to the payments namespace.
-function Boundary({ t, ui, down }: { t: Topology; ui: string | null; down: boolean }) {
+// Who owns what, left to right like the architecture diagram: support's code names only the endpoint, and the
+// endpoint maps to the payments namespace. Each team's worker sits in its own box, so the kill shows where it lands.
+function BoundaryStrip({
+  t,
+  ui,
+  support,
+  payments,
+  temporal,
+  kills,
+}: {
+  t: Topology;
+  ui: string | null;
+  support?: ProcStatus;
+  payments?: ProcStatus;
+  temporal?: ProcStatus;
+  kills: Record<string, number>;
+}) {
+  const isDown = (p?: ProcStatus) => p !== undefined && !p.alive;
   return (
-    <div className="boundary">
-      <div className="team support">
-        <span className="team-name">Support team</span>
-        <code>{t.support.namespace}</code>
-        <span>{t.support.workflow}</span>
-        {ui && <Ext href={`${ui}/namespaces/${t.support.namespace}/workflows`}>Open namespace ↗</Ext>}
-      </div>
-      <div className="endpoint">
-        <span className="boundary-label">team boundary</span>
-        <div className="endpoint-card">
-          <code>{t.endpoint}</code>
-          <code>
-            {t.service}.{t.operation}
-          </code>
-          <span className="muted">the only thing support's code names</span>
+    <div className="strip">
+      <div className={isDown(support) ? "team down" : "team"}>
+        <div className="team-head">
+          <span className="team-name">Support team</span>
+          {ui && <Ext href={`${ui}/namespaces/${t.support.namespace}/workflows`}>namespace ↗</Ext>}
         </div>
-      </div>
-      <div className={down ? "team payments down" : "team payments"}>
-        <span className="team-name">
-          Payments team {down && <span className="team-down">DOWN · restarting</span>}
-        </span>
-        <code>{t.payments.namespace}</code>
         <span>
-          {t.payments.workflow} → {t.payments.activity}
+          <code>{t.support.namespace}</code> · {t.support.workflow}
         </span>
-        <span className="muted">task queue {t.payments.task_queue}</span>
-        {ui && <Ext href={`${ui}/namespaces/${t.payments.namespace}/workflows`}>Open namespace ↗</Ext>}
+        {support && <ProcTile p={support} kills={kills.support_worker} />}
       </div>
-      <p className="caption">
-        Simplified contract. The endpoint maps to the namespace and task queue; the caller's code never does.
-      </p>
+      <span className="strip-arrow" aria-hidden="true">
+        ▶
+      </span>
+      <div className={isDown(temporal) ? "endpoint-card down" : "endpoint-card"}>
+        <span className="headline-label">
+          {isDown(temporal) ? (
+            <>
+              ⚡ Temporal server down
+              <br />
+              {kills.temporal ? "killed during this run" : " "}
+            </>
+          ) : (
+            <>
+              Team boundary
+              <br />
+              the only name in support's code
+            </>
+          )}
+        </span>
+        <code>{t.endpoint}</code>
+        <code>
+          {t.service}.{t.operation}
+        </code>
+      </div>
+      <span className="strip-arrow" aria-hidden="true">
+        ▶
+      </span>
+      <div className={isDown(payments) ? "team down" : "team"}>
+        <div className="team-head">
+          <span className="team-name">Payments team</span>
+          {(kills.payments_worker ?? 0) > 0 && (
+            <span className="team-kills" title="kill -9 during this scene">
+              ⚡ killed {kills.payments_worker === 1 ? "once" : `${kills.payments_worker} times`}
+            </span>
+          )}
+          {ui && <Ext href={`${ui}/namespaces/${t.payments.namespace}/workflows`}>namespace ↗</Ext>}
+        </div>
+        <span>
+          <code>{t.payments.namespace}</code> · {t.payments.workflow} → {t.payments.activity}
+        </span>
+        {/* The kill count sits in the header, so the tile keeps one line inside the card. */}
+        {payments && <ProcTile p={payments} />}
+      </div>
     </div>
   );
+}
+
+type Beat = { text: string };
+
+// The story in four beats, read from the run's fault windows and the rows. Each lights up when it has happened.
+function beatsFor(
+  rows: NexusRow[],
+  faults: FaultWindow[],
+  planned: number,
+  done: boolean,
+  verdict: string,
+): { beats: Beat[]; reached: number } {
+  const n = rows.length;
+  const on = faults.filter((f) => f.start != null);
+  const landed = on.length;
+  const latest = on[on.length - 1];
+  const allBack = landed > 0 && faults.every((f) => f.start != null && f.end != null);
+  const beats = [
+    { text: `Support starts ${n || "the"} refund${n === 1 ? "" : "s"} on the endpoint` },
+    {
+      text:
+        landed === 0
+          ? `⚡ ${planned} failures while they're in flight`
+          : `⚡ Failure ${landed} of ${planned}: ${latest.effect === "stall" ? "payments goes quiet" : `${latest.label} killed`}`,
+    },
+    { text: "Everything back up: payments retries with the same key" },
+    { text: done ? verdict : "The ledger decides: was each refund paid once?" },
+  ];
+  const reached = done ? 4 : allBack ? 3 : landed > 0 ? 2 : n > 0 ? 1 : 0;
+  return { beats, reached };
 }
 
 export function NexusPanel({
@@ -66,112 +124,154 @@ export function NexusPanel({
   ran,
   topology,
   temporalUi,
-  paymentsWorker,
+  processes,
+  run,
+  finished,
+  now,
+  ledgerTickets,
+  calls,
 }: {
   rows: NexusRow[];
   ran: boolean; // this scene is the one the engine last ran; otherwise rows is empty because nothing ran yet
   topology: Topology;
   temporalUi: string | null;
-  paymentsWorker?: ProcStatus;
+  processes: Record<string, ProcStatus>;
+  run?: SceneRun;
+  finished: boolean;
+  now: number;
+  ledgerTickets: Record<string, string>; // the ledger's verdict per ticket (audit), every scene since reset
+  calls?: { calls: number; booked: number; replays: number }; // this scene's calls to payments, counted by payments
 }) {
-  const surfaced = rows.filter((r) => r.caller_saw_failure || r.state === "FAILED").length;
-  const retries = rows.reduce((n, r) => n + Math.max(0, (r.handler.peak_activity_attempt ?? 0) - 1), 0);
-  const workerDown = paymentsWorker !== undefined && !paymentsWorker.alive;
+  const t0 = ran && run ? run.started_at : null;
+  const faults = ran ? (run?.faults ?? []) : [];
+  const allClosed = rows.length > 0 && rows.every((r) => !r.live && r.attempts.every((a) => a.outcome !== "running"));
+
+  // This run's tickets, by the ledger (audit), never by the lane's own state.
+  const scene = ran ? sceneTickets(ledgerTickets) : [];
+  const denied = scene.filter(([, v]) => v === "declined" || v === "rejected");
+  const paidOnce = scene.filter(([, v]) => v === "ok").length;
+  const paidTwice = scene.filter(([, v]) => v === "duplicate").length;
+  const missing = scene.filter(([, v]) => v === "missing").length;
+  const errors = rows.filter((r) => r.caller_saw_failure || r.state === "FAILED").length;
+  const maxStarts = Math.max(0, ...rows.map((r) => r.peak_attempt));
+  const retries = rows.reduce((n, r) => n + Math.max(0, r.attempts.length - 1, (r.handler.peak_activity_attempt ?? 0) - 1), 0);
+  const show = finished && allClosed;
+  const landed = faults.filter((f) => f.start != null);
+  const verdict =
+    paidTwice || missing || errors
+      ? `⚠ ${[paidTwice && `${paidTwice} paid twice`, missing && `${missing} never paid`, errors && `support saw ${errors} error${errors === 1 ? "" : "s"}`].filter(Boolean).join(", ")}`
+      : "Each refund paid once; support's code saw no errors";
+  const planned = processes.temporal ? 4 : 3; // the Temporal kill needs a server the show started itself
+  const { beats, reached } = beatsFor(rows, faults, planned, show, verdict);
 
   return (
     <section className="nexus" aria-label="Nexus">
-      <Boundary t={topology} ui={temporalUi} down={workerDown} />
-      <div className="ops">
-        <div className="headline">
-          <div>
-            <span className="headline-label">Support saw</span>
-            <b>{rows.length}</b> operations · <b>{surfaced}</b> failures surfaced
-          </div>
-          <div>
-            <span className="headline-label">Payments absorbed</span>
-            <b>{retries}</b> activity retries
-          </div>
-        </div>
-        {workerDown && (
-          <p className="worker-down" role="status">
-            ⚡ Payments worker down. Accepted refunds wait and retry inside {topology.payments.namespace}.
-          </p>
-        )}
-        {rows.length === 0 ? (
-          <p className="muted">{ran ? "No operations yet in this scene." : "Not run yet: press Run."}</p>
-        ) : (
-          <div className="ops-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>Ticket</th>
-                  <th>
-                    Support sees <span className="th-sub">the caller's operation</span>
-                  </th>
-                  <th>
-                    Payments sees <span className="th-sub">observed by this dashboard; support never reads it</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => {
-                  const h = r.handler;
-                  const peak = h.peak_activity_attempt ?? 0;
-                  const retrying = r.live && (h.activity_attempt ?? 0) >= 2;
-                  return (
-                    <tr key={r.ticket} className={r.live ? "" : "done"}>
-                      <td title={r.ticket}>{shortTicket(r.ticket)}</td>
-                      <td>
-                        <span className="pill">{r.live ? r.state : `✓ ${r.state}`}</span>{" "}
-                        <span className="muted">start attempts {r.peak_attempt}</span>
-                        {temporalUi && (
-                          <>
-                            {" · "}
-                            <Ext href={workflowLink(temporalUi, r.caller_namespace, r.caller_workflow_id, r.caller_run_id)}>
-                              history ↗
-                            </Ext>
-                          </>
-                        )}
-                        {r.last_failure && <div className="fail">{r.last_failure}</div>}
-                      </td>
-                      <td>
-                        {h.workflow_id ? (
-                          <>
-                            <code title="The handler workflow ID comes from the ticket: a second dedup layer">
-                              {h.workflow_id}
-                            </code>{" "}
-                            <span className="pill">{h.status}</span>{" "}
-                            {retrying ? (
-                              <span className="pill warn">activity attempt {h.activity_attempt}</span>
-                            ) : peak >= 2 ? (
-                              <span className="pill warn">retried ×{peak - 1}</span>
-                            ) : (
-                              <span className="muted">activity attempt {r.live ? (h.activity_attempt ?? 0) : peak}</span>
-                            )}
-                            {temporalUi && h.namespace && (
-                              <>
-                                {" "}
-                                <Ext href={workflowLink(temporalUi, h.namespace, h.workflow_id, h.run_id)}>history ↗</Ext>
-                              </>
-                            )}
-                            {r.live && h.activity_failure && <div className="fail">{h.activity_failure}</div>}
-                          </>
-                        ) : (
-                          <span className="muted">not accepted yet</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-        <p className="muted footnote">
-          Handler workflow ID <code>refund-&lt;ticket&gt;</code> is a second dedup layer: a re-sent start request finds the
-          running workflow instead of starting another.
+      <BoundaryStrip
+        t={topology}
+        ui={temporalUi}
+        support={processes.support_worker}
+        payments={processes.payments_worker}
+        temporal={processes.temporal}
+        kills={ran && run ? run.kills : {}}
+      />
+      <p className="without">
+        <b>Without Nexus,</b> support's code would name payments' namespace, task queue and workflow, and own their
+        retries.
+      </p>
+
+      {ran ? (
+        <ol className="beats">
+          {beats.map((b, i) => (
+            <li key={i} className={i + 1 < reached ? "done" : i + 1 === reached ? "now" : ""}>
+              <b>{i + 1}</b> {b.text}
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="beats-pre">
+          Press Run: 7 tickets, the approved ones go to payments over Nexus. Then, while they're in flight, payments
+          goes quiet and the support worker, the payments worker and the Temporal server itself are killed.
         </p>
+      )}
+
+      <div className="timeline-wrap">
+        <NexusTimeline rows={rows} t0={t0} now={now} faults={faults} temporalUi={temporalUi} />
+        <div className="timeline-notes">
+          <span>
+            {denied.length > 0
+              ? `${denied.map(([k, v]) => `${shortTicket(k)} denied ${v === "declined" ? "by policy" : "by a human"}`).join(" · ")} · no Nexus call made`
+              : " "}
+          </span>
+          <span>
+            <i className="key-dollar">$</i> the ledger booked the refund · support would only see a failure after the
+            10-minute schedule-to-close timeout
+          </span>
+        </div>
+      </div>
+
+      <div className="headline payoff">
+        <div>
+          <span className="headline-label">Failures</span>
+          {show ? (
+            <>
+              <b>{landed.length}</b> <span className="muted">· each with {Math.min(...landed.map((f) => f.hit))}+ refunds in flight</span>
+            </>
+          ) : (
+            <b className="muted">…</b>
+          )}
+        </div>
+        <div>
+          <span className="headline-label">Support's code saw</span>
+          {show ? (
+            <>
+              <b className={errors ? "n-bad" : "n-good"}>{errors}</b> error{errors === 1 ? "" : "s"}{" "}
+              <span className="muted">
+                · {rows.length} operations, {maxStarts === 1 ? "1 start attempt each" : `up to ${maxStarts} start attempts`}
+              </span>
+            </>
+          ) : (
+            <b className="muted">…</b>
+          )}
+        </div>
+        <div>
+          <span className="headline-label">Payments absorbed</span>
+          {show ? (
+            <>
+              <b>{retries}</b> retr{retries === 1 ? "y" : "ies"} <span className="muted">· inside its own namespace</span>
+            </>
+          ) : (
+            <b className="muted">…</b>
+          )}
+        </div>
+        <div>
+          <span className="headline-label">The ledger</span>
+          {show ? (
+            <>
+              <b className={paidTwice || missing ? "n-bad" : "n-good"}>{paidOnce}</b> refund{paidOnce === 1 ? "" : "s"}, each
+              paid once
+              {paidTwice > 0 && <b className="n-bad"> · {paidTwice} paid twice</b>}
+              {missing > 0 && <b className="n-bad"> · {missing} never paid</b>}
+              {calls && (
+                <span className="muted">
+                  {" "}
+                  · {calls.calls} calls: {calls.booked} booked, {calls.replays} answered from the ledger by{" "}
+                  <code>refund-&lt;ticket&gt;</code>
+                </span>
+              )}
+            </>
+          ) : (
+            <b className="muted">…</b>
+          )}
+        </div>
       </div>
     </section>
   );
+}
+
+// The ledger keys of the latest nexus_kill run: <run>-nexus_kill-r<n>-<i>-lane2, highest n since the last reset.
+function sceneTickets(tickets: Record<string, string>): [string, string][] {
+  const all = Object.entries(tickets).filter(([k]) => k.includes("-nexus_kill-r"));
+  const runNo = (k: string) => Number(k.match(/-nexus_kill-r(\d+)-/)?.[1] ?? 0);
+  const latest = Math.max(0, ...all.map(([k]) => runNo(k)));
+  return all.filter(([k]) => runNo(k) === latest).sort(([a], [b]) => a.localeCompare(b));
 }

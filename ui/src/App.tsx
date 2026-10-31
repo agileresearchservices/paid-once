@@ -2,15 +2,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Compare } from "./Architecture";
 import { Diagram } from "./Diagram";
 import { NexusPanel } from "./NexusPanel";
-import { ProcTile } from "./Processes";
 import { Scoreboard } from "./Scoreboard";
 import { STEPS } from "./steps";
 import { Ticker } from "./Ticker";
 import { post, useSnapshot } from "./useSnapshot";
 
 const LANES = [
-  { id: "lane1" as const, name: "Job queue", subtitle: "What most teams run today: queue, polling worker, in-memory agent state, HTTP to payments", procs: ["lane1_api", "lane1_worker"] },
-  { id: "lane2" as const, name: "Temporal + Nexus", subtitle: "Durable workflow; support calls payments over Nexus", procs: ["support_worker", "payments_worker"] },
+  { id: "lane1" as const, name: "Job queue", subtitle: "What most teams run today: queue, polling worker, in-memory agent state, HTTP to payments" },
+  { id: "lane2" as const, name: "Temporal + Nexus", subtitle: "Durable workflow; support calls payments over Nexus" },
 ];
 
 function Chips({ counts, empty }: { counts: Record<string, number>; empty: string }) {
@@ -183,7 +182,12 @@ export function App() {
           ran={onScreen}
           topology={snap.topology}
           temporalUi={snap.temporal_ui}
-          paymentsWorker={snap.processes.payments_worker}
+          processes={snap.processes}
+          run={run}
+          finished={finished}
+          now={snap.now}
+          ledgerTickets={snap.audit.lane2.tickets ?? {}}
+          calls={onScreen ? snap.payments_calls?.lane2 : undefined}
         />
       )}
 
@@ -191,24 +195,7 @@ export function App() {
 
       {step.arch ? (
         <Compare />
-      ) : step.nexus ? (
-        // The Nexus scene only runs the Temporal lane, so the lanes shrink to one strip and the panel keeps the screen.
-        <div className="lanes compact">
-          <article className="lane lane-off">
-            <h2>Job queue</h2>
-            <span className="muted">not part of this scene</span>
-          </article>
-          <article className="lane lane2">
-            <h2>Temporal + Nexus</h2>
-            <div className="tiles">
-              {LANES[1].procs.map((p) => snap.processes[p] && <ProcTile key={p} p={snap.processes[p]} kills={run?.kills?.[p]} />)}
-            </div>
-            <div className="believes">
-              <span className="muted">Workflows:</span> <Chips counts={onScreen ? snap.lane2_view : {}} empty="nothing yet" />
-            </div>
-          </article>
-        </div>
-      ) : (
+      ) : step.nexus ? null : (
         <div className="lanes">
           {LANES.map((l) => (
             <article key={l.id} className={`lane ${l.id}`}>

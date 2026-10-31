@@ -25,7 +25,8 @@ In scope:
   checks two policy rules in code (at most $200, order at most 30 days old) before it asks the model, and a human
   approves or denies what it proposes.
 - Six chaos scenes: happy path, agent process killed, message delivered twice, deploy during the approval wait,
-  payments commits then goes quiet, payments worker killed mid-Nexus-operation (Lane 2 only).
+  payments commits then goes quiet, and a Nexus gauntlet (Lane 2 only): payments goes quiet, then the support worker,
+  the payments worker and the Temporal server are killed, all while the refunds are in flight.
 - Three ledger invariants: every approved ticket refunded exactly once; no refund without an approval; no ticket
   lost or stuck. Each scene includes one ticket outside the policy and one a human denies, so the second invariant is
   tested under the same chaos as the first.
@@ -66,7 +67,8 @@ Two things to know:
 - If a Temporal server is already running on that address, the show **reuses it** and creates two namespaces
   (`support`, `payments`) and one Nexus endpoint (`payments-endpoint`) on it. To keep it separate, start
   your own on another port and point at it: `temporal server start-dev --port 7299` and
-  `TEMPORAL_ADDRESS=127.0.0.1:7299 make scenario`.
+  `TEMPORAL_ADDRESS=127.0.0.1:7299 make scenario`. A reused server is not killed, so the Nexus scene then runs three
+  failures instead of four; point `TEMPORAL_ADDRESS` at a free port and the show starts (and kills) its own.
 - It needs port 8100, so stop `make demo` first; it refuses to start if anything is listening there. While it runs,
   a browser on :8100 shows a "not the demo" banner, and Run and Reset are locked to the test runner.
 - The seed fixes ticket amounts and messages, not the exact timing of the kills. The reproducible claim is the Lane 2
@@ -109,9 +111,15 @@ Run of show, about ten minutes:
   (`✓` paid once, `×2` paid twice, `∅` owed, never paid, `—` denied, nothing owed), and each lane shows what payments saw in the scene: calls, refunds booked, and
   calls answered from an existing key. On step 6 that line is the evidence: Temporal's retry is answered from the
   ledger, the queue's is booked again.
-- **Step 7, Nexus**: the payments team's worker is killed mid-refund. The payments team box goes DOWN; support's
-  side stays `STARTED` with no failure while payments retries. Click a row's `history ↗` links to show both sides in
-  the Temporal Web UI (http://127.0.0.1:8233), including the caller's Nexus Links tab.
+- **Step 7, Nexus**: four failures while the refunds are in flight. Payments books each refund and goes quiet, then
+  the support worker, the payments worker and the Temporal server itself are killed, each for 5-6 seconds. A red row
+  per failure shows when it was down and how many refunds it hit. Under them, each approved refund has two tracks:
+  what support's code sees (one `STARTED` bar, no error) and what payments does (failed attempts, then one that
+  succeeds). A `$` marks when the ledger booked the money; the attempt that finally succeeds is answered from the
+  ledger, not paid again. Four beats light up as the story happens, and the tiles at the bottom read the result from
+  the ledger. The `support sees ↗` and `payments does ↗` labels open each side's history in the Temporal Web UI
+  (http://127.0.0.1:8233), including the caller's Nexus Links tab. The Temporal kill needs a server the show started
+  itself (`make demo` does, if nothing is listening on 7233); with a server you started, the scene skips that kill.
 - **Step 8, Scoreboard**: the totals, and the queue's own job table next to what the ledger says.
 
 The Temporal wordmark and favicon are not in the repo. To show them, put `temporal-wordmark.svg` and `favicon.svg` in

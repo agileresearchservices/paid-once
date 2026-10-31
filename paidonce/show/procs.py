@@ -59,10 +59,11 @@ class ProcessManager:
         }
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._watch, daemon=True)
-        self.temporal: subprocess.Popen | None = None
 
     # -- lifecycle ---------------------------------------------------------
     def ensure_temporal(self) -> str:
+        """Start a Temporal dev server, unless one is already listening. Only one we started can be killed: a server
+        someone else runs is not ours to kill, so it never appears as a process here."""
         port = config.TEMPORAL_ADDRESS.rpartition(":")[2]
         if port_open(int(port)):
             return "using the Temporal server already running on " + config.TEMPORAL_ADDRESS
@@ -72,25 +73,29 @@ class ProcessManager:
                 f"No Temporal server on {config.TEMPORAL_ADDRESS} and no `temporal` CLI on PATH (brew install temporal)."
             )
         config.ensure_data_dir()
-        self.temporal = subprocess.Popen(
-            [
-                exe,
-                "server",
-                "start-dev",  # with its Web UI: the demo links both namespaces from the Nexus panel
-                "--port",
-                port,
-                "--db-filename",
-                str(config.DATA_DIR / "temporal.db"),
-            ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        # The SQLite file is what lets the server die and come back with every workflow where it was.
+        cmd = [
+            exe,
+            "server",
+            "start-dev",  # with its Web UI: the demo links both namespaces from the Nexus panel
+            "--port",
+            port,
+            "--db-filename",
+            str(config.DATA_DIR / "temporal.db"),
+        ]
+        temporal = Proc("temporal", "Temporal server", cmd)
+        self._spawn(temporal)
+        self.procs["temporal"] = temporal
         for _ in range(60):
             if port_open(int(port)):
                 time.sleep(1.5)
                 return "started a Temporal dev server"
             time.sleep(0.5)
         raise RuntimeError("Temporal dev server did not start")
+
+    @property
+    def owns_temporal(self) -> bool:
+        return "temporal" in self.procs
 
     def _spawn(self, p: Proc) -> None:
         env = dict(os.environ, PYTHONUNBUFFERED="1")
@@ -107,15 +112,14 @@ class ProcessManager:
 
     def start_all(self) -> None:
         for p in self.procs.values():
-            self._spawn(p)
+            if p.popen is None:  # Temporal, if ours, is already up
+                self._spawn(p)
         self._thread.start()
 
     def stop_all(self) -> None:
         self._stop.set()
         for p in self.procs.values():
             self._terminate(p)
-        if self.temporal is not None:
-            self.temporal.terminate()
 
     @staticmethod
     def _terminate(p: Proc) -> None:

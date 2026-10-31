@@ -19,21 +19,22 @@ def refund_workflow_id(ticket_id: str) -> str:
     return f"refund-{ticket_id}"
 
 
+# 8s on purpose: in the nexus_kill scene an attempt on a killed worker must time out and retry inside the scene
+# window. The show's Nexus timeline reads these too, to place the end of a timed-out attempt.
+REFUND_START_TO_CLOSE = timedelta(seconds=8)
+REFUND_RETRY = RetryPolicy(initial_interval=timedelta(seconds=1), maximum_interval=timedelta(seconds=3))
+
+
 @workflow.defn
 class RefundWorkflow:
     @workflow.run
     async def run(self, req: RefundRequest) -> RefundResult:
-        # 8s on purpose: in the nexus_kill scene an attempt on a killed worker must time out and
-        # retry inside the scene window.
         return await workflow.execute_activity(
             "post_refund",
             req,
             result_type=RefundResult,
-            start_to_close_timeout=timedelta(seconds=8),
-            retry_policy=RetryPolicy(
-                initial_interval=timedelta(seconds=1),
-                maximum_interval=timedelta(seconds=3),
-            ),
+            start_to_close_timeout=REFUND_START_TO_CLOSE,
+            retry_policy=REFUND_RETRY,
         )
 
 
