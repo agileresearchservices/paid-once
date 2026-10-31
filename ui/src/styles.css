@@ -48,7 +48,7 @@ p { margin: 0 0 8px; }
 .fail { color: var(--serious); font-size: 14px; }
 
 header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-nav { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
+nav { display: flex; gap: 5px; flex-wrap: wrap; flex: 1; }
 button {
   font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--axis);
   border-radius: 8px; padding: 8px 14px; cursor: pointer;
@@ -56,7 +56,7 @@ button {
 button:hover:not(:disabled) { border-color: var(--ink-2); }
 button:disabled { color: var(--muted); cursor: not-allowed; }
 button:focus-visible, .seg:focus-visible, summary:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 2px; }
-button.step { padding: 6px 10px; font-size: 14px; color: var(--ink-2); }
+button.step { padding: 6px 9px; font-size: 14px; color: var(--ink-2); white-space: nowrap; }
 button.step.on { color: var(--ink); border-color: var(--accent); background: var(--accent-wash); }
 button.step b { color: var(--muted); margin-right: 2px; }
 button.primary { background: var(--brand); border-color: transparent; color: #fff; font-weight: 600; }
