@@ -63,7 +63,7 @@ SCENES = [
     SceneInfo("double_delivery", "Double-delivered mail"),
     SceneInfo("deploy_wait", "Deploy during the approval wait"),
     SceneInfo("payments_timeout", "Payments commits, then goes quiet"),
-    SceneInfo("nexus_kill", "Nexus: the payments worker dies mid-refund"),
+    SceneInfo("nexus_kill", "Nexus: four failures mid-refund"),
     SceneInfo("free_roam", "Free roam"),
 ]
 
@@ -569,15 +569,17 @@ class Engine:
 
         async def go() -> None:
             ok = True
+            error = None
             try:
                 await fn()
                 await self.settle(scene_id)
             except Exception as exc:
                 ok = False
+                error = f"{exc!r}"[:120]  # shown on the scene's status line
                 self.emit("error", f"scene {scene_id} failed: {exc!r}", scene=scene_id)
             finally:
                 self.running = False
-                run.update(finished_at=time.time(), ok=ok)
+                run.update(finished_at=time.time(), ok=ok, error=error)
                 self.emit("scene_done", f"{title}: finished", scene=scene_id, ok=ok)
 
         self._task = asyncio.create_task(go())

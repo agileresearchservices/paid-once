@@ -71,7 +71,7 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .controls { display: grid; gap: 8px; align-content: start; min-width: 200px; }
 .scene-status { margin: 0; font-size: 15px; text-align: center; }
 .scene-status.ok { color: var(--good-ink); }
-.scene-status.fail { font-size: 15px; }
+.scene-status.fail { font-size: 13px; text-align: left; overflow-wrap: anywhere; }
 .nav { display: flex; gap: 8px; }
 .nav button { flex: 1; }
 
@@ -320,7 +320,3 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .headline b.n-bad { color: var(--critical-ink); }
 .headline-label { display: block; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
 
-.ticker { list-style: none; padding: 0; margin: 0; font-size: 16px; color: var(--ink-2); display: grid; gap: 2px; }
-.ticker time { color: var(--muted); margin-right: 8px; font-variant-numeric: tabular-nums; }
-.ticker .fault { color: var(--ink); }
-.ticker .error { color: var(--critical-ink); }
