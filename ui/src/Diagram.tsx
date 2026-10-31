@@ -159,6 +159,7 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
             <span><i className="lg active" /> where each stack thinks a ticket is</span>
             <span><i className="lg waiting" /> waiting for a human</span>
             <span><i className="lg paying" /> refund in flight</span>
+            <span><i className="lg failed" /> job failed</span>
             <span className="lg-slots">
               ledger {OUTCOME_GLYPH.ok} once · {OUTCOME_GLYPH.duplicate} twice · {OUTCOME_GLYPH.missing} never
             </span>
