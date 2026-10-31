@@ -23,11 +23,14 @@ Measured results and how to read them: [`docs/scenario-results.md`](docs/scenari
 ## Scope
 
 In scope:
-- One process: refund approval, from "the agent proposes a refund" to "the money moved once".
+- One process: refund approval, from "a helpdesk ticket asks for a refund" to "the money moved once". The agent
+  checks two policy rules in code (at most $200, order at most 30 days old) before it asks the model, and a human
+  approves or denies what it proposes.
 - Six chaos scenes: happy path, agent process killed, message delivered twice, deploy during the approval wait,
   payments commits then goes quiet, payments worker killed mid-Nexus-operation (Lane 2 only).
 - Three ledger invariants: every approved ticket refunded exactly once; no refund without an approval; no ticket
-  lost or stuck.
+  lost or stuck. Each scene includes one ticket outside the policy and one a human denies, so the second invariant is
+  tested under the same chaos as the first.
 - Everything on one machine: processes only, SQLite, one local Temporal dev server.
 
 Out of scope, so do not read results as claims about them:
@@ -100,10 +103,12 @@ is built for a laptop browser in full screen. The scoreboard resets whenever the
 
 Run of show, about ten minutes:
 - **Step 1, Two architectures**: the same refund flow built twice, and a side-by-side table of what differs.
-- **Step 2, Happy path**: both lanes refund five tickets cleanly.
+- **Step 2, Happy path**: seven tickets per lane. The agent's policy check denies one, the human approves five and
+  denies one; both lanes refund the five once and pay nothing on the two denied tickets, which go back to the
+  helpdesk as grey dots.
 - **Steps 3-6** (agent crash, double delivery, deploy mid-wait, payments goes quiet): the same chaos hits both
   lanes; watch the ledger-based scoreboards diverge. The payments node's slots mark each ticket in the ledger
-  (`✓` once, `×2` twice, `∅` never), and each lane shows what payments saw in the scene: calls, refunds booked, and
+  (`✓` once, `×2` twice, `∅` never, `—` none owed), and each lane shows what payments saw in the scene: calls, refunds booked, and
   calls answered from an existing key. On step 6 that line is the evidence: Temporal's retry is answered from the
   ledger, the queue's is booked again.
 - **Step 7, Nexus**: the payments team's worker is killed mid-refund. The payments team box goes DOWN; support's
