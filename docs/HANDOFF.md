@@ -48,13 +48,17 @@ whoever changes the code next.
   `temperature` are rejected on current models, so the agent does not set any. Strict schemas reject `minimum` on
   integers; the amount floor is applied in code.
 - **For a workflow-run Nexus operation the caller's operation stays `STARTED, attempt 1`** while the payments-side
-  activity retries. The UI reads retry state from pending-activity data, because retry attempts are not in workflow
-  history. `paidonce/show/engine.py` keeps each row (and the peak activity attempt) after the operation completes, so
-  the evidence stays on screen when the scene ends.
+  activity retries. The step 7 timeline (`ui/src/NexusTimeline.tsx`) needs each attempt's times, and history only
+  records the last attempt, so `paidonce/show/engine.py` builds `attempts` by polling the refund workflow's pending
+  activity (`_merge_attempts`) and closes them from its history (`_finish_attempts`). A StartToClose timeout ends an
+  attempt at start + `REFUND_START_TO_CLOSE`. The server's `current_retry_interval` came back unusable (an
+  epoch-sized number, on one poll only), so backoff comes from `REFUND_RETRY`. The caller's times come from its
+  history (Nexus operation scheduled, started, completed), and each row's `ledger` (calls, replays, `booked_at`) from
+  payments' counter and `GET /refunds`. Rows are kept after the operation completes, so the evidence stays on screen.
 - **Ticket IDs carry a scene-run number** (`<reset id>-<scene>-r<n>-<i>-<lane>`), so re-running a scene starts new
   workflows instead of colliding with the last run's IDs. The idempotency key is still `refund-<ticket_id>`.
 - **The show links into the Temporal Web UI** (`TEMPORAL_UI_URL`, default `http://127.0.0.1:8233`; the engine re-checks
-  it every 10 seconds and hides the links while it doesn't answer). Each Nexus row links the caller's workflow history in `support` and the
+  it every 10 seconds and hides the links while it doesn't answer). Each timeline row links the caller's workflow history in `support` and the
   handler's in `payments`.
 - **The UI is a stepper** for a laptop browser, full screen (`#1`..`#8` in the URL, arrow keys, 1-8, R runs the
   scene). Nothing is built for tablet or phone. Step 1 is the side-by-side architecture page (`ui/src/Architecture.tsx`):

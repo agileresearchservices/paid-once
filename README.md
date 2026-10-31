@@ -109,9 +109,13 @@ Run of show, about ten minutes:
   (`✓` paid once, `×2` paid twice, `∅` owed, never paid, `—` denied, nothing owed), and each lane shows what payments saw in the scene: calls, refunds booked, and
   calls answered from an existing key. On step 6 that line is the evidence: Temporal's retry is answered from the
   ledger, the queue's is booked again.
-- **Step 7, Nexus**: the payments team's worker is killed mid-refund. The payments team box goes DOWN; support's
-  side stays `STARTED` with no failure while payments retries. Click a row's `history ↗` links to show both sides in
-  the Temporal Web UI (http://127.0.0.1:8233), including the caller's Nexus Links tab.
+- **Step 7, Nexus**: the payments team's worker is killed mid-refund. A timeline gives each approved refund two
+  tracks: what support's code sees (one `STARTED` bar, no error) and what payments does (attempt 1 times out on the
+  dead worker, attempt 2 succeeds), under a band that marks the outage. A `$` marks when the ledger booked the money:
+  inside attempt 1, so attempt 2 is answered from the ledger, not paid again. Four beats light up as the story
+  happens, and the tiles at the bottom read the result from the ledger. The `support sees ↗` and `payments does ↗`
+  labels open each side's history in the Temporal Web UI (http://127.0.0.1:8233), including the caller's Nexus
+  Links tab.
 - **Step 8, Scoreboard**: the totals, and the queue's own job table next to what the ledger says.
 
 The Temporal wordmark and favicon are not in the repo. To show them, put `temporal-wordmark.svg` and `favicon.svg` in
