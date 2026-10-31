@@ -36,8 +36,8 @@ LANE1_URL = os.environ.get("RACCOON_LANE1_URL", f"http://127.0.0.1:{LANE1_PORT}"
 
 TEMPORAL_ADDRESS = os.environ.get("TEMPORAL_ADDRESS", "127.0.0.1:7233")
 TEMPORAL_UI_URL = os.environ.get("TEMPORAL_UI_URL", "http://127.0.0.1:8233")
-SUPPORT_NAMESPACE = os.environ.get("RACCOON_SUPPORT_NS", "raccoon-support")
-PAYMENTS_NAMESPACE = os.environ.get("RACCOON_PAYMENTS_NS", "raccoon-payments")
+SUPPORT_NAMESPACE = os.environ.get("RACCOON_SUPPORT_NS", "support")
+PAYMENTS_NAMESPACE = os.environ.get("RACCOON_PAYMENTS_NS", "payments")
 SUPPORT_TASK_QUEUE = "support-agent"
 PAYMENTS_TASK_QUEUE = "payments-nexus"
 NEXUS_ENDPOINT = "payments-endpoint"  # keep in sync with raccoon.lane2.contract.NEXUS_ENDPOINT

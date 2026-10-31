@@ -1,8 +1,8 @@
-"""The diagram's view of a Lane 2 ticket, from describe() alone, and the per-scene payments call totals."""
+"""The diagram's view of a Lane 2 ticket, the per-scene payments call totals, and when a scene has settled."""
 
 from types import SimpleNamespace
 
-from raccoon.show.engine import _lane2_stage, _scene_calls
+from raccoon.show.engine import _lane2_stage, _scene_calls, _unsettled
 
 
 def test_unapproved_parked_workflow_waits_for_a_human():
@@ -30,3 +30,36 @@ def test_scene_calls_only_sum_this_scenes_tickets():
         "lane1": {"calls": 2, "booked": 2, "replays": 0},
         "lane2": {"calls": 2, "booked": 1, "replays": 1},
     }
+
+
+PAIRS = [("lane1", "a"), ("lane2", "b")]
+
+
+def test_scene_settles_once_ledger_and_stacks_agree():
+    ledger = {"lane1": {"a": "missing"}, "lane2": {"b": "ok"}}
+    flow = {
+        "lane1": [{"ticket": "a", "at": "lane1_worker", "state": "failed"}],
+        "lane2": [{"ticket": "b", "at": "done", "state": "refunded"}],
+    }
+    assert _unsettled(PAIRS, ledger, flow) == []
+
+
+def test_in_flight_ticket_holds_the_scene_open():
+    # Lane 1 gave up, but the ledger's settle window hasn't passed, so "missing" isn't decided yet.
+    ledger = {"lane1": {"a": "in_flight"}, "lane2": {"b": "ok"}}
+    flow = {
+        "lane1": [{"ticket": "a", "at": "lane1_worker", "state": "failed"}],
+        "lane2": [{"ticket": "b", "at": "done", "state": "refunded"}],
+    }
+    assert _unsettled(PAIRS, ledger, flow) == ["a"]
+
+
+def test_refunded_ticket_still_moving_in_its_stack_holds_the_scene_open():
+    # Payments booked it, but the workflow hasn't completed: the dot is still on its way.
+    ledger = {"lane1": {"a": "ok"}, "lane2": {"b": "ok"}}
+    flow = {
+        "lane1": [{"ticket": "a", "at": "done", "state": "refunded"}],
+        "lane2": [{"ticket": "b", "at": "payments_worker", "state": "refund running in payments"}],
+    }
+    assert _unsettled(PAIRS, ledger, flow) == ["b"]
+    assert _unsettled(PAIRS, ledger, {"lane1": flow["lane1"], "lane2": []}) == ["b"]
