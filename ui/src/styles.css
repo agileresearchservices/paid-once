@@ -85,6 +85,7 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .lg.active { background: var(--sky); }
 .lg.waiting { border: 2px solid var(--ink-2); }
 .lg.paying { background: var(--violet); }
+.lg.failed { background: var(--critical); }
 .lg-stage { color: var(--warning); }
 .lg-slots { color: var(--ink-2); }
 .fault-caption {
