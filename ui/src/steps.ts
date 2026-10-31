@@ -17,7 +17,7 @@ export const STEPS: Step[] = [
   {
     id: "architecture",
     scene: null,
-    short: "Two architectures",
+    short: "Architectures",
     title: "Two ways to build the same refund",
     story:
       "A support agent proposes refunds, a human approves, and the payments team moves the money. Both stacks run that flow and call the same payments service.",
@@ -37,7 +37,7 @@ export const STEPS: Step[] = [
   {
     id: "tip_over",
     scene: "tip_over",
-    short: "Agent crash",
+    short: "Crash",
     title: "The agent workers crash",
     story:
       "Payments saves each refund but answers slowly. Mid-call, the agent workers are killed (kill -9). Each lane has to pick up where it left off.",
@@ -48,7 +48,7 @@ export const STEPS: Step[] = [
   {
     id: "double_delivery",
     scene: "double_delivery",
-    short: "Double delivery",
+    short: "Redelivery",
     title: "The same message arrives twice",
     story: "The same work is delivered twice: the queue redelivers its jobs, and Temporal receives the approval signal a second time.",
     watch: "The duplicate count, and dollars refunded twice.",
@@ -58,7 +58,7 @@ export const STEPS: Step[] = [
   {
     id: "deploy_wait",
     scene: "deploy_wait",
-    short: "Deploy mid-wait",
+    short: "Deploy",
     title: "A deploy lands during the approval wait",
     story: "Approvals can take days, so a deploy will land while tickets wait. Both lanes' workers restart mid-wait.",
     watch: "Tickets a human approved: do they still get refunded?",
@@ -68,7 +68,7 @@ export const STEPS: Step[] = [
   {
     id: "payments_timeout",
     scene: "payments_timeout",
-    short: "Payments goes quiet",
+    short: "Payments quiet",
     title: "Payments commits, then goes quiet",
     story: "Payments saves the refund, then the response never arrives and the caller times out. Both lanes retry.",
     watch: "Which retries the ledger recognises as the same refund.",
