@@ -35,6 +35,7 @@ export interface ShowEvent {
   ok?: boolean; // scene_done only
   target?: string[]; // fault only: diagram node ids it lands on (process names, or "temporal")
   effect?: "kill" | "duplicate" | "stall"; // fault only
+  proc?: string; // kill and restart only: the process name
 }
 
 // Where one stack thinks one ticket is: a diagram node id, a wire ("lane1_worker>payments") or "done".
@@ -55,6 +56,15 @@ export interface NexusHandler {
   activity_failure?: string;
 }
 
+// One attempt of the refund activity inside payments. Times are epoch seconds.
+export interface RefundAttempt {
+  n: number;
+  started_at: number;
+  ended_at: number | null; // null while running
+  outcome: "running" | "failed" | "ok" | "unknown";
+  failure: string;
+}
+
 // One Nexus operation in the current scene. Kept after it completes (live = false).
 export interface NexusRow {
   ticket: string;
@@ -71,6 +81,12 @@ export interface NexusRow {
   peak_attempt: number;
   last_failure: string;
   caller_saw_failure: boolean;
+  // The timeline: what support saw over time, what payments did, and what the ledger says.
+  op_scheduled_at: number;
+  op_closed_at: number | null;
+  phases: { state: string; at: number }[]; // the caller's operation state, each time it changed
+  attempts: RefundAttempt[];
+  ledger: { calls: number; replays: number; booked_at: number | null };
 }
 
 export interface Topology {
