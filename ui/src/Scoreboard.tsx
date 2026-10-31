@@ -1,3 +1,4 @@
+import { OUTCOME_GLYPH } from "./outcomes";
 import type { LaneAudit } from "./types";
 
 // Ticket outcomes as one whole split into parts: a tall segmented bar. The four reserved status
@@ -5,6 +6,7 @@ import type { LaneAudit } from "./types";
 // "Unapproved" shares the critical colour with "refunded twice", so it gets a striped texture, and
 // "never refunded" sits next to red in orange, so it gets dots: no two failure segments differ by hue alone.
 // Segments read "4 duplicated" rather than icon + count: a numeric icon next to a count ("×2 4") read as one number.
+// The legend's icons are the diagram's ledger glyphs (outcomes.ts); there the count comes after the label, so they don't merge.
 interface Part {
   key: string;
   label: string;
@@ -16,11 +18,11 @@ interface Part {
 
 function parts(a: LaneAudit): Part[] {
   return [
-    { key: "ok", label: "Refunded once", short: "once", icon: "✓", value: a.refunded_once, className: "good" },
-    { key: "dup", label: "Refunded more than once", short: "duplicated", icon: "⧉", value: a.duplicates, className: "critical" },
-    { key: "unapproved", label: "Refunded without approval", short: "unapproved", icon: "!", value: a.unapproved, className: "critical striped" },
-    { key: "missing", label: "Approved, never refunded", short: "missing", icon: "∅", value: a.missing, className: "serious dotted" },
-    { key: "flight", label: "Still settling", short: "settling", icon: "…", value: a.in_flight, className: "warning" },
+    { key: "ok", label: "Refunded once", short: "once", icon: OUTCOME_GLYPH.ok, value: a.refunded_once, className: "good" },
+    { key: "dup", label: "Refunded more than once", short: "duplicated", icon: OUTCOME_GLYPH.duplicate, value: a.duplicates, className: "critical" },
+    { key: "unapproved", label: "Refunded without approval", short: "unapproved", icon: OUTCOME_GLYPH.unapproved, value: a.unapproved, className: "critical striped" },
+    { key: "missing", label: "Approved, never refunded", short: "missing", icon: OUTCOME_GLYPH.missing, value: a.missing, className: "serious dotted" },
+    { key: "flight", label: "Still settling", short: "settling", icon: OUTCOME_GLYPH.settling, value: a.in_flight, className: "warning" },
   ];
 }
 
