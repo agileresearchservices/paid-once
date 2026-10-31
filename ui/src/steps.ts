@@ -44,7 +44,7 @@ export const STEPS: Step[] = [
       "Payments saves each refund but answers slowly. Mid-call, the agent workers are killed (kill -9). Each lane has to pick up where it left off.",
     watch: "How each lane re-drives the refund, and what the ledger records.",
     result:
-      "The queue lost its in-memory state and retried with a fresh idempotency key: duplicates and lost tickets. Temporal's restarted worker replayed from history and retried with a key derived from the ticket.",
+      "Queue + LangGraph lost the agent's in-memory state and retried with a fresh idempotency key: duplicates and lost tickets. Temporal's restarted worker replayed from history and retried with a key derived from the ticket.",
   },
   {
     id: "double_delivery",
@@ -54,7 +54,7 @@ export const STEPS: Step[] = [
     story: "The same work is delivered twice: the queue redelivers its jobs, and Temporal receives each human decision signal again.",
     watch: "The duplicate count, and dollars refunded twice.",
     result:
-      "The queue refunded some tickets twice. Each workflow took the first decision and counted the repeats without acting on them.",
+      "Queue + LangGraph refunded some tickets twice. Each workflow took the first decision and counted the repeats without acting on them.",
   },
   {
     id: "deploy_wait",
@@ -64,7 +64,7 @@ export const STEPS: Step[] = [
     story: "Approvals can take days, so a deploy will land while tickets wait. Both lanes' workers restart mid-wait.",
     watch: "Tickets a human approved: do they still get refunded?",
     result:
-      "The queue kept its place in memory and lost it: approved, never refunded. Temporal's workflows were waiting in Temporal the whole time.",
+      "Queue + LangGraph kept its place in memory and lost it: approved, never refunded. Temporal's workflows were waiting in Temporal the whole time.",
   },
   {
     id: "payments_timeout",
@@ -74,7 +74,7 @@ export const STEPS: Step[] = [
     story: "Payments saves the refund, then the response never arrives and the caller times out. Both lanes retry.",
     watch: "Which retries the ledger recognises as the same refund.",
     result:
-      "Both lanes retried. Temporal's retry reused the ticket's key, so payments answered it from the ledger; the queue's fresh key per attempt booked the refund again.",
+      "Both lanes retried. Temporal's retry reused the ticket's key, so payments answered it from the ledger. Queue + LangGraph made a fresh key for each attempt, so payments booked the refund again.",
   },
   {
     id: "nexus_kill",
