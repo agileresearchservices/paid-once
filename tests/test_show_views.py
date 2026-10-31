@@ -6,11 +6,13 @@ from types import SimpleNamespace
 from paidonce.models import TicketOutcome
 from paidonce.show.engine import (
     LANE1_STAGES,
+    Engine,
     _backoff_before,
     _finish_attempts,
     _lane2_stage,
     _merge_attempts,
     _scene_calls,
+    _stall_window,
     _ticket_ledger,
     _unsettled,
 )
@@ -201,3 +203,61 @@ def test_ticket_ledger_reads_payments_counter_and_booking_time():
     calls = {"lane2": {"t1": {"calls": 2, "replays": 1}}}
     assert _ticket_ledger(calls, {"t1": 104.0}, "lane2", "t1") == {"calls": 2, "replays": 1, "booked_at": 104.0}
     assert _ticket_ledger(calls, {}, "lane2", "t2") == {"calls": 0, "replays": 0, "booked_at": None}
+
+
+# The gauntlet's fault windows (step 7).
+
+STALL = {"mode": "commit_then_stall"}
+
+
+def test_stall_window_runs_from_first_booking_to_last_held_reply():
+    booked = {"a": 10.0, "b": 11.0, "c": 12.5}
+    w = _stall_window(booked, ["a", "b", "c"], 9.0, {**STALL, "remaining": 2}, 5)
+    assert w == {"start": 10.0, "end": 12.5 + 9.0, "hit": 3}
+
+
+def test_stall_window_ends_at_the_last_booking_the_stall_actually_held():
+    # The fault's count ran out after two bookings, so the third booking replied at once.
+    booked = {"a": 10.0, "b": 11.0, "c": 12.5}
+    w = _stall_window(booked, ["a", "b", "c"], 9.0, {**STALL, "remaining": 0}, 2)
+    assert w == {"start": 10.0, "end": 11.0 + 9.0, "hit": 2}
+
+
+def test_stall_window_ignores_other_scenes_bookings():
+    w = _stall_window({"a": 10.0, "elsewhere": 1.0}, ["a"], 9.0, {**STALL, "remaining": 4}, 5)
+    assert w["start"] == 10.0 and w["hit"] == 1
+
+
+def test_stall_window_is_empty_before_any_booking():
+    assert _stall_window({}, ["a"], 9.0, {**STALL, "remaining": 5}, 5) == {"start": None, "end": None, "hit": 0}
+
+
+def test_stall_window_after_the_fault_was_cleared_counts_the_bookings():
+    w = _stall_window({"a": 10.0, "b": 11.0}, ["a", "b"], 9.0, None, 5)
+    assert w == {"start": 10.0, "end": 11.0 + 9.0, "hit": 2}
+
+
+def _engine_with_window(key: str) -> SimpleNamespace:
+    run = {"kills": {}, "faults": [{"key": key, "effect": "kill", "start": 1.0, "end": None, "hit": 5}]}
+    return SimpleNamespace(scene_runs={"nexus_kill": run}, running=True, current="nexus_kill", emit=lambda *a, **k: None)
+
+
+def test_restart_closes_the_killed_process_window():
+    eng = _engine_with_window("payments_worker")
+    Engine.emit_from_procs(eng, "restart", "back", proc="payments_worker")
+    assert eng.scene_runs["nexus_kill"]["faults"][0]["end"] is not None
+
+
+def test_restart_of_another_process_leaves_the_window_open():
+    # A worker that crash-loops while Temporal is down restarts on its own: that closes nothing.
+    eng = _engine_with_window("temporal")
+    Engine.emit_from_procs(eng, "restart", "back", proc="support_worker")
+    assert eng.scene_runs["nexus_kill"]["faults"][0]["end"] is None
+
+
+def test_a_second_restart_does_not_move_a_closed_window():
+    eng = _engine_with_window("payments_worker")
+    Engine.emit_from_procs(eng, "restart", "back", proc="payments_worker")
+    end = eng.scene_runs["nexus_kill"]["faults"][0]["end"]
+    Engine.emit_from_procs(eng, "restart", "back again", proc="payments_worker")
+    assert eng.scene_runs["nexus_kill"]["faults"][0]["end"] == end

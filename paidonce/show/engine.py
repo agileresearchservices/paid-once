@@ -36,6 +36,11 @@ LANE_NAMES = {"lane1": "the job queue", "lane2": "Temporal + Nexus"}
 
 AGENT_WORKERS = ["lane1_worker", "support_worker"]
 
+# The Nexus gauntlet (step 7): four failures, each landing on refunds still in flight.
+GAUNTLET_STALL_S = 9.0  # payments holds its reply this long after booking: past the activity's 8 s timeout
+GAUNTLET_LATENCY_S = 2.0  # every payments call takes this long, so a kill lands mid-call
+GAUNTLET_DOWN_S = {"support_worker": 5.0, "payments_worker": 6.0, "temporal": 5.0}
+
 MESSAGES = [
     "The mug arrived in pieces. Please refund me.",
     "I was charged twice for the same order, please refund the duplicate.",
@@ -133,10 +138,29 @@ class Engine:
 
     def emit_from_procs(self, kind: str, msg: str, **extra) -> None:
         # Kills count against the scene that made them, so a step never shows kills from an earlier scene.
-        if kind == "kill" and self.running and self.current in self.scene_runs:
-            kills = self.scene_runs[self.current]["kills"]
+        run = self.scene_runs.get(self.current) if self.running and self.current else None
+        if kind == "kill" and run is not None:
+            kills = run["kills"]
             kills[extra["proc"]] = kills.get(extra["proc"], 0) + 1
+        if kind == "restart" and run is not None:
+            # Only a kill the scene injected has a window; an unplanned exit's restart closes nothing.
+            for w in run["faults"]:
+                if w["key"] == extra.get("proc") and w["end"] is None:
+                    w["end"] = time.time()
         self.emit(kind, msg, **extra)
+
+    def kill_window(self, scene: str, proc: str, label: str, down_s: float) -> bool:
+        """kill -9 a process mid-scene and record its outage window, with how many refunds were in flight."""
+        hit = sum(1 for r in self.nexus_seen.values() if r.get("live"))
+        self.fault(scene, f"Fault: kill -9 on the {label}", [proc], "kill")
+        run = self.scene_runs[scene]
+        window = {"key": proc, "label": label, "effect": "kill", "start": time.time(), "end": None, "hit": hit}
+        run["faults"].append(window)
+        if not self.procs.kill(proc, down_s):
+            run["faults"].remove(window)
+            self.emit("error", f"could not kill {proc}: it was not running", scene=scene)
+            return False
+        return True
 
     @property
     def http(self) -> httpx.AsyncClient:
@@ -408,25 +432,67 @@ class Engine:
         await self.clear_faults()
 
     async def scene_nexus_kill(self) -> None:
+        """The Nexus gauntlet: while the refunds are in flight, payments goes quiet after booking, then the support
+        worker, the payments worker and the Temporal server itself are killed. Each fault is timed to land on
+        refunds still open, and records how many it hit."""
+        scene = "nexus_kill"
         self.emit(
             "scene",
-            "Temporal only: the payments team's worker dies in the middle of Nexus operations",
-            scene="nexus_kill",
+            "Temporal only: four failures while the refunds are in flight over Nexus",
+            scene=scene,
         )
-        await self.set_fault("lane2", "none", latency_s=2.0)
-        await self.submit_cohort("nexus_kill", 5, lanes=("lane2",))
-        await self.wait_for_proposals("nexus_kill")
-        await self.approve_scene("nexus_kill", then="; each approval becomes a Nexus operation to payments")
-        await asyncio.sleep(1.2)
+        await self.set_fault(
+            "lane2", "commit_then_stall", count=5, delay_s=GAUNTLET_STALL_S, latency_s=GAUNTLET_LATENCY_S
+        )
+        await self.submit_cohort(scene, 5, lanes=("lane2",))
+        await self.wait_for_proposals(scene)
+        await self.approve_scene(scene, then="; each approval becomes a Nexus operation to payments")
         self.fault(
-            "nexus_kill",
-            "Fault: the payments team's worker is down for 10 seconds; support keeps waiting, the retries happen inside payments",
-            ["payments_worker"],
-            "kill",
+            scene, "Fault: payments books each refund, then holds its reply past the timeout", ["payments"], "stall"
         )
-        self.procs.kill("payments_worker", restart_after=10.0)
-        await asyncio.sleep(22)
+        # Filled in from the ledger as the bookings land: see _stall_window.
+        self.scene_runs[scene]["faults"].append(
+            {
+                "key": "payments",
+                "label": "payments quiet after booking",
+                "effect": "stall",
+                "start": None,
+                "end": None,
+                "hit": 0,
+            }
+        )
+        await asyncio.sleep(3.0)
+        self.kill_window(scene, "support_worker", "support worker", GAUNTLET_DOWN_S["support_worker"])
+        # Payments' second try is a replay of a booked refund; kill its worker while that call is under way.
+        await self._wait_for_attempt(2, timeout=15.0)
+        await asyncio.sleep(0.5)
+        self.kill_window(scene, "payments_worker", "payments worker", GAUNTLET_DOWN_S["payments_worker"])
+        await asyncio.sleep(3.0)
+        if self.procs.owns_temporal:
+            self.kill_window(scene, "temporal", "Temporal server", GAUNTLET_DOWN_S["temporal"])
+        else:
+            self.emit(
+                "note", "the Temporal server is not the show's to kill (it was already running): skipped", scene=scene
+            )
+        await self._wait_for_rows_closed(timeout=40.0)
         await self.clear_faults()
+
+    async def _wait_for_attempt(self, n: int, timeout: float) -> None:
+        """Until every Nexus row of the scene shows payments' attempt n (or the timeout)."""
+        end = time.time() + timeout
+        while time.time() < end:
+            rows = list(self.nexus_seen.values())
+            if rows and all(any(a["n"] >= n for a in r.get("attempts", [])) for r in rows):
+                return
+            await asyncio.sleep(0.25)
+
+    async def _wait_for_rows_closed(self, timeout: float) -> None:
+        end = time.time() + timeout
+        while time.time() < end:
+            rows = list(self.nexus_seen.values())
+            if rows and not any(r.get("live") for r in rows):
+                return
+            await asyncio.sleep(0.5)
 
     async def scene_free_roam(self) -> None:
         self.emit("scene", "Free roam: faults picked at random", scene="free_roam")
@@ -498,7 +564,7 @@ class Engine:
             del self.scene_tickets[key]
         self.nexus_seen = {}  # a new dict, so a refresh still in flight writes to the old one
         title = next((s.title for s in SCENES if s.id == scene_id), scene_id)
-        run = {"started_at": time.time(), "finished_at": None, "ok": None, "kills": {}}
+        run = {"started_at": time.time(), "finished_at": None, "ok": None, "kills": {}, "faults": []}
         self.scene_runs[scene_id] = run
 
         async def go() -> None:
@@ -578,6 +644,11 @@ class Engine:
             self.payments_calls = _scene_calls(self.payments_calls_by_ticket, pairs)
             r = await self.http.get(f"{config.PAYMENTS_URL}/refunds", params={"lane": "lane2"})
             self.booked_at = {row["ticket_id"]: row["created_at"] for row in r.json()}
+            run = self.scene_runs.get(self.current) if self.current else None
+            for w in run["faults"] if run else []:
+                if w["effect"] == "stall":
+                    lane2 = [tid for lane, tid in pairs if lane == "lane2"]
+                    w.update(_stall_window(self.booked_at, lane2, GAUNTLET_STALL_S, self.faults.get("lane2"), 5))
         except Exception:
             pass
         try:
@@ -992,6 +1063,17 @@ def _backoff_before(attempt: int) -> float:
     wait = initial * REFUND_RETRY.backoff_coefficient ** (attempt - 2)
     cap = REFUND_RETRY.maximum_interval.total_seconds() if REFUND_RETRY.maximum_interval else wait
     return min(wait, cap)
+
+
+def _stall_window(booked_at: dict, tickets: list[str], delay_s: float, fault: dict | None, count: int) -> dict:
+    """The payments-quiet window, from the ledger: the first stalled booking to the last one's held reply.
+    `hit` is how many bookings the stall actually held (the payments fault's count minus what it has left)."""
+    times = sorted(booked_at[t] for t in tickets if t in booked_at)
+    left = fault.get("remaining", count) if fault and fault.get("mode") == "commit_then_stall" else 0
+    hit = min(count - left, len(times)) if fault and fault.get("mode") == "commit_then_stall" else len(times)
+    if not times:
+        return {"start": None, "end": None, "hit": 0}
+    return {"start": times[0], "end": times[min(hit, len(times)) - 1] + delay_s if hit else times[0], "hit": hit}
 
 
 def _ticket_ledger(calls: dict, booked_at: dict, lane: str, ticket_id: str) -> dict:

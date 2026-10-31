@@ -8,7 +8,8 @@ ticket IDs carry a per-run prefix, so reruns never collide with earlier tickets.
 
 --check exits non-zero if Lane 2 has any ledger violation (duplicate, missing, unapproved, stuck), if a ticket
 the human or the policy said no to was not closed unpaid, if a ticket is still waiting at the end,
-or if the nexus_kill scene never showed the payments-side retry it exists to show.
+or if the nexus_kill scene never showed the payments-side retry it exists to show, or one of its failures
+landed on nothing in flight. Its Temporal-server kill needs a server the show started itself: don't pre-start one.
 Lane 1 is printed for contrast but never gates the result.
 """
 
@@ -133,6 +134,20 @@ def main(scenes, check):
                 )
                 if peak_handler < 2:
                     failures.append("nexus_kill: no payments-side retry observed")
+                # The gauntlet only means something if every failure landed on refunds still in flight.
+                windows = snap["scene_runs"]["nexus_kill"].get("faults", [])
+                for w in windows:
+                    print(f"  fault: {w['label']}: hit {w['hit']}, window {'closed' if w['end'] else 'OPEN'}")
+                    if w["hit"] < 1 or w["end"] is None:
+                        failures.append(
+                            f"nexus_kill: '{w['label']}' hit {w['hit']} refunds, ended={w['end'] is not None}"
+                        )
+                expected = {"payments", "support_worker", "payments_worker"} | (
+                    {"temporal"} if "temporal" in snap["processes"] else set()
+                )
+                missing = expected - {w["key"] for w in windows}
+                if missing:
+                    failures.append(f"nexus_kill: no fault window for {sorted(missing)}")
             errs = [e for e in snap["events"] if e["kind"] == "error"]
             if errs:
                 print("  ERRORS:", json.dumps(errs))
