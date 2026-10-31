@@ -44,7 +44,11 @@ function BoundaryStrip({
         ▶
       </span>
       <div className="endpoint-card">
-        <span className="headline-label">Team boundary · the only name in support's code</span>
+        <span className="headline-label">
+          Team boundary
+          <br />
+          the only name in support's code
+        </span>
         <code>{t.endpoint}</code>
         <code>
           {t.service}.{t.operation}
@@ -56,12 +60,18 @@ function BoundaryStrip({
       <div className={down ? "team down" : "team"}>
         <div className="team-head">
           <span className="team-name">Payments team</span>
+          {(kills.payments_worker ?? 0) > 0 && (
+            <span className="team-kills" title="kill -9 during this scene">
+              ⚡ killed {kills.payments_worker === 1 ? "once" : `${kills.payments_worker} times`}
+            </span>
+          )}
           {ui && <Ext href={`${ui}/namespaces/${t.payments.namespace}/workflows`}>namespace ↗</Ext>}
         </div>
         <span>
           <code>{t.payments.namespace}</code> · {t.payments.workflow} → {t.payments.activity}
         </span>
-        {payments && <ProcTile p={payments} kills={kills.payments_worker} />}
+        {/* The kill count sits in the header, so the tile keeps one line inside the card. */}
+        {payments && <ProcTile p={payments} />}
       </div>
     </div>
   );
