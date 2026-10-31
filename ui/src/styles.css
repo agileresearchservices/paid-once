@@ -97,16 +97,16 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 @keyframes flow { to { stroke-dashoffset: -14; } }
 .diagram .arrowhead { fill: var(--axis); }
 .diagram .wire-label { fill: var(--muted); font-size: 12.5px; }
-.diagram .node rect { fill: var(--page); stroke: var(--axis); stroke-width: 1.5; transition: fill 0.3s, stroke 0.3s; }
-.diagram .node.door rect { stroke: var(--violet); stroke-dasharray: 5 4; }
-.diagram .node.down rect { fill: var(--critical-wash); stroke: var(--critical); }
-.diagram .node.down .n-title, .diagram .node.down .n-sub { opacity: 0.6; }
+.diagram .node > rect { fill: var(--page); stroke: var(--axis); stroke-width: 1.5; transition: fill 0.3s, stroke 0.3s; }
+.diagram .node.door > rect { stroke: var(--violet); stroke-dasharray: 5 4; }
+.diagram .node.down > rect { fill: var(--critical-wash); stroke: var(--critical); }
 .diagram .n-title { fill: var(--ink); font-size: 15.5px; font-weight: 600; }
 .diagram .n-sub { fill: var(--muted); font-size: 13px; }
 .diagram .n-state { fill: var(--good-ink); font-size: 12px; font-weight: 700; letter-spacing: 0.05em; }
-.diagram .n-state.down { fill: var(--critical-ink); }
+.diagram .n-down rect { fill: var(--critical); }
+.diagram .n-down text { fill: #fff; font-size: 12.5px; font-weight: 700; letter-spacing: 0.04em; }
 .diagram .n-mark { fill: var(--critical-ink); font-size: 13px; font-weight: 600; }
-.diagram .node.hit rect { animation: hit 0.5s ease-in-out 4; }
+.diagram .node.hit > rect { animation: hit 0.5s ease-in-out 4; }
 @keyframes hit { 50% { stroke: var(--critical); stroke-width: 4; fill: #5a1f19; } }
 .diagram .node.hit { animation: shake 0.35s ease-in-out 3; }
 @keyframes shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }

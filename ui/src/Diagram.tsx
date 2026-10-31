@@ -215,15 +215,22 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
           const p = b.proc ? snap.processes[b.proc] : undefined;
           const down = p ? !p.alive : false;
           const cls = ["node", down && "down", hitNow.has(id) && "hit", id === "endpoint" && "door"].filter(Boolean).join(" ");
+          // Payments' bottom strip holds the Temporal ledger row, so its badge sits under the Job queue row instead.
+          const badgeY = id === "payments" ? b.y + 72 : b.y + b.h - 27;
           return (
             <g key={id} className={cls}>
               <rect x={b.x} y={b.y} width={b.w} height={b.h} rx={10} />
               <text className="n-title" x={b.x + 14} y={b.y + 22}>{b.title}</text>
               <text className="n-sub" x={b.x + 14} y={b.y + 40}>{b.sub}</text>
-              {p && (
-                <text className={down ? "n-state down" : "n-state"} x={b.x + b.w - 12} y={b.y + 22} textAnchor="end">
-                  {down ? "DOWN · restarting" : "UP"}
-                </text>
+              {p && !down && (
+                <text className="n-state" x={b.x + b.w - 12} y={b.y + 22} textAnchor="end">UP</text>
+              )}
+              {/* Down gets its own solid badge on the node's bottom strip: on the title line it ran into the title */}
+              {down && (
+                <g className="n-down">
+                  <rect x={b.x + 14} y={badgeY} width={152} height={21} rx={4} />
+                  <text x={b.x + 22} y={badgeY + 15}>DOWN · restarting</text>
+                </g>
               )}
               {marks[id] && (
                 <text className="n-mark" x={b.x + b.w - 4} y={b.y - 6} textAnchor="end">{marks[id]}</text>
