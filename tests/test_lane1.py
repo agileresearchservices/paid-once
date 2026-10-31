@@ -5,11 +5,11 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from raccoon import audit, config
-from raccoon.lane1 import api, store
-from raccoon.lane1.worker import Worker
-from raccoon.payments import ledger
-from raccoon.payments.service import app as payments_app
+from paidonce import audit, config
+from paidonce.lane1 import api, store
+from paidonce.lane1.worker import Worker
+from paidonce.payments import ledger
+from paidonce.payments.service import app as payments_app
 from tests.helpers import Server, drain
 
 

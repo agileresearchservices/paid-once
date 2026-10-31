@@ -7,7 +7,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-from raccoon import config
+from paidonce import config
 
 
 @contextmanager

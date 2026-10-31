@@ -3,9 +3,9 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
-from raccoon import audit
-from raccoon.payments import ledger
-from raccoon.payments.service import app
+from paidonce import audit
+from paidonce.payments import ledger
+from paidonce.payments.service import app
 
 
 def post(client, key, ticket="t1", amount=1500, lane="lane1"):

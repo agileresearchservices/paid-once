@@ -1,4 +1,4 @@
-// Shape of Engine.snapshot() in raccoon/show/engine.py, streamed from /api/stream.
+// Shape of Engine.snapshot() in paidonce/show/engine.py, streamed from /api/stream.
 
 export type LaneId = "lane1" | "lane2";
 

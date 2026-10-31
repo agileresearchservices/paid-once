@@ -1,4 +1,4 @@
-"""Process manager: starts every service and lets the raccoon kill them.
+"""Process manager: starts every service and lets the fault injector kill them.
 
 This is the demo's stand-in for Kubernetes. A killed process comes back after a short delay,
 the way a restarted pod would.
@@ -16,7 +16,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 
-from raccoon import config
+from paidonce import config
 
 
 def port_open(port: int, host: str = "127.0.0.1") -> bool:
@@ -43,18 +43,18 @@ class ProcessManager:
         self.emit = emit
         py = sys.executable
         self.procs: dict[str, Proc] = {
-            "payments": Proc("payments", "Payments service", [py, "-m", "raccoon.payments"]),
-            "lane1_api": Proc("lane1_api", "Queue API", [py, "-m", "raccoon.lane1.api"]),
-            "lane1_worker": Proc("lane1_worker", "Queue worker", [py, "-m", "raccoon.lane1.worker"]),
+            "payments": Proc("payments", "Payments service", [py, "-m", "paidonce.payments"]),
+            "lane1_api": Proc("lane1_api", "Queue API", [py, "-m", "paidonce.lane1.api"]),
+            "lane1_worker": Proc("lane1_worker", "Queue worker", [py, "-m", "paidonce.lane1.worker"]),
             "support_worker": Proc(
                 "support_worker",
                 "Support team worker",
-                [py, "-m", "raccoon.lane2.support_worker"],
+                [py, "-m", "paidonce.lane2.support_worker"],
             ),
             "payments_worker": Proc(
                 "payments_worker",
                 "Payments team worker + Nexus handler",
-                [py, "-m", "raccoon.lane2.payments_worker"],
+                [py, "-m", "paidonce.lane2.payments_worker"],
             ),
         }
         self._stop = threading.Event()

@@ -11,8 +11,8 @@ from typing import TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from raccoon import config
-from raccoon.models import Proposal, Ticket
+from paidonce import config
+from paidonce.models import Proposal, Ticket
 
 SYSTEM_PROMPT = """You are a support agent for an online store. Decide how to handle a refund request.
 Respond only by calling the propose_action tool, exactly once.
@@ -61,7 +61,7 @@ def _stub_decide(ticket: Ticket) -> Proposal:
 
 
 def decide(ticket: Ticket) -> Proposal:
-    """Check policy, then ask the model. Real Anthropic call unless RACCOON_STUB_LLM=1 (tests only)."""
+    """Check policy, then ask the model. Real Anthropic call unless PAIDONCE_STUB_LLM=1 (tests only)."""
     broken = check_policy(ticket)
     if broken:
         return Proposal(action="deny", amount_cents=0, reason=f"policy: {broken}")

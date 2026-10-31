@@ -1,7 +1,7 @@
 """Run scenes headlessly against the real stack and print the ledger scoreboard after each.
 
 Usage: python scripts/smoke.py [--check] intro tip_over ...    (needs the show server NOT already running)
-Set RACCOON_STUB_LLM=1 to avoid real model calls (`make scenario` does).
+Set PAIDONCE_STUB_LLM=1 to avoid real model calls (`make scenario` does).
 
 The scoreboard is reset first, so each run starts from zero. Chaos is seeded (the engine's seed);
 ticket IDs carry a per-run prefix, so reruns never collide with earlier tickets.
@@ -21,10 +21,10 @@ import time
 
 import httpx
 
-from raccoon import config
-from raccoon.show.procs import port_open
+from paidonce import config
+from paidonce.show.procs import port_open
 
-# RACCOON_SHOW_PORT. With the other RACCOON_*_PORT, RACCOON_DATA and TEMPORAL_ADDRESS a run can sit beside the demo.
+# PAIDONCE_SHOW_PORT. With the other PAIDONCE_*_PORT, PAIDONCE_DATA and TEMPORAL_ADDRESS a run can sit beside the demo.
 PORT = config.SHOW_PORT
 BASE = f"http://127.0.0.1:{PORT}"
 MUST_HAVE = [
@@ -90,8 +90,10 @@ def main(scenes, check):
         raise SystemExit(f"Port {PORT} is busy: stop `make demo` (or the other show server) first.")
     # Locks the server's controls to this runner, so a browser left open on the show's port can't reset or run scenes.
     token = secrets.token_hex(8)
-    headers = {"x-raccoon-scenario": token}
-    srv = subprocess.Popen([sys.executable, "-m", "raccoon.show"], env={**os.environ, "RACCOON_SCENARIO_TOKEN": token})
+    headers = {"x-paidonce-scenario": token}
+    srv = subprocess.Popen(
+        [sys.executable, "-m", "paidonce.show"], env={**os.environ, "PAIDONCE_SCENARIO_TOKEN": token}
+    )
     failures: list[str] = []
     try:
         wait_api(srv)

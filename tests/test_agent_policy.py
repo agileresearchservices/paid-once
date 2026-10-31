@@ -1,7 +1,7 @@
 import pytest
 
-from raccoon import agent
-from raccoon.models import Ticket
+from paidonce import agent
+from paidonce.models import Ticket
 
 
 def ticket(amount=2500, age=3):

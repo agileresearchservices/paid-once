@@ -1,7 +1,7 @@
 """The payments service (owned by "the payments team"). Plain HTTP, as it is today.
 
 Fault injection lives here because a real payments provider is where "committed, then the
-response never arrived" happens. The raccoon flips the flag through /admin/fault. Faults are
+response never arrived" happens. The fault injector flips the flag through /admin/fault. Faults are
 tracked per lane so one lane's chaos never consumes the other's.
 """
 
@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
-from raccoon.payments import ledger
+from paidonce.payments import ledger
 
 LANES = ("lane1", "lane2")
 

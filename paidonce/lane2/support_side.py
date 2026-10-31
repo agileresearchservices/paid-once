@@ -1,7 +1,7 @@
 """Support team's workflow: decide, wait for a human, then ask payments for the refund over Nexus.
 
 Workflow module: deterministic, and nothing here touches config, httpx or the filesystem. The agent
-runs in an activity that is called by name, so this file never imports raccoon.agent.
+runs in an activity that is called by name, so this file never imports paidonce.agent.
 """
 
 from datetime import timedelta
@@ -10,8 +10,8 @@ from temporalio import workflow
 from temporalio.common import RetryPolicy
 
 with workflow.unsafe.imports_passed_through():
-    from raccoon.lane2.contract import NEXUS_ENDPOINT, PaymentsService
-    from raccoon.models import (
+    from paidonce.lane2.contract import NEXUS_ENDPOINT, PaymentsService
+    from paidonce.models import (
         ApprovalDecision,
         Proposal,
         RefundRequest,

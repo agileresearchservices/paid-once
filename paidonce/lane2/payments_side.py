@@ -11,8 +11,8 @@ from temporalio import nexus, workflow
 from temporalio.common import RetryPolicy, WorkflowIDConflictPolicy
 
 with workflow.unsafe.imports_passed_through():
-    from raccoon.lane2.contract import PaymentsService
-    from raccoon.models import RefundRequest, RefundResult
+    from paidonce.lane2.contract import PaymentsService
+    from paidonce.models import RefundRequest, RefundResult
 
 
 def refund_workflow_id(ticket_id: str) -> str:

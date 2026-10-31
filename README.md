@@ -1,7 +1,5 @@
 # Paid Once: refunds over Nexus
 
-The repository and Python package keep their working name, `refund-raccoon` / `raccoon`.
-
 A small, runnable test of one migration assumption: **moving an agent's refund-approval process onto Temporal,
 with Nexus to the payments team, keeps every approved refund exactly-once and loses no ticket under worker
 crashes, redelivery, deploys during an approval wait, and a payments commit-then-timeout, without changing the
@@ -77,18 +75,18 @@ Two things to know:
 To measure the one-line fix to Lane 1 (derive its idempotency key from the ticket instead of from each attempt):
 
 ```bash
-RACCOON_L1_STABLE_KEY=1 make scenario
+PAIDONCE_L1_STABLE_KEY=1 make scenario
 ```
 
 Lane 1 is unchanged unless that variable is set.
 
 Integration tests for Lane 2 and Nexus: `make test-temporal`. It starts a throwaway in-memory Temporal dev server on
-port 7299 (`RACCOON_TEST_TEMPORAL_PORT` changes it), creates the namespaces and endpoint there, and stops it after,
+port 7299 (`PAIDONCE_TEST_TEMPORAL_PORT` changes it), creates the namespaces and endpoint there, and stops it after,
 so it is safe to run while `make demo` is up.
 
 ## Run the live demo
 
-The demo uses a real Anthropic model (`claude-sonnet-5-5` by default; set `RACCOON_MODEL` to change it).
+The demo uses a real Anthropic model (`claude-sonnet-5-5` by default; set `PAIDONCE_MODEL` to change it).
 
 ```bash
 echo 'ANTHROPIC_API_KEY=...' > .env     # gitignored; or export it in your shell
@@ -123,11 +121,11 @@ The Temporal wordmark and favicon are not in the repo. To show them, put `tempor
 
 | Path | What it is |
 |---|---|
-| `raccoon/payments/` | The payments service and its SQLite ledger, with fault injection (commit-then-stall, latency) |
-| `raccoon/lane1/` | Lane 1: API, threaded worker, jobs table with a visibility timeout, LangGraph graph |
-| `raccoon/lane2/` | Lane 2: the Nexus contract, the support and payments workflows, activities, workers, setup |
-| `raccoon/audit.py` | The three invariants, computed from the ledger |
-| `raccoon/show/` | The process manager, the scenes and the raccoon, the server that streams state to the UI |
+| `paidonce/payments/` | The payments service and its SQLite ledger, with fault injection (commit-then-stall, latency) |
+| `paidonce/lane1/` | Lane 1: API, threaded worker, jobs table with a visibility timeout, LangGraph graph |
+| `paidonce/lane2/` | Lane 2: the Nexus contract, the support and payments workflows, activities, workers, setup |
+| `paidonce/audit.py` | The three invariants, computed from the ledger |
+| `paidonce/show/` | The process manager, the scenes and the fault injector, the server that streams state to the UI |
 | `scripts/smoke.py` | The headless scene runner behind `make scenario` |
 | `ui/` | The Vite + React + TypeScript demo UI |
 

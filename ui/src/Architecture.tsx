@@ -1,5 +1,5 @@
 // The side-by-side page: the same job done two ways. Every row is what the code in this repo does
-// (raccoon/lane1/, raccoon/lane2/); keep it that way, the panel will ask.
+// (paidonce/lane1/, paidonce/lane2/); keep it that way, the panel will ask.
 
 const ROWS: { q: string; queue: string; temporal: string }[] = [
   {

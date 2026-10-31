@@ -6,9 +6,9 @@ the payments namespace, task queue or workflow type behind it. Sandbox-safe: no 
 
 import nexusrpc
 
-from raccoon.models import RefundRequest, RefundResult
+from paidonce.models import RefundRequest, RefundResult
 
-NEXUS_ENDPOINT = "payments-endpoint"  # mirrored in raccoon/config.py
+NEXUS_ENDPOINT = "payments-endpoint"  # mirrored in paidonce/config.py
 
 
 @nexusrpc.service

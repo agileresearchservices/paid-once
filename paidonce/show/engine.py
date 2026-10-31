@@ -1,7 +1,7 @@
 """The show engine: submits tickets to both lanes, plays the human approver, and injects the faults.
 
 Every scene runs the same story against Lane 1 (job queue) and Lane 2 (Temporal + Nexus) at the same time, so the audience watches
-two systems take identical hits. Scoring comes from the payments ledger (raccoon.audit), never from
+two systems take identical hits. Scoring comes from the payments ledger (paidonce.audit), never from
 what either lane reports about itself.
 """
 
@@ -17,13 +17,13 @@ from dataclasses import dataclass
 import httpx
 from temporalio.client import Client, WorkflowExecutionStatus
 
-from raccoon import audit, config
-from raccoon.lane2.client import connect
-from raccoon.lane2.contract import NEXUS_ENDPOINT, PaymentsService
-from raccoon.lane2.payments_side import RefundWorkflow, refund_workflow_id
-from raccoon.lane2.support_side import SupportTicketWorkflow, ticket_workflow_id
-from raccoon.models import ApprovalDecision, Ticket, TicketOutcome
-from raccoon.show.procs import ProcessManager
+from paidonce import audit, config
+from paidonce.lane2.client import connect
+from paidonce.lane2.contract import NEXUS_ENDPOINT, PaymentsService
+from paidonce.lane2.payments_side import RefundWorkflow, refund_workflow_id
+from paidonce.lane2.support_side import SupportTicketWorkflow, ticket_workflow_id
+from paidonce.models import ApprovalDecision, Ticket, TicketOutcome
+from paidonce.show.procs import ProcessManager
 
 SETTLE_S = 20.0
 # A scene stays "running" after its script until every ticket has landed, so Run again never appears mid-flight.

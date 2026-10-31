@@ -109,7 +109,7 @@ flowchart LR
     Lane1 --> Ledger[(Payments ledger)]
     Lane2 --> Ledger
     Intake([Ticket and decision record<br/>written by the show harness]) --> Audit
-    Ledger --> Audit{{"Audit<br/>raccoon/audit.py"}}
+    Ledger --> Audit{{"Audit<br/>paidonce/audit.py"}}
     Audit --> Board["Scoreboard<br/>3 invariants per lane"]
 ```
 
