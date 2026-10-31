@@ -196,7 +196,8 @@ export function App() {
         </div>
       )}
 
-      {!step.nexus && !step.arch && <Ticker events={snap.events} />}
+      {/* Scene steps show faults on the diagram, so the event log only appears on the scoreboard. */}
+      {!step.scene && !step.arch && <Ticker events={snap.events} />}
     </main>
   );
 }
