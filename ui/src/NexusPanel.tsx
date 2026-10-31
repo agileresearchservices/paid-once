@@ -24,7 +24,7 @@ function Ext({ href, children }: { href: string; children: ReactNode }) {
 }
 
 // Who owns what: support's code names only the endpoint, and the endpoint maps to the payments namespace.
-function Boundary({ t, ui }: { t: Topology; ui: string | null }) {
+function Boundary({ t, ui, down }: { t: Topology; ui: string | null; down: boolean }) {
   return (
     <div className="boundary">
       <div className="team support">
@@ -43,8 +43,10 @@ function Boundary({ t, ui }: { t: Topology; ui: string | null }) {
           <span className="muted">the only thing support's code names</span>
         </div>
       </div>
-      <div className="team payments">
-        <span className="team-name">Payments team</span>
+      <div className={down ? "team payments down" : "team payments"}>
+        <span className="team-name">
+          Payments team {down && <span className="team-down">DOWN · restarting</span>}
+        </span>
         <code>{t.payments.namespace}</code>
         <span>
           {t.payments.workflow} → {t.payments.activity}
@@ -61,11 +63,13 @@ function Boundary({ t, ui }: { t: Topology; ui: string | null }) {
 
 export function NexusPanel({
   rows,
+  ran,
   topology,
   temporalUi,
   paymentsWorker,
 }: {
   rows: NexusRow[];
+  ran: boolean; // this scene is the one the engine last ran; otherwise rows is empty because nothing ran yet
   topology: Topology;
   temporalUi: string | null;
   paymentsWorker?: ProcStatus;
@@ -76,7 +80,7 @@ export function NexusPanel({
 
   return (
     <section className="nexus" aria-label="Nexus">
-      <Boundary t={topology} ui={temporalUi} />
+      <Boundary t={topology} ui={temporalUi} down={workerDown} />
       <div className="ops">
         <div className="headline">
           <div>
@@ -94,7 +98,7 @@ export function NexusPanel({
           </p>
         )}
         {rows.length === 0 ? (
-          <p className="muted">No operations yet in this scene.</p>
+          <p className="muted">{ran ? "No operations yet in this scene." : "Not run yet: press Run."}</p>
         ) : (
           <div className="ops-scroll">
             <table>

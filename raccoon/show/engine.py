@@ -97,7 +97,8 @@ class Engine:
         self.nexus_seen: dict[str, dict] = {}
         self.temporal_ui: str | None = None
         self._ui_probed_at = 0.0
-        self.lane1_view: dict[str, int] = {}
+        self.lane1_view: dict[str, int] = {}  # this scene's tickets, by the queue's own status
+        self.lane1_view_all: dict[str, int] = {}  # every ticket since reset: the scoreboard compares it with the ledger
         self.lane2_view: dict[str, int] = {}
         self.faults: dict = {}
         # Tickets the approver bot has approved, so a parked workflow isn't drawn as waiting for a human.
@@ -499,14 +500,17 @@ class Engine:
         try:
             r = await self.http.get(f"{config.LANE1_URL}/tickets")
             counts: dict[str, int] = {}
+            counts_all: dict[str, int] = {}
             ours = {tid for lane, tid in pairs if lane == "lane1"}
             flow1 = []
             for t in r.json():
+                counts_all[t["status"]] = counts_all.get(t["status"], 0) + 1
                 if t["ticket_id"] in ours:
                     counts[t["status"]] = counts.get(t["status"], 0) + 1
                     at, state = LANE1_STAGES.get(t["status"], ("lane1_api", t["status"]))
                     flow1.append({"ticket": t["ticket_id"], "at": at, "state": state})
             self.lane1_view = counts
+            self.lane1_view_all = counts_all
             self.flow["lane1"] = flow1
         except Exception:
             pass
@@ -617,6 +621,7 @@ class Engine:
             "events": self.events[-60:],
             "nexus": list(self.nexus_seen.values()),
             "lane1_view": self.lane1_view,
+            "lane1_view_all": self.lane1_view_all,
             "lane2_view": self.lane2_view,
             "faults": self.faults,
             "payments_calls": self.payments_calls,
@@ -677,7 +682,7 @@ def _lane2_stage(status: str, activities, ops, approved: bool = False) -> dict:
         return {"at": "support_worker", "state": "agent deciding"}
     if approved:
         # Approved but nothing pending: the signal is in history and the support worker is down or not yet polling.
-        return {"at": "temporal", "state": "approved, held in Temporal for a worker"}
+        return {"at": "temporal", "state": "approved, queued in Temporal for a worker"}
     return {"at": "temporal", "state": "waiting in Temporal"}
 
 

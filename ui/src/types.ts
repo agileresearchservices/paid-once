@@ -101,9 +101,12 @@ export interface Snapshot {
   processes: Record<string, ProcStatus>;
   events: ShowEvent[];
   nexus: NexusRow[];
-  lane1_view: Record<string, number>;
+  lane1_view: Record<string, number>; // this scene's tickets, by the queue's own job table
+  lane1_view_all: Record<string, number>; // every ticket since reset, by the queue's own job table
   lane2_view: Record<string, number>;
   faults: Partial<Record<LaneId, FaultState>>;
+  // This scene's calls to payments, counted by payments: booked = new ledger rows, replays = answered from the key.
+  payments_calls: Partial<Record<LaneId, { calls: number; booked: number; replays: number }>>;
   flow: Record<LaneId, FlowDot[]>; // this scene's tickets only
   temporal_ui: string | null; // Temporal Web UI base URL, or null when it is not answering
   topology: Topology;

@@ -30,7 +30,7 @@ export const STEPS: Step[] = [
     short: "Happy path",
     title: "Happy path: nothing goes wrong",
     story:
-      "Both stacks get the same five tickets and a human approves them all. Temporal makes the flow durable; Nexus decides whose failure it is.",
+      "Both stacks get the same five tickets and a human approves them all. Temporal keeps each ticket's progress through crashes; Nexus is how support calls payments without owning payments' retries.",
     watch: "Both lanes get the same five tickets, with no trouble yet.",
     result: "Both lanes agree: five approved, five refunded once. The differences only show up under failure.",
   },
@@ -52,7 +52,8 @@ export const STEPS: Step[] = [
     title: "The same message arrives twice",
     story: "The same work is delivered twice: the queue redelivers its jobs, and Temporal receives the approval signal a second time.",
     watch: "The duplicate count, and dollars refunded twice.",
-    result: "The queue refunded some tickets twice. Temporal counted the second approval and did not act on it again.",
+    result:
+      "The queue refunded some tickets twice. The workflow took the first approval and counted the repeats without acting on them.",
   },
   {
     id: "deploy_wait",
@@ -72,7 +73,7 @@ export const STEPS: Step[] = [
     story: "Payments saves the refund, then the response never arrives and the caller times out. Both lanes retry.",
     watch: "Which retries the ledger recognises as the same refund.",
     result:
-      "Temporal retries at least once. The retry is safe because the ledger dedupes on a key derived from the ticket; the queue's fresh key per attempt pays twice.",
+      "Both lanes retried. Temporal's retry reused the ticket's key, so payments answered it from the ledger; the queue's fresh key per attempt booked the refund again.",
   },
   {
     id: "nexus_kill",

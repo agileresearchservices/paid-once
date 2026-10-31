@@ -45,7 +45,9 @@ function Invariant({ text, verdict, detail }: { text: string; verdict: Verdict; 
   );
 }
 
-export function Scoreboard({ audit, name }: { audit: LaneAudit; name: string }) {
+// believedDone: what the lane's own records claim, set only where the ledger's answer sits next to it (the scoreboard
+// step). The verdicts never read it.
+export function Scoreboard({ audit, name, believedDone, note }: { audit: LaneAudit; name: string; believedDone?: number; note?: string }) {
   const ps = parts(audit);
   const total = ps.reduce((n, p) => n + p.value, 0);
   const untested = total === 0;
@@ -60,9 +62,15 @@ export function Scoreboard({ audit, name }: { audit: LaneAudit; name: string }) 
         <span className="hero-num">{audit.refunded_once}</span>
         <span className="hero-of">of {audit.approved} approved refunded exactly once</span>
       </div>
-      {/* Always rendered, so the lane doesn't jump when the first duplicate lands. */}
-      <p className="loss" aria-hidden={audit.duplicate_cents === 0}>
-        {audit.duplicate_cents > 0 ? `${dollars(audit.duplicate_cents)} refunded twice` : " "}
+      {note && <p className="hero-note">{note}</p>}
+      {believedDone !== undefined && (
+        <p className="believed">
+          Its own job table says <b>{believedDone}</b> done. The ledger says <b>{audit.refunded_once}</b> refunded exactly once.
+        </p>
+      )}
+      {/* Always rendered, so the lane doesn't jump when the first duplicate lands. A clean lane shows its $0.00. */}
+      <p className={audit.duplicate_cents > 0 ? "loss" : "loss none"} aria-hidden={untested}>
+        {untested ? " " : `${dollars(audit.duplicate_cents)} refunded twice`}
       </p>
 
       {total === 0 ? (
