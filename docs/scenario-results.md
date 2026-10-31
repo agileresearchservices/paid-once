@@ -81,6 +81,12 @@ In `nexus_kill`, the payments-side activity attempt peaked at 2 in both runs whi
 stayed at attempt 1, `STARTED`. Retries inside the handler's workflow are not visible as retries on the caller. All
 five refund workflows finished with `replayed: true` (the ledger returned the stored row for the retry).
 
+`nexus_kill` is now a gauntlet (four failures on the same in-flight refunds: payments stalls after booking, then
+the support worker, the payments worker and the Temporal server are killed). On a side-port run at `2603d71`, with
+the show starting its own Temporal server: every failure hit all 5 refunds and its window closed; the payments-side
+activity peaked at attempt 3, the caller's operation at attempt 1; 5 refunds each paid once, 0 violations. The
+cumulative Lane 2 totals are unchanged (43 submitted, 31 refunded once, 0 duplicates, 6/6 denials).
+
 ## Fresh clone at `a5f62d6`
 
 Cloned into an empty directory with no `.env` and no `ANTHROPIC_API_KEY`, then
