@@ -108,6 +108,7 @@ export interface SceneRun {
   started_at: number;
   finished_at: number | null;
   ok: boolean | null;
+  error?: string | null; // why the scene failed, when ok is false
   kills: Record<string, number>; // kill -9s during this run, by process
   faults?: FaultWindow[]; // the failures this run injected, each with its window (the Nexus gauntlet records these)
 }

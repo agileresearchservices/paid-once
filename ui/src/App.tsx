@@ -4,7 +4,6 @@ import { Diagram } from "./Diagram";
 import { NexusPanel } from "./NexusPanel";
 import { Scoreboard } from "./Scoreboard";
 import { STEPS } from "./steps";
-import { Ticker } from "./Ticker";
 import { post, useSnapshot } from "./useSnapshot";
 
 const LANES = [
@@ -119,7 +118,7 @@ export function App() {
   const settling = snap.audit.lane1.in_flight + snap.audit.lane2.in_flight > 0;
   const elapsed = run ? Math.max(0, Math.round(snap.now - run.started_at)) : 0;
   let status: { text: string; cls: string } | null = null;
-  if (finished && run?.ok === false) status = { text: "Scene failed: see the ticker", cls: "fail" };
+  if (finished && run?.ok === false) status = { text: `Scene failed: ${run.error ?? "see the server log"}`, cls: "fail" };
   else if (finished && settling) status = { text: "Done, settling…", cls: "muted" };
   else if (finished) status = { text: "Done ✓", cls: "ok" };
 
@@ -220,7 +219,6 @@ export function App() {
       )}
 
       {/* Scene steps show faults on the diagram, so the event log only appears on the scoreboard. */}
-      {!step.scene && !step.arch && <Ticker events={snap.events} />}
     </main>
   );
 }

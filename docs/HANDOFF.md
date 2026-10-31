@@ -83,7 +83,7 @@ whoever changes the code next.
   message text. Latency is drawn as staging, not as a fault. Dots come from the snapshot's `flow`: where each stack
   thinks each of this scene's tickets is, read from Lane 1's own table and Lane 2's `describe()` (no query, so it works
   with the worker dead). The payments node's slots come from the ledger audit, never from a stack. The Nexus step keeps
-  its own panel and has no diagram; the event ticker shows only on the scoreboard step.
+  its own panel and has no diagram. There is no event log on screen; a failed scene shows its error on its status line.
 - **On screen the demo is "Paid Once: refunds over Nexus"**, and faults are labelled plainly ("Fault: kill -9 on both
   agent workers", event kind `fault`). The lanes are "Job queue" and "Temporal + Nexus" on screen (`LANE_NAMES` in the
   engine, `LANES` in `ui/src/App.tsx`); code, docs, the ledger and ticket IDs still say lane1/lane2. The Temporal namespaces show
