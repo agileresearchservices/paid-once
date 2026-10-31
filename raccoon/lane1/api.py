@@ -26,6 +26,7 @@ class TicketBody(BaseModel):
     order_id: str
     amount_cents: int
     message: str
+    order_age_days: int = 3
 
 
 class RedeliverBody(BaseModel):

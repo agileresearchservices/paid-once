@@ -15,6 +15,7 @@ from raccoon.db import connect
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS tickets (
   ticket_id TEXT PRIMARY KEY, customer TEXT, order_id TEXT, amount_cents INTEGER, message TEXT,
+  order_age_days INTEGER NOT NULL DEFAULT 3,
   status TEXT NOT NULL, proposal TEXT, refund_id TEXT, detail TEXT DEFAULT '',
   created_at REAL NOT NULL, updated_at REAL NOT NULL
 );
@@ -31,6 +32,10 @@ CREATE TABLE IF NOT EXISTS job_log (
 def init() -> None:
     with connect(config.LANE1_DB) as conn:
         conn.executescript(SCHEMA)
+        # data/lane1.db outlives code changes: add columns that came after the table was made.
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(tickets)")}
+        if "order_age_days" not in cols:
+            conn.execute("ALTER TABLE tickets ADD COLUMN order_age_days INTEGER NOT NULL DEFAULT 3")
 
 
 def create_ticket(ticket: dict) -> bool:
@@ -44,14 +49,15 @@ def create_ticket(ticket: dict) -> bool:
             conn.execute("COMMIT")
             return False
         conn.execute(
-            "INSERT INTO tickets (ticket_id, customer, order_id, amount_cents, message, status, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, 'new', ?, ?)",
+            "INSERT INTO tickets (ticket_id, customer, order_id, amount_cents, message, order_age_days, status, "
+            "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'new', ?, ?)",
             (
                 ticket["ticket_id"],
                 ticket["customer"],
                 ticket["order_id"],
                 ticket["amount_cents"],
                 ticket["message"],
+                ticket.get("order_age_days", 3),
                 now,
                 now,
             ),

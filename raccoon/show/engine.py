@@ -146,9 +146,9 @@ class Engine:
         return self._payments_temporal
 
     # -- tickets and approvals --------------------------------------------------
-    def _make_ticket(self, scene: str, i: int, lane: str, amount: int, message: str) -> Ticket:
+    def _make_ticket(self, scene: str, i: int, lane: str, amount: int, message: str, age: int = 3) -> Ticket:
         tid = f"{self.run_id}-{scene}-r{self.run_no}-{i:02d}-{lane}"
-        return Ticket(tid, f"cust-{i:02d}", f"ord-{self.run_id}-r{self.run_no}-{i:02d}", amount, message)
+        return Ticket(tid, f"cust-{i:02d}", f"ord-{self.run_id}-r{self.run_no}-{i:02d}", amount, message, age)
 
     async def submit_ticket(self, lane: str, scene: str, ticket: Ticket) -> None:
         audit.record_ticket(lane, ticket.ticket_id, scene, ticket.amount_cents)
@@ -160,6 +160,7 @@ class Engine:
                 "order_id": ticket.order_id,
                 "amount_cents": ticket.amount_cents,
                 "message": ticket.message,
+                "order_age_days": ticket.order_age_days,
             }
             for _ in range(60):  # a helpdesk webhook retries until the API answers
                 try:

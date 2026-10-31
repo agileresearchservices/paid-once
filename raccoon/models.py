@@ -12,6 +12,7 @@ class Ticket:
     order_id: str
     amount_cents: int
     message: str
+    order_age_days: int = 3  # from the order system; the agent's return-window rule reads it
 
 
 @dataclass

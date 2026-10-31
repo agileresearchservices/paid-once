@@ -3,9 +3,10 @@ import time
 
 import httpx
 import pytest
+from fastapi.testclient import TestClient
 
 from raccoon import audit, config
-from raccoon.lane1 import store
+from raccoon.lane1 import api, store
 from raccoon.lane1.worker import Worker
 from raccoon.payments import ledger
 from raccoon.payments.service import app as payments_app
@@ -42,6 +43,20 @@ def test_happy_path_refunds_once(payments):
     drain(worker)
     assert store.get_ticket("t1")["status"] == "done"
     assert len(ledger.all_refunds("lane1")) == 1
+
+
+def test_policy_denies_an_old_order_sent_through_the_api(payments):
+    """The order's age has to reach the agent, or Lane 1 would refund what Lane 2 denies."""
+    body = {"ticket_id": "t1", "customer": "c", "order_id": "o", "amount_cents": 2500, "message": "broken"}
+    with TestClient(api.app) as client:
+        assert client.post("/tickets", json={**body, "order_age_days": 45}).json() == {"created": True}
+    audit.record_ticket("lane1", "t1", "test", 2500)
+    drain(Worker())
+    row = store.get_ticket("t1")
+    assert row["status"] == "denied"
+    assert "45 days" in row["detail"]
+    assert store.approve("t1") == "not_ready"
+    assert ledger.all_refunds("lane1") == []
 
 
 def test_approve_before_proposal_is_not_ready(payments):
