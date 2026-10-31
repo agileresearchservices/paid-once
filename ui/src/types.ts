@@ -14,6 +14,7 @@ export interface LaneAudit {
   in_flight: number;
   unapproved: number;
   violations: number;
+  tickets?: Record<string, string>; // ledger state per ticket: ok | duplicate | in_flight | missing | waiting | unapproved
 }
 
 export interface ProcStatus {
@@ -28,6 +29,15 @@ export interface ShowEvent {
   msg: string;
   scene?: string;
   ok?: boolean; // scene_done only
+  target?: string[]; // fault only: diagram node ids it lands on (process names, or "temporal")
+  effect?: "kill" | "duplicate" | "stall"; // fault only
+}
+
+// Where one stack thinks one ticket is: a diagram node id, a wire ("lane1_worker>payments") or "done".
+export interface FlowDot {
+  ticket: string;
+  at: string;
+  state: string;
 }
 
 // The payments side, read by the dashboard straight from the payments namespace. Support never sees it.
@@ -94,6 +104,7 @@ export interface Snapshot {
   lane1_view: Record<string, number>;
   lane2_view: Record<string, number>;
   faults: Partial<Record<LaneId, FaultState>>;
+  flow: Record<LaneId, FlowDot[]>; // this scene's tickets only
   temporal_ui: string | null; // Temporal Web UI base URL, or null when it is not answering
   topology: Topology;
 }

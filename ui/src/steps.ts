@@ -10,16 +10,27 @@ export interface Step {
   watch: string; // what to look at, without giving the outcome away
   result?: string; // what it showed; appears once this step's scene has finished
   nexus?: boolean; // show the Nexus panel
+  arch?: boolean; // the side-by-side architecture page
 }
 
 export const STEPS: Step[] = [
   {
+    id: "architecture",
+    scene: null,
+    short: "Two architectures",
+    title: "Two ways to build the same refund",
+    story:
+      "A support agent proposes refunds, a human approves, and the payments team moves the money. Both stacks run that flow and call the same payments service.",
+    watch: "Where each one keeps a ticket's progress, and how it reaches payments.",
+    arch: true,
+  },
+  {
     id: "intro",
     scene: "intro",
-    short: "Meet the system",
-    title: "Meet the system",
+    short: "Happy path",
+    title: "Happy path: nothing goes wrong",
     story:
-      "A support agent proposes refunds, a human approves, and the payments team moves the money. Temporal makes it durable; Nexus decides whose failure it is.",
+      "Both stacks get the same five tickets and a human approves them all. Temporal makes the flow durable; Nexus decides whose failure it is.",
     watch: "Both lanes get the same five tickets, with no trouble yet.",
     result: "Both lanes agree: five approved, five refunded once. The differences only show up under failure.",
   },

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Compare } from "./Architecture";
+import { Diagram } from "./Diagram";
 import { NexusPanel } from "./NexusPanel";
-import { PaymentsStrip, ProcTile } from "./Processes";
+import { ProcTile } from "./Processes";
 import { Scoreboard } from "./Scoreboard";
 import { STEPS } from "./steps";
 import { Ticker } from "./Ticker";
@@ -31,7 +33,7 @@ function Wordmark() {
   return <img className="wordmark" src="/brand/temporal-wordmark.svg" alt="Temporal" onError={() => setMissing(true)} />;
 }
 
-// The step lives in the URL hash (#1..#7), so a refresh mid-demo stays on the same step.
+// The step lives in the URL hash (#1..#8), so a refresh mid-demo stays on the same step.
 function stepFromHash(): number {
   const n = Number(window.location.hash.slice(1));
   return Number.isInteger(n) && n >= 1 && n <= STEPS.length ? n - 1 : 0;
@@ -69,7 +71,7 @@ export function App() {
     }
   }, []);
 
-  // Arrows step, 1-7 jump, R runs this step's scene.
+  // Arrows step, 1-8 jump, R runs this step's scene.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -106,7 +108,6 @@ export function App() {
   if (finished && run?.ok === false) status = { text: "Scene failed: see the ticker", cls: "fail" };
   else if (finished && settling) status = { text: "Done, settling…", cls: "muted" };
   else if (finished) status = { text: "Done ✓", cls: "ok" };
-  const recentFault = [...snap.events].reverse().find((e) => e.kind === "fault" && snap.now - e.ts < 6);
 
   return (
     <main>
@@ -149,8 +150,6 @@ export function App() {
         </div>
       </section>
 
-      {recentFault && <div className="fault-banner" role="status">⚡ {recentFault.msg}</div>}
-
       {step.nexus && (
         <NexusPanel
           rows={snap.nexus}
@@ -160,9 +159,11 @@ export function App() {
         />
       )}
 
-      <PaymentsStrip proc={snap.processes.payments} faults={snap.faults} />
+      {(step.arch || (step.scene && !step.nexus)) && <Diagram snap={snap} scene={step.scene} />}
 
-      {step.nexus ? (
+      {step.arch ? (
+        <Compare />
+      ) : step.nexus ? (
         // The Nexus scene only runs the Temporal lane, so the lanes shrink to one strip and the panel keeps the screen.
         <div className="lanes compact">
           <article className="lane lane-off">
@@ -185,9 +186,6 @@ export function App() {
             <article key={l.id} className={`lane ${l.id}`}>
               <h2>{l.name}</h2>
               <p className="muted">{l.subtitle}</p>
-              <div className="tiles">
-                {l.procs.map((p) => snap.processes[p] && <ProcTile key={p} p={snap.processes[p]} kills={run?.kills?.[p]} />)}
-              </div>
               <div className="believes">
                 <span className="muted">{l.id === "lane1" ? "Its own job table:" : "Temporal workflow status (this scene):"}</span>{" "}
                 <Chips counts={l.id === "lane1" ? snap.lane1_view : snap.lane2_view} empty="nothing yet" />
@@ -198,7 +196,7 @@ export function App() {
         </div>
       )}
 
-      {!step.nexus && <Ticker events={snap.events} />}
+      {!step.nexus && !step.arch && <Ticker events={snap.events} />}
     </main>
   );
 }
