@@ -1,3 +1,4 @@
+import { OUTCOME_GLYPH } from "./outcomes";
 import type { FlowDot, LaneId, ShowEvent, Snapshot } from "./types";
 
 // One architecture diagram for both stacks. Faults land on the node they hit; dots show where each stack
@@ -20,9 +21,9 @@ interface Box {
 
 const NODES: Record<string, Box> = {
   lane1_api: { x: 60, y: ROW.lane1, w: 200, h: NODE_H, title: "Queue API", sub: "jobs table (SQLite)", proc: "lane1_api" },
-  lane1_worker: { x: 320, y: ROW.lane1, w: 210, h: NODE_H, title: "Queue worker", sub: "agent state in memory", proc: "lane1_worker" },
+  lane1_worker: { x: 320, y: ROW.lane1, w: 224, h: NODE_H, title: "Queue worker", sub: "agent · state in memory", proc: "lane1_worker" },
   temporal: { x: 60, y: ROW.lane2, w: 200, h: NODE_H, title: "Temporal server", sub: "durable history" },
-  support_worker: { x: 320, y: ROW.lane2, w: 210, h: NODE_H, title: "Support worker", sub: "SupportTicketWorkflow", proc: "support_worker" },
+  support_worker: { x: 320, y: ROW.lane2, w: 224, h: NODE_H, title: "Support worker", sub: "agent · SupportTicketWorkflow", proc: "support_worker" },
   endpoint: { x: 600, y: ROW.lane2, w: 190, h: NODE_H, title: "Nexus endpoint", sub: "payments-endpoint" },
   payments_worker: { x: 860, y: ROW.lane2, w: 210, h: NODE_H, title: "Payments worker", sub: "RefundWorkflow", proc: "payments_worker" },
   payments: { x: 1170, y: ROW.lane1, w: 294, h: ROW.lane2 + NODE_H - ROW.lane1, title: "Payments service + ledger", sub: "the audit reads this ledger", proc: "payments" },
@@ -34,10 +35,10 @@ const mid = (lane: LaneId) => ROW[lane] + NODE_H / 2;
 const WIRES: { id: string; x1: number; x2: number; lane: LaneId; label?: string }[] = [
   { id: "in_lane1", x1: 8, x2: 60, lane: "lane1" },
   { id: "lane1_api>lane1_worker", x1: 260, x2: 320, lane: "lane1" },
-  { id: "lane1_worker>payments", x1: 530, x2: 1170, lane: "lane1", label: "plain HTTP" },
+  { id: "lane1_worker>payments", x1: 544, x2: 1170, lane: "lane1", label: "plain HTTP" },
   { id: "in_lane2", x1: 8, x2: 60, lane: "lane2" },
   { id: "temporal>support_worker", x1: 260, x2: 320, lane: "lane2" },
-  { id: "support_worker>endpoint", x1: 530, x2: 600, lane: "lane2" },
+  { id: "support_worker>endpoint", x1: 544, x2: 600, lane: "lane2" },
   { id: "endpoint>payments_worker", x1: 790, x2: 860, lane: "lane2", label: "Nexus" },
   { id: "payments_worker>payments", x1: 1070, x2: 1170, lane: "lane2" },
 ];
@@ -100,8 +101,9 @@ function Ledger({ lane, label, dots, tickets }: { lane: LaneId; label: string; d
       {ids.map((id, i) => {
         const st = tickets[id] ?? "waiting";
         const x = x0 + 82 + i * 26;
-        const cls = st === "ok" ? "slot ok" : st === "duplicate" ? "slot dup" : st === "missing" || st === "unapproved" ? "slot bad" : "slot";
-        const glyph = st === "ok" ? "✓" : st === "duplicate" ? "×2" : st === "missing" ? "?" : st === "unapproved" ? "!" : "";
+        // Same colours as the scoreboard: twice and unapproved are critical (red), never refunded is serious (orange).
+        const cls = st === "ok" ? "slot ok" : st === "duplicate" || st === "unapproved" ? "slot bad" : st === "missing" ? "slot missing" : "slot";
+        const glyph = st === "ok" || st === "duplicate" || st === "missing" || st === "unapproved" ? OUTCOME_GLYPH[st] : "";
         return (
           <g key={id} className={cls}>
             <rect x={x} y={y} width={22} height={18} rx={4} />
@@ -157,6 +159,9 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
             <span><i className="lg active" /> where each stack thinks a ticket is</span>
             <span><i className="lg waiting" /> waiting for a human</span>
             <span><i className="lg paying" /> refund in flight</span>
+            <span className="lg-slots">
+              ledger {OUTCOME_GLYPH.ok} once · {OUTCOME_GLYPH.duplicate} twice · {OUTCOME_GLYPH.missing} never
+            </span>
             <span className="lg-stage">⏱ slowed on purpose, so a fault lands mid-call</span>
           </span>
         )}
@@ -232,8 +237,9 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
                   <text x={b.x + 22} y={badgeY + 15}>DOWN · restarting</text>
                 </g>
               )}
+              {/* On the node's top border, like a fieldset legend: above it, it ran into the row labels */}
               {marks[id] && (
-                <text className="n-mark" x={b.x + b.w - 4} y={b.y - 6} textAnchor="end">{marks[id]}</text>
+                <text className="n-mark" x={b.x + b.w - 10} y={b.y + 5} textAnchor="end">{marks[id]}</text>
               )}
               {hitNow.has(id) && (
                 <text className="bolt" x={b.x + b.w / 2} y={b.y + b.h / 2 + 12} textAnchor="middle">⚡</text>

@@ -73,3 +73,17 @@ def test_commit_then_stall_still_commits():
 def test_rejects_bad_amounts(amount):
     with TestClient(app) as client:
         assert post(client, "k", amount=amount).status_code == 422
+
+
+def test_calls_count_replays_per_ticket():
+    with TestClient(app) as client:
+        client.post("/admin/reset")
+        post(client, "same", ticket="t1", lane="lane2")
+        post(client, "same", ticket="t1", lane="lane2")
+        post(client, "fresh-1", ticket="t2", lane="lane1")
+        post(client, "fresh-2", ticket="t2", lane="lane1")
+        calls = client.get("/admin/calls").json()
+        assert calls["lane2"]["t1"] == {"calls": 2, "replays": 1}
+        assert calls["lane1"]["t2"] == {"calls": 2, "replays": 0}
+        client.post("/admin/reset")
+        assert client.get("/admin/calls").json() == {}

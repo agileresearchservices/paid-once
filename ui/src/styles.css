@@ -20,6 +20,7 @@
   --accent-ink: #a5a9f5;
   --accent-wash: #22265c;
   --violet: #b664ff;
+  --sky: #38bdf8; /* ticket position: a blue, so it can't be mistaken for violet (refund in flight) */
   --brand: linear-gradient(90deg, #444ce7, #b664ff);
   --mono: "Noto Sans Mono", ui-monospace, Menlo, monospace;
   color-scheme: dark;
@@ -66,6 +67,7 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .story-text p { max-width: 110ch; color: var(--ink-2); font-size: 18px; margin-bottom: 6px; }
 .story-text .watch { color: var(--ink); font-size: 16px; }
 .story-text .result { color: var(--ink); font-size: 16px; border-left: 3px solid var(--accent); padding-left: 10px; }
+.story-text .result.pending { visibility: hidden; }
 .controls { display: grid; gap: 8px; align-content: start; min-width: 200px; }
 .scene-status { margin: 0; font-size: 15px; text-align: center; }
 .scene-status.ok { color: var(--good-ink); }
@@ -80,10 +82,11 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .legend { display: flex; gap: 22px; color: var(--ink-2); flex-wrap: wrap; }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .lg { display: inline-block; width: 11px; height: 11px; border-radius: 50%; }
-.lg.active { background: var(--accent-ink); }
+.lg.active { background: var(--sky); }
 .lg.waiting { border: 2px solid var(--ink-2); }
 .lg.paying { background: var(--violet); }
 .lg-stage { color: var(--warning); }
+.lg-slots { color: var(--ink-2); }
 .fault-caption {
   background: var(--critical-wash); border: 1px solid var(--critical); color: var(--ink); border-radius: 8px;
   padding: 3px 12px; font-size: 16px; animation: flash 0.9s ease-in-out 2;
@@ -97,7 +100,7 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .diagram .team { fill: none; stroke: var(--axis); stroke-dasharray: 6 6; }
 .diagram .row-label { fill: var(--muted); font-size: 12px; letter-spacing: 0.08em; font-weight: 600; }
 .diagram .wire { stroke: var(--axis); stroke-width: 2; }
-.diagram .wire.busy { stroke: var(--accent-ink); stroke-dasharray: 8 6; animation: flow 0.8s linear infinite; }
+.diagram .wire.busy { stroke: var(--violet); stroke-dasharray: 8 6; animation: flow 1.6s linear infinite; }
 @keyframes flow { to { stroke-dashoffset: -14; } }
 .diagram .arrowhead { fill: var(--axis); }
 .diagram .wire-label { fill: var(--muted); font-size: 12.5px; }
@@ -109,7 +112,8 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .diagram .n-state { fill: var(--good-ink); font-size: 12px; font-weight: 700; letter-spacing: 0.05em; }
 .diagram .n-down rect { fill: var(--critical); }
 .diagram .n-down text { fill: #fff; font-size: 12.5px; font-weight: 700; letter-spacing: 0.04em; }
-.diagram .n-mark { fill: var(--critical-ink); font-size: 13px; font-weight: 600; }
+/* The halo in the diagram's background colour cuts the node border behind the mark, so it reads as a label on it */
+.diagram .n-mark { fill: var(--critical-ink); font-size: 13px; font-weight: 600; paint-order: stroke; stroke: var(--surface); stroke-width: 6px; stroke-linejoin: round; }
 .diagram .node.hit > rect { animation: hit 0.5s ease-in-out 4; }
 @keyframes hit { 50% { stroke: var(--critical); stroke-width: 4; fill: #5a1f19; } }
 .diagram .node.hit { animation: shake 0.35s ease-in-out 3; }
@@ -122,9 +126,10 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 @keyframes blink { 50% { opacity: 0.2; } }
 .diagram .packet rect { fill: var(--critical-wash); stroke: var(--critical); }
 .diagram .packet text { fill: var(--critical-ink); font-size: 13px; font-weight: 700; }
-.diagram .packet { animation: travel 1.1s ease-in 3; }
+.diagram .packet { animation: travel 1.8s ease-in 3; }
 @keyframes travel { from { transform: translateX(0); opacity: 0; } 20% { opacity: 1; } to { transform: translateX(var(--dx)); opacity: 0; } }
-.diagram .tdot { transition: transform 0.9s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.8s ease-in; fill: var(--accent-ink); }
+/* Slow enough to follow a ticket by eye; the scenes' own timing is server-side and unchanged */
+.diagram .tdot { transition: transform 1.8s cubic-bezier(0.4, 0, 0.2, 1), opacity 1.4s ease-in; fill: var(--sky); }
 .diagram .tdot.waiting { fill: var(--page); stroke: var(--ink-2); stroke-width: 2; }
 .diagram .tdot.paying { fill: var(--violet); }
 .diagram .tdot.done { fill: var(--good); }
@@ -133,9 +138,9 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .diagram .slot text { font-size: 12px; font-weight: 700; }
 .diagram .slot.ok rect { fill: #0b3a22; stroke: var(--good); stroke-dasharray: none; }
 .diagram .slot.ok text { fill: var(--good-ink); }
-.diagram .slot.dup rect { fill: #4a2306; stroke: var(--serious); stroke-dasharray: none; }
-.diagram .slot.dup text { fill: var(--serious); }
-.diagram .slot.bad rect { stroke: var(--critical); stroke-dasharray: none; }
+.diagram .slot.missing rect { fill: #4a2306; stroke: var(--serious); stroke-dasharray: none; }
+.diagram .slot.missing text { fill: var(--serious); }
+.diagram .slot.bad rect { fill: var(--critical-wash); stroke: var(--critical); stroke-dasharray: none; }
 .diagram .slot.bad text { fill: var(--critical-ink); }
 @media (prefers-reduced-motion: reduce) {
   .diagram *, .fault-caption { animation: none !important; transition: none !important; }
@@ -174,12 +179,17 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .tile.down .tile-state { color: var(--critical-ink); }
 .tile-kills { color: var(--muted); font-size: 14px; }
 .believes { font-size: 15px; margin-bottom: 8px; }
+.calls { margin-top: 4px; }
+.calls b { font-variant-numeric: tabular-nums; }
 
 .scoreboard { border-top: 1px solid var(--grid); padding-top: 12px; margin-top: 8px; }
 .hero { display: flex; align-items: baseline; gap: 12px; }
 .hero-num { font-size: 52px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
 .hero-of { color: var(--ink-2); }
 .loss { color: var(--critical-ink); font-weight: 600; margin: 4px 0 0; min-height: 1.45em; }
+.loss.none { color: var(--good-ink); font-weight: 400; }
+.hero-note { color: var(--muted); font-size: 14px; margin: 2px 0 0; }
+.believed { color: var(--ink-2); font-size: 15px; margin: 4px 0 0; }
 
 .bar { display: flex; gap: 2px; height: 40px; margin: 12px 0 8px; }
 .bar.empty { align-items: center; padding: 0 12px; color: var(--muted); background: var(--page); border-radius: 6px; }
@@ -197,10 +207,9 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .warning { background: var(--warning); }
 .serious { background: var(--serious); }
 .critical { background: var(--critical); }
-.dotted { background-image: radial-gradient(rgba(0, 0, 0, 0.35) 1.5px, transparent 1.8px); background-size: 6px 6px; }
 .striped { background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.35) 0 3px, transparent 3px 7px); }
 /* The label sits on a solid patch of the segment's own colour, so the texture never runs through the text. */
-.seg.dotted > span, .seg.striped > span { background-color: inherit; padding: 1px 6px; border-radius: 4px; }
+.seg.striped > span { background-color: inherit; padding: 1px 6px; border-radius: 4px; }
 
 .legend { list-style: none; display: flex; gap: 14px; flex-wrap: wrap; padding: 0; margin: 0 0 12px; font-size: 15px; color: var(--ink-2); }
 .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; }
@@ -229,6 +238,8 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .boundary { display: grid; gap: 0; align-content: start; }
 .team { display: grid; gap: 0; border: 1px solid var(--axis); border-radius: 10px; padding: 8px 14px; background: var(--page); font-size: 15px; }
 .team-name { font-weight: 700; }
+.team.down { border-color: var(--critical); background: var(--critical-wash); }
+.team-down { margin-left: 6px; padding: 1px 6px; border-radius: 4px; background: var(--critical); color: #fff; font-size: 12px; letter-spacing: 0.04em; }
 /* The endpoint is support's side of the line: the dashed team boundary runs under it, where the arrow crosses. */
 .endpoint { position: relative; display: grid; justify-items: center; padding: 22px 0 34px; }
 .endpoint::before { content: ""; position: absolute; left: 0; right: 0; bottom: 14px; border-top: 2px dashed var(--muted); }

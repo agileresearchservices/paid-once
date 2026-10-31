@@ -101,11 +101,14 @@ Run of show, about ten minutes:
 - **Step 1, Two architectures**: the same refund flow built twice, and a side-by-side table of what differs.
 - **Step 2, Happy path**: both lanes refund five tickets cleanly.
 - **Steps 3-6** (agent crash, double delivery, deploy mid-wait, payments goes quiet): the same chaos hits both
-  lanes; watch the ledger-based scoreboards diverge.
-- **Step 7, Nexus**: the payments team's worker is killed mid-refund. Support's side stays `STARTED` with no
-  failure while payments retries. Click a row's `history ↗` links to show both sides in the Temporal Web UI
-  (http://127.0.0.1:8233), including the caller's Nexus Links tab.
-- **Step 8, Scoreboard**: the totals.
+  lanes; watch the ledger-based scoreboards diverge. The payments node's slots mark each ticket in the ledger
+  (`✓` once, `×2` twice, `∅` never), and each lane shows what payments saw in the scene: calls, refunds booked, and
+  calls answered from an existing key. On step 6 that line is the evidence: Temporal's retry is answered from the
+  ledger, the queue's is booked again.
+- **Step 7, Nexus**: the payments team's worker is killed mid-refund. The payments team box goes DOWN; support's
+  side stays `STARTED` with no failure while payments retries. Click a row's `history ↗` links to show both sides in
+  the Temporal Web UI (http://127.0.0.1:8233), including the caller's Nexus Links tab.
+- **Step 8, Scoreboard**: the totals, and the queue's own job table next to what the ledger says.
 
 The Temporal wordmark and favicon are not in the repo. To show them, put `temporal-wordmark.svg` and `favicon.svg` in
 `ui/public/brand/` (gitignored) before `make ui`; otherwise the header shows text.

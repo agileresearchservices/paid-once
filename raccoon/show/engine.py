@@ -97,9 +97,14 @@ class Engine:
         self.nexus_seen: dict[str, dict] = {}
         self.temporal_ui: str | None = None
         self._ui_probed_at = 0.0
-        self.lane1_view: dict[str, int] = {}
+        self.lane1_view: dict[str, int] = {}  # this scene's tickets, by the queue's own status
+        self.lane1_view_all: dict[str, int] = {}  # every ticket since reset: the scoreboard compares it with the ledger
         self.lane2_view: dict[str, int] = {}
         self.faults: dict = {}
+        # Tickets the approver bot has approved, so a parked workflow isn't drawn as waiting for a human.
+        self.approved: set[str] = set()
+        # This scene's calls to payments per lane, from payments' own counter: calls, booked, replays.
+        self.payments_calls: dict[str, dict[str, int]] = {}
         # Where each stack thinks each of this scene's tickets is, for the architecture diagram.
         self.flow: dict[str, list[dict]] = {"lane1": [], "lane2": []}
         self._task: asyncio.Task | None = None
@@ -187,6 +192,7 @@ class Engine:
     async def approve_ticket(self, lane: str, ticket_id: str) -> None:
         """A human clicks Approve. The decision is recorded the moment it is made, delivered or not."""
         audit.record_approval(lane, ticket_id, delivered=False)
+        self.approved.add(ticket_id)
         if lane == "lane1":
             for _ in range(80):
                 try:
@@ -478,6 +484,8 @@ class Engine:
         self.run_id = uuid.uuid4().hex[:4]
         self.rng = random.Random(self.seed)
         self.scene_tickets.clear()
+        self.approved.clear()
+        self.payments_calls = {}
         self.nexus_seen = {}
         self.flow = {"lane1": [], "lane2": []}
         self.scene_runs = {}  # a cancelled scene's finally block then updates a run nobody shows
@@ -492,20 +500,25 @@ class Engine:
         try:
             r = await self.http.get(f"{config.LANE1_URL}/tickets")
             counts: dict[str, int] = {}
+            counts_all: dict[str, int] = {}
             ours = {tid for lane, tid in pairs if lane == "lane1"}
             flow1 = []
             for t in r.json():
-                counts[t["status"]] = counts.get(t["status"], 0) + 1
+                counts_all[t["status"]] = counts_all.get(t["status"], 0) + 1
                 if t["ticket_id"] in ours:
+                    counts[t["status"]] = counts.get(t["status"], 0) + 1
                     at, state = LANE1_STAGES.get(t["status"], ("lane1_api", t["status"]))
                     flow1.append({"ticket": t["ticket_id"], "at": at, "state": state})
             self.lane1_view = counts
+            self.lane1_view_all = counts_all
             self.flow["lane1"] = flow1
         except Exception:
             pass
         try:
             r = await self.http.get(f"{config.PAYMENTS_URL}/admin/fault")
             self.faults = r.json()
+            r = await self.http.get(f"{config.PAYMENTS_URL}/admin/calls")
+            self.payments_calls = _scene_calls(r.json(), pairs)
         except Exception:
             pass
         try:
@@ -525,7 +538,12 @@ class Engine:
             status = desc.status.name if desc.status else "UNKNOWN"
             states[status] = states.get(status, 0) + 1
             ops = desc.raw_description.pending_nexus_operations
-            flow2.append({"ticket": tid, **_lane2_stage(status, desc.raw_description.pending_activities, ops)})
+            flow2.append(
+                {
+                    "ticket": tid,
+                    **_lane2_stage(status, desc.raw_description.pending_activities, ops, tid in self.approved),
+                }
+            )
             row = seen.get(tid)
             if ops:
                 op = ops[0]
@@ -603,8 +621,10 @@ class Engine:
             "events": self.events[-60:],
             "nexus": list(self.nexus_seen.values()),
             "lane1_view": self.lane1_view,
+            "lane1_view_all": self.lane1_view_all,
             "lane2_view": self.lane2_view,
             "faults": self.faults,
+            "payments_calls": self.payments_calls,
             "flow": self.flow,
             "temporal_ui": self.temporal_ui,
             "topology": TOPOLOGY,
@@ -647,7 +667,7 @@ LANE1_STAGES = {
 }
 
 
-def _lane2_stage(status: str, activities, ops) -> dict:
+def _lane2_stage(status: str, activities, ops, approved: bool = False) -> dict:
     """Where a support workflow is, from describe() alone: a query would need a live worker."""
     if status == "COMPLETED":
         return {"at": "done", "state": "refunded"}
@@ -660,7 +680,23 @@ def _lane2_stage(status: str, activities, ops) -> dict:
         return {"at": "endpoint", "state": "Nexus operation starting"}
     if activities:
         return {"at": "support_worker", "state": "agent deciding"}
+    if approved:
+        # Approved but nothing pending: the signal is in history and the support worker is down or not yet polling.
+        return {"at": "temporal", "state": "approved, queued in Temporal for a worker"}
     return {"at": "temporal", "state": "waiting in Temporal"}
+
+
+def _scene_calls(calls: dict, pairs: list[tuple[str, str]]) -> dict[str, dict[str, int]]:
+    """Payments' per-ticket call counts, summed per lane over this scene's tickets."""
+    out: dict[str, dict[str, int]] = {}
+    for lane, tid in pairs:
+        c = calls.get(lane, {}).get(tid)
+        if c:
+            row = out.setdefault(lane, {"calls": 0, "booked": 0, "replays": 0})
+            row["calls"] += c["calls"]
+            row["replays"] += c["replays"]
+            row["booked"] += c["calls"] - c["replays"]
+    return out
 
 
 def _enum_name(op) -> str:

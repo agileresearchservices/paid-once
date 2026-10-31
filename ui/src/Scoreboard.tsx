@@ -1,10 +1,12 @@
+import { OUTCOME_GLYPH } from "./outcomes";
 import type { LaneAudit } from "./types";
 
 // Ticket outcomes as one whole split into parts: a tall segmented bar. The four reserved status
 // colours carry state, and every segment also has an icon and a name so colour is never the only cue.
-// "Unapproved" shares the critical colour with "refunded twice", so it gets a striped texture, and
-// "never refunded" sits next to red in orange, so it gets dots: no two failure segments differ by hue alone.
+// "Unapproved" shares the critical colour with "refunded twice", so it gets a striped texture. "Never refunded"
+// is solid orange; its name and glyph set it apart from red.
 // Segments read "4 duplicated" rather than icon + count: a numeric icon next to a count ("×2 4") read as one number.
+// The legend's icons are the diagram's ledger glyphs (outcomes.ts); there the count comes after the label, so they don't merge.
 interface Part {
   key: string;
   label: string;
@@ -16,11 +18,11 @@ interface Part {
 
 function parts(a: LaneAudit): Part[] {
   return [
-    { key: "ok", label: "Refunded once", short: "once", icon: "✓", value: a.refunded_once, className: "good" },
-    { key: "dup", label: "Refunded more than once", short: "duplicated", icon: "⧉", value: a.duplicates, className: "critical" },
-    { key: "unapproved", label: "Refunded without approval", short: "unapproved", icon: "!", value: a.unapproved, className: "critical striped" },
-    { key: "missing", label: "Approved, never refunded", short: "missing", icon: "∅", value: a.missing, className: "serious dotted" },
-    { key: "flight", label: "Still settling", short: "settling", icon: "…", value: a.in_flight, className: "warning" },
+    { key: "ok", label: "Refunded once", short: "once", icon: OUTCOME_GLYPH.ok, value: a.refunded_once, className: "good" },
+    { key: "dup", label: "Refunded more than once", short: "duplicated", icon: OUTCOME_GLYPH.duplicate, value: a.duplicates, className: "critical" },
+    { key: "unapproved", label: "Refunded without approval", short: "unapproved", icon: OUTCOME_GLYPH.unapproved, value: a.unapproved, className: "critical striped" },
+    { key: "missing", label: "Approved, never refunded", short: "missing", icon: OUTCOME_GLYPH.missing, value: a.missing, className: "serious" },
+    { key: "flight", label: "Still settling", short: "settling", icon: OUTCOME_GLYPH.settling, value: a.in_flight, className: "warning" },
   ];
 }
 
@@ -43,7 +45,9 @@ function Invariant({ text, verdict, detail }: { text: string; verdict: Verdict; 
   );
 }
 
-export function Scoreboard({ audit, name }: { audit: LaneAudit; name: string }) {
+// believedDone: what the lane's own records claim, set only where the ledger's answer sits next to it (the scoreboard
+// step). The verdicts never read it.
+export function Scoreboard({ audit, name, believedDone, note }: { audit: LaneAudit; name: string; believedDone?: number; note?: string }) {
   const ps = parts(audit);
   const total = ps.reduce((n, p) => n + p.value, 0);
   const untested = total === 0;
@@ -58,9 +62,15 @@ export function Scoreboard({ audit, name }: { audit: LaneAudit; name: string }) 
         <span className="hero-num">{audit.refunded_once}</span>
         <span className="hero-of">of {audit.approved} approved refunded exactly once</span>
       </div>
-      {/* Always rendered, so the lane doesn't jump when the first duplicate lands. */}
-      <p className="loss" aria-hidden={audit.duplicate_cents === 0}>
-        {audit.duplicate_cents > 0 ? `${dollars(audit.duplicate_cents)} refunded twice` : " "}
+      {note && <p className="hero-note">{note}</p>}
+      {believedDone !== undefined && (
+        <p className="believed">
+          Its own job table says <b>{believedDone}</b> done. The ledger says <b>{audit.refunded_once}</b> refunded exactly once.
+        </p>
+      )}
+      {/* Always rendered, so the lane doesn't jump when the first duplicate lands. A clean lane shows its $0.00. */}
+      <p className={audit.duplicate_cents > 0 ? "loss" : "loss none"} aria-hidden={untested}>
+        {untested ? " " : `${dollars(audit.duplicate_cents)} refunded twice`}
       </p>
 
       {total === 0 ? (

@@ -1,4 +1,4 @@
-# Handoff: where this stands (2026-10-30)
+# Handoff: where this stands (2026-10-31)
 
 Everything the demo needs is built and verified on Python 3.12 with a local Temporal dev server (CLI 1.9.1,
 server 1.32.0). Start with `README.md` for setup and `docs/architecture.md` for the design. This file is for
@@ -61,6 +61,17 @@ whoever changes the code next.
 - **Kill badges count the scene on screen.** The engine records kills per scene run (`scene_runs[...]["kills"]`), so a
   step never shows kills from an earlier scene and Reset clears them. Before a lane has a ticket its invariants read
   "Not tested yet", not "Holds".
+- **Every scene panel is scoped to the scene on screen.** `lane1_view`, `lane2_view`, `flow` and `payments_calls` count
+  only the current scene's tickets, and the UI shows Nexus rows and lane chips only when `snap.current` is the step's
+  scene, so step 7 reads "Not run yet" instead of step 6's rows. `lane1_view_all` (every ticket since reset) feeds the
+  scoreboard's "its own job table says N done" line; it is the queue's claim, shown next to the ledger, never scored.
+- **Payments counts its calls** (`CALLS` in `raccoon/payments/service.py`, `GET /admin/calls`, cleared by
+  `/admin/reset`): per lane and ticket, calls and how many the ledger answered from an existing key. The engine sums
+  them per scene into the snapshot's `payments_calls` (`booked` = calls − replays). It observes only; the ledger and
+  the audit don't read it.
+- **An approved Lane 2 ticket with nothing pending reads "approved, queued in Temporal for a worker"**, drawn as a
+  position dot, not the "waiting for a human" ring. The engine remembers approvals it sent (`Engine.approved`) because
+  `describe()` can't tell a waiting workflow from one whose worker is down.
 - **Temporal look, local only.** Palette and fonts (Inter, Noto Sans Mono, bundled) follow temporal.io. The wordmark and
   favicon go in `ui/public/brand/`, which is gitignored because they are trademarks; without them the header shows
   text.

@@ -25,6 +25,17 @@ function Chips({ counts, empty }: { counts: Record<string, number>; empty: strin
   );
 }
 
+// What payments saw from this lane in this scene: a retry that reuses the key is answered from the ledger.
+function PaymentsCalls({ c }: { c?: { calls: number; booked: number; replays: number } }) {
+  if (!c || c.calls === 0) return null;
+  return (
+    <div className="calls">
+      <span className="muted">Payments got</span> <b>{c.calls}</b> calls · booked <b>{c.booked}</b> · answered{" "}
+      <b>{c.replays}</b> from the ledger
+    </div>
+  );
+}
+
 // Temporal's wordmark lives in ui/public/brand/, which is gitignored. On a fresh clone it isn't there and the
 // header shows text instead.
 function Wordmark() {
@@ -100,7 +111,10 @@ export function App() {
     return <main className="loading">{connected ? "Loading…" : "Waiting for the show server on port 8100…"}</main>;
   }
 
-  const thisRunning = running && snap.current === step.scene;
+  // Scene-scoped views (Nexus rows, workflow status, payments calls) describe the scene the engine last ran,
+  // so a step shows them only when that scene is this step's.
+  const onScreen = step.scene != null && snap.current === step.scene;
+  const thisRunning = running && onScreen;
   const run = step.scene ? snap.scene_runs?.[step.scene] : undefined;
   const finished = !thisRunning && run?.finished_at != null;
   const settling = snap.audit.lane1.in_flight + snap.audit.lane2.in_flight > 0;
@@ -138,7 +152,12 @@ export function App() {
           <h2>{step.title}</h2>
           <p>{step.story}</p>
           <p className="watch"><b>Watch:</b> {step.watch}</p>
-          {finished && step.result && <p className="result"><b>Result:</b> {step.result}</p>}
+          {/* Laid out before the scene finishes, so the page doesn't jump when the result appears */}
+          {step.result && (
+            <p className={finished ? "result" : "result pending"} aria-hidden={!finished}>
+              <b>Result:</b> {step.result}
+            </p>
+          )}
         </div>
         <div className="controls">
           {step.scene && (
@@ -160,7 +179,8 @@ export function App() {
 
       {step.nexus && (
         <NexusPanel
-          rows={snap.nexus}
+          rows={onScreen ? snap.nexus : []}
+          ran={onScreen}
           topology={snap.topology}
           temporalUi={snap.temporal_ui}
           paymentsWorker={snap.processes.payments_worker}
@@ -184,7 +204,7 @@ export function App() {
               {LANES[1].procs.map((p) => snap.processes[p] && <ProcTile key={p} p={snap.processes[p]} kills={run?.kills?.[p]} />)}
             </div>
             <div className="believes">
-              <span className="muted">Workflows:</span> <Chips counts={snap.lane2_view} empty="nothing yet" />
+              <span className="muted">Workflows:</span> <Chips counts={onScreen ? snap.lane2_view : {}} empty="nothing yet" />
             </div>
           </article>
         </div>
@@ -194,11 +214,19 @@ export function App() {
             <article key={l.id} className={`lane ${l.id}`}>
               <h2>{l.name}</h2>
               <p className="muted">{l.subtitle}</p>
-              <div className="believes">
-                <span className="muted">{l.id === "lane1" ? "Its own job table:" : "Temporal workflow status (this scene):"}</span>{" "}
-                <Chips counts={l.id === "lane1" ? snap.lane1_view : snap.lane2_view} empty="nothing yet" />
-              </div>
-              <Scoreboard audit={snap.audit[l.id]} name={l.name} />
+              {step.scene && (
+                <div className="believes">
+                  <span className="muted">{l.id === "lane1" ? "Its own job table (this scene):" : "Temporal workflow status (this scene):"}</span>{" "}
+                  <Chips counts={onScreen ? (l.id === "lane1" ? snap.lane1_view : snap.lane2_view) : {}} empty="nothing yet" />
+                  <PaymentsCalls c={onScreen ? snap.payments_calls?.[l.id] : undefined} />
+                </div>
+              )}
+              <Scoreboard
+                audit={snap.audit[l.id]}
+                name={l.name}
+                believedDone={!step.scene && l.id === "lane1" ? (snap.lane1_view_all?.done ?? 0) : undefined}
+                note={l.id === "lane2" && snap.scene_runs?.nexus_kill ? "Includes the Nexus scene, which runs on Temporal only." : undefined}
+              />
             </article>
           ))}
         </div>
