@@ -85,7 +85,7 @@ whoever changes the code next.
   with the worker dead). The payments node's slots come from the ledger audit, never from a stack. The Nexus step keeps
   its own panel and has no diagram. There is no event log on screen; a failed scene shows its error on its status line.
 - **On screen the demo is "Paid Once: refunds over Nexus"**, and faults are labelled plainly ("Fault: kill -9 on both
-  agent workers", event kind `fault`). The lanes are "Job queue" and "Temporal + Nexus" on screen (`LANE_NAMES` in the
+  agent workers", event kind `fault`). The lanes are "Queue + LangGraph" and "Temporal + Nexus" on screen (`LANE_NAMES` in the
   engine, `LANES` in `ui/src/App.tsx`); code, docs, the ledger and ticket IDs still say lane1/lane2. The Temporal namespaces show
   on screen and in the Web UI links, so they are named for the teams, `support` and `payments` (`PAIDONCE_SUPPORT_NS`,
   `PAIDONCE_PAYMENTS_NS`). Setup retargets an existing `payments-endpoint` that still points at an old namespace. The
@@ -126,6 +126,9 @@ whoever changes the code next.
 - A careful dedupe check exists for finished tickets, so redelivery after completion is a no-op. Duplicates only arise for in-flight work.
 - `PAIDONCE_L1_STABLE_KEY=1` (off by default) makes Lane 1 derive its idempotency key from the ticket instead of the attempt. It exists only so the write-up can measure the one-line fix (duplicates drop to 0, the 7 lost tickets remain). Default runs, the UI and the demo are unchanged, so Lane 1 is still the competent-team-today system described above.
 - "Improve the current implementation" (outbox, sweeper, durable checkpointer) is argued in the write-up, not built as a third lane.
+- On screen the lane is "Queue + LangGraph" (it was "Job queue"). It names the stack the way "Temporal + Nexus" does,
+  including the part that fails in the crash and deploy scenes (LangGraph's in-memory checkpointer). Avoid labels such as
+  "traditional" or "hand-rolled": they read as a strawman. Behaviour is unchanged.
 
 ## Constraints that bite
 - Workflow modules (`lane2/support_side.py`, `lane2/payments_side.py`) must not import `paidonce.config`,

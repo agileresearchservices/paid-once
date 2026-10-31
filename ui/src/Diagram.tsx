@@ -193,7 +193,7 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
           </span>
         )}
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Job queue and Temporal + Nexus, both calling the payments service">
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Queue + LangGraph and Temporal + Nexus, both calling the payments service">
         <defs>
           <marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
             <path d="M0,0 L8,4 L0,8 z" className="arrowhead" />
@@ -202,7 +202,7 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
 
         <rect className="team" x={822} y={4} width={W - 824} height={H - 8} rx={14} />
         <text className="row-label" x={838} y={20}>PAYMENTS TEAM</text>
-        <text className="row-label" x={158} y={20}>JOB QUEUE</text>
+        <text className="row-label" x={158} y={20}>QUEUE + LANGGRAPH</text>
         <text className="row-label" x={HUMAN.x + HUMAN.w + 18} y={ROW.lane2 - 9}>TEMPORAL + NEXUS · SUPPORT TEAM</text>
 
         <g className={humanNow ? "human now" : "human"}>
@@ -256,7 +256,7 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
           const p = b.proc ? snap.processes[b.proc] : undefined;
           const down = p ? !p.alive : false;
           const cls = ["node", down && "down", hitNow.has(id) && "hit", id === "endpoint" && "door"].filter(Boolean).join(" ");
-          // Payments' bottom strip holds the Temporal ledger row, so its badge sits under the Job queue row instead.
+          // Payments' bottom strip holds the Temporal ledger row, so its badge sits under the Queue + LangGraph row instead.
           const badgeY = id === "payments" ? b.y + 72 : b.y + b.h - 27;
           return (
             <g key={id} className={cls}>

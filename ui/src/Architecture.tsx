@@ -46,7 +46,7 @@ export function Compare() {
         <thead>
           <tr>
             <th />
-            <th>Job queue</th>
+            <th>Queue + LangGraph</th>
             <th className="t">Temporal + Nexus</th>
           </tr>
         </thead>
@@ -61,7 +61,7 @@ export function Compare() {
         </tbody>
       </table>
       <p className="muted fair">
-        The queue isn't a strawman: it is a common, competent setup. Deriving its key from the ticket is a one-line fix
+        Queue + LangGraph isn't a strawman: it is a common, competent setup. Deriving its key from the ticket is a one-line fix
         that removed every duplicate in the measured run; the lost approvals remain (docs/scenario-results.md).
       </p>
     </section>

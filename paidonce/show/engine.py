@@ -1,6 +1,6 @@
 """The show engine: submits tickets to both lanes, plays the human approver, and injects the faults.
 
-Every scene runs the same story against Lane 1 (job queue) and Lane 2 (Temporal + Nexus) at the same time, so the audience watches
+Every scene runs the same story against Lane 1 (Queue + LangGraph) and Lane 2 (Temporal + Nexus) at the same time, so the audience watches
 two systems take identical hits. Scoring comes from the payments ledger (paidonce.audit), never from
 what either lane reports about itself.
 """
@@ -32,7 +32,7 @@ SCENE_SETTLE_MAX_S = 45.0
 SCENE_QUIET_S = 3.0
 
 # How the show names each lane on screen; the code, ledger and ticket IDs keep lane1/lane2.
-LANE_NAMES = {"lane1": "the job queue", "lane2": "Temporal + Nexus"}
+LANE_NAMES = {"lane1": "Queue + LangGraph", "lane2": "Temporal + Nexus"}
 
 AGENT_WORKERS = ["lane1_worker", "support_worker"]
 
