@@ -1,12 +1,14 @@
 import { OUTCOME_GLYPH } from "./outcomes";
 import type { FlowDot, LaneId, ShowEvent, Snapshot } from "./types";
 
-// One architecture diagram for both stacks. Faults land on the node they hit; dots show where each stack
-// thinks each of this scene's tickets is. The payments node is filled from the ledger audit, never from a stack.
+// One architecture diagram for both stacks. Tickets come in from the helpdesk on the left; a human approves or denies
+// at the API / Temporal column; a denied ticket goes back to the helpdesk with no refund. Faults land on the node they
+// hit; dots show where each stack thinks each of this scene's tickets is. The payments node is filled from the ledger
+// audit, never from a stack.
 
 const W = 1464;
-const H = 244;
-const ROW: Record<LaneId, number> = { lane1: 30, lane2: 144 }; // node top per row
+const H = 270;
+const ROW: Record<LaneId, number> = { lane1: 30, lane2: 170 }; // node top per row; the gap holds the human
 const NODE_H = 76;
 
 interface Box {
@@ -20,26 +22,31 @@ interface Box {
 }
 
 const NODES: Record<string, Box> = {
-  lane1_api: { x: 60, y: ROW.lane1, w: 200, h: NODE_H, title: "Queue API", sub: "jobs table (SQLite)", proc: "lane1_api" },
-  lane1_worker: { x: 320, y: ROW.lane1, w: 224, h: NODE_H, title: "Queue worker", sub: "agent · state in memory", proc: "lane1_worker" },
-  temporal: { x: 60, y: ROW.lane2, w: 200, h: NODE_H, title: "Temporal server", sub: "durable history" },
-  support_worker: { x: 320, y: ROW.lane2, w: 224, h: NODE_H, title: "Support worker", sub: "agent · SupportTicketWorkflow", proc: "support_worker" },
-  endpoint: { x: 600, y: ROW.lane2, w: 190, h: NODE_H, title: "Nexus endpoint", sub: "payments-endpoint" },
+  helpdesk: { x: 2, y: ROW.lane1, w: 116, h: ROW.lane2 + NODE_H - ROW.lane1, title: "Helpdesk", sub: "support tickets" },
+  lane1_api: { x: 158, y: ROW.lane1, w: 180, h: NODE_H, title: "Queue API", sub: "jobs table (SQLite)", proc: "lane1_api" },
+  lane1_worker: { x: 378, y: ROW.lane1, w: 236, h: NODE_H, title: "Queue worker", sub: "agent · state in memory", proc: "lane1_worker" },
+  temporal: { x: 158, y: ROW.lane2, w: 180, h: NODE_H, title: "Temporal server", sub: "durable history" },
+  support_worker: { x: 378, y: ROW.lane2, w: 236, h: NODE_H, title: "Support worker", sub: "agent · SupportTicketWorkflow", proc: "support_worker" },
+  endpoint: { x: 650, y: ROW.lane2, w: 150, h: NODE_H, title: "Nexus endpoint", sub: "payments-endpoint" },
   payments_worker: { x: 860, y: ROW.lane2, w: 210, h: NODE_H, title: "Payments worker", sub: "RefundWorkflow", proc: "payments_worker" },
   payments: { x: 1170, y: ROW.lane1, w: 294, h: ROW.lane2 + NODE_H - ROW.lane1, title: "Payments service + ledger", sub: "the audit reads this ledger", proc: "payments" },
 };
 
 const mid = (lane: LaneId) => ROW[lane] + NODE_H / 2;
 
+// The human reviews proposals where approvals actually land: the Queue API and the Temporal server.
+const HUMAN = { x: 163, y: 126, w: 170, h: 24 };
+const HUMAN_X = HUMAN.x + HUMAN.w / 2;
+
 // Wires: [from x, to x, row, id]. A wire is "busy" while a ticket is on it or in the node it feeds.
 const WIRES: { id: string; x1: number; x2: number; lane: LaneId; label?: string }[] = [
-  { id: "in_lane1", x1: 8, x2: 60, lane: "lane1" },
-  { id: "lane1_api>lane1_worker", x1: 260, x2: 320, lane: "lane1" },
-  { id: "lane1_worker>payments", x1: 544, x2: 1170, lane: "lane1", label: "plain HTTP" },
-  { id: "in_lane2", x1: 8, x2: 60, lane: "lane2" },
-  { id: "temporal>support_worker", x1: 260, x2: 320, lane: "lane2" },
-  { id: "support_worker>endpoint", x1: 544, x2: 600, lane: "lane2" },
-  { id: "endpoint>payments_worker", x1: 790, x2: 860, lane: "lane2", label: "Nexus" },
+  { id: "helpdesk>lane1_api", x1: 118, x2: 158, lane: "lane1" },
+  { id: "lane1_api>lane1_worker", x1: 338, x2: 378, lane: "lane1" },
+  { id: "lane1_worker>payments", x1: 614, x2: 1170, lane: "lane1", label: "plain HTTP" },
+  { id: "helpdesk>temporal", x1: 118, x2: 158, lane: "lane2" },
+  { id: "temporal>support_worker", x1: 338, x2: 378, lane: "lane2" },
+  { id: "support_worker>endpoint", x1: 614, x2: 650, lane: "lane2" },
+  { id: "endpoint>payments_worker", x1: 800, x2: 860, lane: "lane2", label: "Nexus" },
   { id: "payments_worker>payments", x1: 1070, x2: 1170, lane: "lane2" },
 ];
 
@@ -48,8 +55,10 @@ const CAPTION_S = 8;
 
 function dotPos(at: string, i: number, lane: LaneId): { x: number; y: number; gone?: boolean } {
   if (at === "done") return { x: NODES.payments.x + 12, y: mid(lane), gone: true };
+  // Closed with no refund: back in the helpdesk, in its lane's half.
+  if (at === "closed") return { x: NODES.helpdesk.x + 16 + (i % 6) * 15, y: ROW[lane] + NODE_H - 13 - Math.floor(i / 6) * 15 };
   const box = NODES[at];
-  if (box) return { x: box.x + 16 + (i % 12) * 15, y: box.y + box.h - 13 - Math.floor(i / 12) * 15 };
+  if (box) return { x: box.x + 16 + (i % 10) * 15, y: box.y + box.h - 13 - Math.floor(i / 10) * 15 };
   const wire = WIRES.find((w) => w.id === at);
   if (wire) return { x: wire.x1 + 40 + i * 18, y: mid(lane) };
   return { x: 0, y: mid(lane), gone: true };
@@ -57,6 +66,7 @@ function dotPos(at: string, i: number, lane: LaneId): { x: number; y: number; go
 
 function dotClass(d: FlowDot): string {
   if (d.at === "done") return "tdot done";
+  if (d.at === "closed") return "tdot closed";
   if (d.state === "failed") return "tdot failed";
   if (d.state.startsWith("waiting")) return "tdot waiting";
   if (d.at.includes(">") || d.at === "payments_worker" || d.at === "endpoint") return "tdot paying";
@@ -100,15 +110,18 @@ function Ledger({ lane, label, dots, tickets }: { lane: LaneId; label: string; d
       {ids.length === 0 && <text x={x0 + 82} y={y + 13} className="n-sub">no tickets this scene</text>}
       {ids.map((id, i) => {
         const st = tickets[id] ?? "waiting";
-        const x = x0 + 82 + i * 26;
+        const x = x0 + 82 + i * 24;
         // Same colours as the scoreboard: twice and unapproved are critical (red), never refunded is serious (orange).
-        const cls = st === "ok" ? "slot ok" : st === "duplicate" || st === "unapproved" ? "slot bad" : st === "missing" ? "slot missing" : "slot";
-        const glyph = st === "ok" || st === "duplicate" || st === "missing" || st === "unapproved" ? OUTCOME_GLYPH[st] : "";
+        // Owed nothing and paid nothing (a denial, or a ticket outside the policy) is neutral.
+        const owedNothing = st === "rejected" || st === "declined";
+        const cls = st === "ok" ? "slot ok" : st === "duplicate" || st === "unapproved" ? "slot bad" : st === "missing" ? "slot missing" : owedNothing ? "slot none" : "slot";
+        const glyph = owedNothing ? OUTCOME_GLYPH.denied : st === "ok" || st === "duplicate" || st === "missing" || st === "unapproved" ? OUTCOME_GLYPH[st] : "";
+        const what = st === "ok" ? "refunded once" : st === "duplicate" ? "refunded more than once" : owedNothing ? "no refund owed, none paid" : st;
         return (
           <g key={id} className={cls}>
             <rect x={x} y={y} width={22} height={18} rx={4} />
             <text x={x + 11} y={y + 13.5} textAnchor="middle">{glyph}</text>
-            <title>{`${id}: ${st === "ok" ? "refunded once" : st === "duplicate" ? "refunded more than once" : st}`}</title>
+            <title>{`${id}: ${what}`}</title>
           </g>
         );
       })}
@@ -132,6 +145,9 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
   for (const e of faults) for (const t of e.target ?? []) if (e.effect && EFFECT_MARK[e.effect]) marks[t] = EFFECT_MARK[e.effect];
   for (const [p, n] of Object.entries(run?.kills ?? {})) marks[p] = `⚡ killed ${n === 1 ? "once" : `${n} times`}`;
   const dupNow = faults.some((e) => e.effect === "duplicate" && snap.now - e.ts < FLASH_S + 1);
+  const humanNow =
+    run != null &&
+    snap.events.some((e) => e.kind === "human" && e.ts >= run.started_at && snap.now - e.ts < FLASH_S + 1 && (e.scene === scene || e.scene?.startsWith(`${scene}_`)));
 
   const busy = new Set<string>();
   for (const lane of ["lane1", "lane2"] as LaneId[])
@@ -160,8 +176,9 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
             <span><i className="lg waiting" /> waiting for a human</span>
             <span><i className="lg paying" /> refund in flight</span>
             <span><i className="lg failed" /> job failed</span>
+            <span><i className="lg closed" /> denied, no refund</span>
             <span className="lg-slots">
-              ledger {OUTCOME_GLYPH.ok} once · {OUTCOME_GLYPH.duplicate} twice · {OUTCOME_GLYPH.missing} never
+              ledger {OUTCOME_GLYPH.ok} once · {OUTCOME_GLYPH.duplicate} twice · {OUTCOME_GLYPH.missing} never · {OUTCOME_GLYPH.denied} none owed
             </span>
             <span className="lg-stage">⏱ slowed on purpose, so a fault lands mid-call</span>
           </span>
@@ -176,8 +193,16 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
 
         <rect className="team" x={822} y={4} width={W - 824} height={H - 8} rx={14} />
         <text className="row-label" x={838} y={20}>PAYMENTS TEAM</text>
-        <text className="row-label" x={60} y={20}>JOB QUEUE</text>
-        <text className="row-label" x={60} y={134}>TEMPORAL + NEXUS · SUPPORT TEAM</text>
+        <text className="row-label" x={158} y={20}>JOB QUEUE</text>
+        <text className="row-label" x={HUMAN.x + HUMAN.w + 18} y={ROW.lane2 - 9}>TEMPORAL + NEXUS · SUPPORT TEAM</text>
+
+        <g className={humanNow ? "human now" : "human"}>
+          <line className="wire" x1={HUMAN_X} x2={HUMAN_X} y1={HUMAN.y} y2={ROW.lane1 + NODE_H + 3} markerEnd="url(#arrow)" />
+          <line className="wire" x1={HUMAN_X} x2={HUMAN_X} y1={HUMAN.y + HUMAN.h} y2={ROW.lane2 - 3} markerEnd="url(#arrow)" />
+          <rect x={HUMAN.x} y={HUMAN.y} width={HUMAN.w} height={HUMAN.h} rx={12} />
+          <text x={HUMAN_X} y={HUMAN.y + 16.5} textAnchor="middle">Human: approve / deny</text>
+        </g>
+        <text className="n-sub" x={NODES.lane1_worker.x + 14} y={HUMAN.y + 17}>both agents: policy rules, then Claude</text>
 
         {WIRES.map((w) => (
           <g key={w.id}>
@@ -206,13 +231,14 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
 
         {dupNow && (
           <>
-            <g className="packet" style={{ ["--dx" as string]: "52px" }}>
-              <rect x={258} y={mid("lane1") - 11} width={30} height={22} rx={5} />
-              <text x={273} y={mid("lane1") + 5} textAnchor="middle">×2</text>
+            <g className="packet" style={{ ["--dx" as string]: "32px" }}>
+              <rect x={336} y={mid("lane1") - 11} width={30} height={22} rx={5} />
+              <text x={351} y={mid("lane1") + 5} textAnchor="middle">×2</text>
             </g>
-            <g className="packet" style={{ ["--dx" as string]: "46px" }}>
-              <rect x={6} y={mid("lane2") - 11} width={30} height={22} rx={5} />
-              <text x={21} y={mid("lane2") + 5} textAnchor="middle">×2</text>
+            {/* Temporal's duplicate is the human's decision signal, replayed: it comes down from the review */}
+            <g className="packet" style={{ ["--dx" as string]: "0px", ["--dy" as string]: "24px" }}>
+              <rect x={HUMAN_X + 8} y={HUMAN.y + 2} width={30} height={22} rx={5} />
+              <text x={HUMAN_X + 23} y={HUMAN.y + 18} textAnchor="middle">×2</text>
             </g>
           </>
         )}

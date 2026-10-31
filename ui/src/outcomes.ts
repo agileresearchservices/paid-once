@@ -5,5 +5,6 @@ export const OUTCOME_GLYPH = {
   duplicate: "×2",
   missing: "∅",
   unapproved: "!",
+  denied: "—", // owed nothing, paid nothing: a human said no, or the ticket broke the refund policy
   settling: "…",
 } as const;

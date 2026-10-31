@@ -7,6 +7,8 @@ import type { LaneAudit } from "./types";
 // is solid orange; its name and glyph set it apart from red.
 // Segments read "4 duplicated" rather than icon + count: a numeric icon next to a count ("×2 4") read as one number.
 // The legend's icons are the diagram's ledger glyphs (outcomes.ts); there the count comes after the label, so they don't merge.
+// "No refund owed, none paid" is neutral grey: a denied ticket with no money moved is the correct outcome, not a win
+// or a loss.
 interface Part {
   key: string;
   label: string;
@@ -19,6 +21,7 @@ interface Part {
 function parts(a: LaneAudit): Part[] {
   return [
     { key: "ok", label: "Refunded once", short: "once", icon: OUTCOME_GLYPH.ok, value: a.refunded_once, className: "good" },
+    { key: "none", label: "No refund owed, none paid", short: "none owed", icon: OUTCOME_GLYPH.denied, value: a.rejected + a.declined, className: "neutral" },
     { key: "dup", label: "Refunded more than once", short: "duplicated", icon: OUTCOME_GLYPH.duplicate, value: a.duplicates, className: "critical" },
     { key: "unapproved", label: "Refunded without approval", short: "unapproved", icon: OUTCOME_GLYPH.unapproved, value: a.unapproved, className: "critical striped" },
     { key: "missing", label: "Approved, never refunded", short: "missing", icon: OUTCOME_GLYPH.missing, value: a.missing, className: "serious" },
@@ -48,6 +51,7 @@ function Invariant({ text, verdict, detail }: { text: string; verdict: Verdict; 
 // believedDone: what the lane's own records claim, set only where the ledger's answer sits next to it (the scoreboard
 // step). The verdicts never read it.
 export function Scoreboard({ audit, name, believedDone, note }: { audit: LaneAudit; name: string; believedDone?: number; note?: string }) {
+  const a = audit;
   const ps = parts(audit);
   const total = ps.reduce((n, p) => n + p.value, 0);
   const untested = total === 0;
@@ -96,6 +100,7 @@ export function Scoreboard({ audit, name, believedDone, note }: { audit: LaneAud
           <li key={p.key}>
             <i className={`swatch ${p.className}`} aria-hidden="true" />
             {p.icon} {p.label} <b>{p.value}</b>
+            {p.key === "none" && ` (${a.declined} outside the policy, ${a.rejected} a human said no)`}
           </li>
         ))}
       </ul>
@@ -109,7 +114,7 @@ export function Scoreboard({ audit, name, believedDone, note }: { audit: LaneAud
         <Invariant
           text="No refund without an approval"
           verdict={untested ? "untested" : audit.unapproved > 0 ? "violated" : "holds"}
-          detail={`${audit.unapproved} unapproved`}
+          detail={`${audit.unapproved} refunded without approval · ${audit.rejected + audit.declined} denied tickets, none paid`}
         />
         <Invariant
           text="No ticket lost or stuck"
@@ -130,6 +135,8 @@ export function Scoreboard({ audit, name, believedDone, note }: { audit: LaneAud
             <tr><th>Approved, never refunded</th><td>{audit.missing}</td></tr>
             <tr><th>Still settling</th><td>{audit.in_flight}</td></tr>
             <tr><th>Refunded without approval</th><td>{audit.unapproved}</td></tr>
+            <tr><th>Denied by a human, not paid</th><td>{audit.rejected}</td></tr>
+            <tr><th>Outside the refund policy, not paid</th><td>{audit.declined}</td></tr>
           </tbody>
         </table>
       </details>

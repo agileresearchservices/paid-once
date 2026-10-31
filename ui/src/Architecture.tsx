@@ -13,6 +13,11 @@ const ROWS: { q: string; queue: string; temporal: string }[] = [
     temporal: "A durable wait in the workflow. A new worker replays to the same point",
   },
   {
+    q: "A refund someone says no to",
+    queue: "Policy rules deny it in the worker; a human's \"no\" marks the row rejected at the API",
+    temporal: "The workflow ends denied or rejected, with the reason in its history",
+  },
+  {
     q: "A worker dies mid-refund",
     queue: "The job reappears after a 10s visibility timeout and recovery re-drives it",
     temporal: "Temporal retries the activity on its retry policy (1s, growing to 3s)",
