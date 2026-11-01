@@ -479,9 +479,7 @@ class Engine:
         )
         await self.submit_cohort("deploy_wait", 5)
         await self.wait_for_proposals("deploy_wait")
-        self.fault(
-            "deploy_wait", "Fault: a deploy restarts both workers", AGENT_WORKERS, "kill"
-        )
+        self.fault("deploy_wait", "Fault: a deploy restarts both workers", AGENT_WORKERS, "kill")
         self.procs.kill("lane1_worker", restart_after=3.0)
         self.procs.kill("support_worker", restart_after=3.0)
         await asyncio.sleep(6)
@@ -518,9 +516,7 @@ class Engine:
         await self.submit_cohort(scene, 5, lanes=("lane2",))
         await self.wait_for_proposals(scene)
         await self.approve_scene(scene, then="; each approval becomes a Nexus operation to payments")
-        self.fault(
-            scene, "Fault: payments goes quiet after booking", ["payments"], "stall"
-        )
+        self.fault(scene, "Fault: payments goes quiet after booking", ["payments"], "stall")
         # Filled in from the ledger as the bookings land: see _stall_window.
         self.scene_runs[scene]["faults"].append(
             {
