@@ -130,7 +130,7 @@ export function Walkthrough({ beat, flow }: { beat: string | null; flow?: Record
           {i >= 4 && (done ? <Row kind="done">Refunded. Customer told.</Row> : <Row kind="paying">Asking payments…</Row>)}
         </Pane>
         {/* The human sees the proposal and decides; nothing about payments. */}
-        <Pane who="Human view" avatar={<LegendIcon kind="waiting" />}>
+        <Pane who="Human in the loop" avatar={<LegendIcon kind="waiting" />}>
           {i < 2 ? (
             <p className="pane-empty">Nothing to review</p>
           ) : (

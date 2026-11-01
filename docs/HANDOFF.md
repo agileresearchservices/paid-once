@@ -150,7 +150,7 @@ whoever changes the code next.
   (an earlier version stopped at each step; `make scenario` no longer has to release anything). The "approve" step shows the human's
   card approved a few seconds before the decision is actually delivered; the refund must start within Lane 1's 3 s timeout, so the
   decision cannot be held back to match.
-- The panel is three panes, Customer, Agent and Human view, each showing only what that role sees (the customer never sees the
+- The panel is three panes, Customer, Agent and Human in the loop, each showing only what that role sees (the customer never sees the
   policy check, proposal or approval). It outlines the flow and deliberately does not compare the stacks: that
   starts with the scenes. The customer pane is a chat that grows one agent reply per step (2-5), newest at the bottom; on a window shorter than ~945 px the
   oldest line scrolls off the top under a fade (`.pane-body.chat`, `contain: size` so the chat never grows the page). The Agent pane's policy-check row is typing dots until both stacks show the ticket waiting for a
