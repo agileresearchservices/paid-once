@@ -85,6 +85,10 @@ whoever changes the code next.
   scene). Nothing is built for tablet or phone. Step 1 is the architecture diagram plus the walkthrough
   (below). The side-by-side table that used to sit under the diagram was removed; the walkthrough is a general outline
   (a support chat, no stack comparison); the per-stack notes it used to carry are in the private talk track.
+- **Running a scene scrolls the page** (`App.tsx`, on the scene starting): it scrolls down until the diagram (or the Nexus panel) is at the top, so the
+  explanation above can scroll away and everything that updates stays on screen. Scene steps use a compact lane layout (`.lane.compact`:
+  name and the stack's own view on one line, the amount refunded twice beside the number, no table view), so the diagram plus both
+  scoreboards measure about 840 px after a run, under the 945 px screen. Step 1 does its own scrolling (`Walkthrough.tsx`).
 - **Faults are drawn where they land.** One architecture diagram (`ui/src/Diagram.tsx`) on step 1 and the scene steps
   replaces the old toast, payments strip and process tiles. Fault events carry `target` (diagram node ids: process
   names or `temporal`) and `effect` (`kill`, `duplicate`, `stall`), set in `Engine.fault()`, so the UI never parses

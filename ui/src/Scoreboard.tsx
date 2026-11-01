@@ -50,7 +50,19 @@ function Invariant({ text, verdict, detail }: { text: string; verdict: Verdict; 
 
 // believedDone: what the lane's own records claim, set only where the ledger's answer sits next to it (the scoreboard
 // step). The verdicts never read it.
-export function Scoreboard({ audit, name, believedDone, note }: { audit: LaneAudit; name: string; believedDone?: number; note?: string }) {
+export function Scoreboard({
+  audit,
+  name,
+  believedDone,
+  note,
+  compact,
+}: {
+  audit: LaneAudit;
+  name: string;
+  believedDone?: number;
+  note?: string;
+  compact?: boolean; // a scene step: the "refunded twice" amount sits beside the number and there is no table view
+}) {
   const ps = parts(audit);
   const total = ps.reduce((n, p) => n + p.value, 0);
   const untested = total === 0;
@@ -59,11 +71,19 @@ export function Scoreboard({ audit, name, believedDone, note }: { audit: LaneAud
     : audit.duplicates + audit.missing > 0 ? "violated" : audit.in_flight > 0 ? "settling" : "holds";
   const lost: Verdict = untested ? "untested" : audit.missing > 0 ? "violated" : audit.in_flight > 0 ? "settling" : "holds";
 
+  // Always rendered, so the lane doesn't jump when the first duplicate lands. A clean lane shows its $0.00.
+  const loss = (
+    <p className={audit.duplicate_cents > 0 ? "loss" : "loss none"} aria-hidden={untested}>
+      {untested ? " " : `${dollars(audit.duplicate_cents)} refunded twice`}
+    </p>
+  );
+
   return (
     <section className="scoreboard" aria-label={`${name} scoreboard`}>
       <div className="hero">
         <span className="hero-num">{audit.refunded_once}</span>
         <span className="hero-of">of {audit.approved} approved refunded once</span>
+        {compact && loss}
       </div>
       {note && <p className="hero-note">{note}</p>}
       {believedDone !== undefined && (
@@ -71,10 +91,7 @@ export function Scoreboard({ audit, name, believedDone, note }: { audit: LaneAud
           Job table says <b>{believedDone}</b> done. Ledger says <b>{audit.refunded_once}</b> paid once.
         </p>
       )}
-      {/* Always rendered, so the lane doesn't jump when the first duplicate lands. A clean lane shows its $0.00. */}
-      <p className={audit.duplicate_cents > 0 ? "loss" : "loss none"} aria-hidden={untested}>
-        {untested ? " " : `${dollars(audit.duplicate_cents)} refunded twice`}
-      </p>
+      {!compact && loss}
 
       {total === 0 ? (
         <div className="bar empty">No tickets yet</div>
@@ -112,6 +129,7 @@ export function Scoreboard({ audit, name, believedDone, note }: { audit: LaneAud
         />
       </ul>
 
+      {!compact && (
       <details className="table-view">
         <summary>Table view</summary>
         <table>
@@ -129,6 +147,7 @@ export function Scoreboard({ audit, name, believedDone, note }: { audit: LaneAud
           </tbody>
         </table>
       </details>
+      )}
     </section>
   );
 }
