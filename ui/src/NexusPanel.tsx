@@ -74,7 +74,7 @@ export function NexusPanel({
             <b className="muted">…</b>
           )}
         </div>
-        <div title={calls ? `${calls.calls} calls to payments: ${calls.booked} booked, ${calls.replays} answered from the ledger` : undefined}>
+        <div title={calls ? `${calls.calls} calls to payments: ${calls.booked} paid, ${calls.replays} answered from the ledger` : undefined}>
           <span className="headline-label">The ledger</span>
           {show ? (
             <>

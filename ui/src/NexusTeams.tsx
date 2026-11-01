@@ -66,7 +66,7 @@ function paymentsHover(r: NexusRow, t: Topology, now: number): string {
   return [
     `${shortTicket(r.ticket)} · ${t.payments.workflow} → ${t.payments.activity} · key refund-${r.ticket}`,
     ...lines,
-    booked != null ? "$ the ledger booked it once" : "",
+    booked != null ? "$ the ledger paid it once" : "",
   ]
     .filter(Boolean)
     .join("\n");
@@ -198,7 +198,7 @@ export function NexusTeams({
             )}
           </div>
           {rows.length > 0 &&
-            (open ? <Status cls="busy">retrying until it's booked…</Status> : <Status cls="ok">{OUTCOME_GLYPH.ok} all booked, once each</Status>)}
+            (open ? <Status cls="busy">retrying until it's paid…</Status> : <Status cls="ok">{OUTCOME_GLYPH.ok} all paid, once each</Status>)}
         </div>
       </div>
 
