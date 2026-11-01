@@ -196,7 +196,6 @@ export function App() {
           rows={onScreen ? snap.nexus : []}
           ran={onScreen}
           topology={snap.topology}
-          temporalUi={snap.temporal_ui}
           processes={snap.processes}
           run={run}
           finished={finished}

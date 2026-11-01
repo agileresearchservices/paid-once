@@ -9,7 +9,6 @@ export function NexusPanel({
   rows,
   ran,
   topology,
-  temporalUi,
   processes,
   run,
   finished,
@@ -20,7 +19,6 @@ export function NexusPanel({
   rows: NexusRow[];
   ran: boolean; // this scene is the one the engine last ran; otherwise rows is empty because nothing ran yet
   topology: Topology;
-  temporalUi: string | null;
   processes: Record<string, ProcStatus>;
   run?: SceneRun;
   finished: boolean;
@@ -47,7 +45,6 @@ export function NexusPanel({
       <NexusTeams
         rows={rows}
         t={topology}
-        ui={temporalUi}
         processes={processes}
         faults={faults}
         kills={ran && run ? run.kills : {}}

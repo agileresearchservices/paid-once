@@ -90,9 +90,9 @@ whoever changes the code next.
   that failure (`procs.owns_temporal`). Don't pre-start Temporal for a side-port scenario run; let the show start it.
 - **Ticket IDs carry a scene-run number** (`<reset id>-<scene>-r<n>-<i>-<lane>`), so re-running a scene starts new
   workflows instead of colliding with the last run's IDs. The idempotency key is still `refund-<ticket_id>`.
-- **The show links into the Temporal Web UI** (`TEMPORAL_UI_URL`, default `http://127.0.0.1:8233`; the engine re-checks
-  it every 10 seconds and hides the links while it doesn't answer). On step 6 the namespace links in the team boxes open the first refund's caller history in `support` and
-  its handler history in `payments`.
+- **The page has no Temporal Web UI links.** Step 6's team boxes used to link each namespace to the first refund's
+  history; they were removed as noise. Open `http://127.0.0.1:8233` directly (namespaces `support`, `payments`). The engine
+  still reports `temporal_ui` (`TEMPORAL_UI_URL`, re-checked every 10 seconds) in the snapshot; the UI ignores it.
 - **The UI is a stepper** for a laptop browser, full screen (`#1`..`#7` in the URL, arrow keys, 1-7; scenes
   run from the button only, no R shortcut). Nothing is built for tablet or phone. Step 1 is the walkthrough (three role
   panes: customer, agent, human in the loop, shown empty before the run) above the architecture diagram. The side-by-side table that used to sit under the diagram was removed; the walkthrough is a general outline

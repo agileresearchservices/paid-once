@@ -293,7 +293,6 @@ svg.lg-icon, .diagram svg.lg-icon { display: inline-block; width: 26px; height: 
 .tbox.down { border-color: var(--critical); background: var(--critical-wash); }
 .tbox-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
 .tbox-name { font-size: 24px; font-weight: 700; }
-.tbox-head a, .tbox-head .muted { font-size: 17px; }
 .tbox-worker { font-size: 17px; color: var(--muted); }
 .tbox-worker.bad { color: var(--critical-ink); font-weight: 700; }
 .tickets { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px 20px; }

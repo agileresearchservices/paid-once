@@ -120,8 +120,8 @@ Run of show, about ten minutes:
   worker, the payments worker and the Temporal server itself are killed, each for 5-6 seconds. The box a failure hits
   goes red. Support's box holds one check per refund (one call each, "no errors"); payments' box turns each refund into
   a `$` when the ledger books the money, with its retry count (`↻2`) underneath; the retry that finally succeeds is answered from
-  the ledger, not paid again. Hover a ticket for its detail; the namespace links open the first refund's history on each
-  side in the Temporal Web UI (http://127.0.0.1:8233), including the caller's Nexus Links tab. Three tiles at the bottom
+  the ledger, not paid again. Hover a ticket for its detail; both sides' histories are in the Temporal Web UI
+  (http://127.0.0.1:8233, namespaces `support` and `payments`), including the caller's Nexus Links tab. Three tiles at the bottom
   (errors support saw, retries payments absorbed, refunds paid once) read from the ledger. The Temporal kill
   needs a server the show started itself (`make demo` does, if nothing is listening on 7233); with a server you started,
   the scene skips that kill.
