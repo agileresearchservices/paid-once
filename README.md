@@ -107,7 +107,7 @@ Run of show, about ten minutes:
 - **Step 1, Two architectures**: the same refund flow built twice, and a one-ticket walkthrough of how each stack handles it.
 - **Step 2, Happy path**: seven tickets per lane. The agent's policy check denies one, the human approves five and
   denies one; both lanes refund the five once and pay nothing on the two denied tickets, which go back to the
-  helpdesk as grey dots.
+  helpdesk as grey dash badges.
 - **Steps 3-5** (workers die, double delivery, payments goes quiet): the same chaos hits both
   lanes; watch the ledger-based scoreboards diverge. The payments node's slots mark each ticket in the ledger
   (`✓` paid once, `×2` paid twice, `∅` owed, never paid, `—` denied, nothing owed), and each lane shows what payments saw in the scene: calls, refunds booked, and
