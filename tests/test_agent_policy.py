@@ -1,6 +1,9 @@
+import sys
+from types import SimpleNamespace
+
 import pytest
 
-from paidonce import agent
+from paidonce import agent, config
 from paidonce.models import Ticket
 
 
@@ -30,3 +33,27 @@ def test_policy_deny_never_reaches_the_model(monkeypatch):
     assert proposal.action == "deny"
     assert proposal.amount_cents == 0
     assert proposal.reason.startswith("policy: ")
+
+
+def _model_replies(monkeypatch, **tool_input):
+    """Stand in for the Anthropic client: it answers every call with this propose_action tool use."""
+    block = SimpleNamespace(type="tool_use", name="propose_action", input=tool_input)
+    client = SimpleNamespace(messages=SimpleNamespace(create=lambda **_: SimpleNamespace(content=[block])))
+    monkeypatch.setitem(sys.modules, "anthropic", SimpleNamespace(Anthropic=lambda **_: client))
+    monkeypatch.setattr(config, "STUB_LLM", False)
+
+
+def test_a_refund_of_nothing_becomes_the_full_order_amount(monkeypatch):
+    _model_replies(monkeypatch, action="refund", amount_cents=0, reason="damaged")
+    proposal = agent.decide(ticket(amount=4200))
+    assert (proposal.action, proposal.amount_cents) == ("refund", 4200)
+
+
+def test_a_refund_is_never_more_than_the_order(monkeypatch):
+    _model_replies(monkeypatch, action="refund", amount_cents=99999, reason="damaged")
+    assert agent.decide(ticket(amount=4200)).amount_cents == 4200
+
+
+def test_the_model_call_finishes_inside_the_lane2_activity_timeout():
+    # lane2/support_side.py gives run_agent 60 s; the model client must give up well before that.
+    assert (agent.LLM_MAX_RETRIES + 1) * agent.LLM_TIMEOUT_S < 60

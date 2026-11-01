@@ -124,7 +124,7 @@ function tallyParts(statuses: string[]): TallyPart[] {
   if (n("missing")) problems.push({ text: `${n("missing")} owed`, cls: "missing" });
   if (n("unapproved")) problems.push({ text: `${n("unapproved")} unapproved`, cls: "bad" });
   if (problems.length) return problems;
-  const open = statuses.filter((x) => x === "waiting" || x === "settling").length;
+  const open = statuses.filter((x) => x === "waiting" || x === "in_flight").length;
   return n("ok") > 0 && open === 0 ? [{ text: `all ${n("ok")} paid once`, cls: "ok" }] : [];
 }
 

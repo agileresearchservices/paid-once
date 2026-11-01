@@ -671,6 +671,7 @@ class Engine:
     async def reset(self) -> None:
         if self.running and self._task:
             self._task.cancel()
+            await asyncio.gather(self._task, return_exceptions=True)  # let its finally block run before we wipe state
             self.running = False
         await self.clear_faults()
         for url in (
@@ -692,6 +693,8 @@ class Engine:
         self.payments_calls_all = {}
         self.payments_calls_by_ticket = {}
         self.lane2_status.clear()
+        self.lane1_view = {}
+        self.lane1_view_all = {}
         self.lane2_view = {}
         self.lane2_view_all = {}
         self.booked_at = {}

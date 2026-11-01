@@ -145,15 +145,20 @@ class ProcessManager:
 
     def _watch(self) -> None:
         while not self._stop.is_set():
-            now = time.time()
-            for p in self.procs.values():
-                dead = p.popen is None or p.popen.poll() is not None
-                if dead and p.restart_at is None:
-                    p.restart_at = now + 2.0  # an unplanned exit: restart like an orchestrator would
-                if dead and p.restart_at is not None and now >= p.restart_at:
-                    self._spawn(p)
-                    self.emit("restart", f"{p.label} restarted", proc=name_of(p))
+            try:
+                self._restart_dead(time.time())
+            except Exception as exc:  # the watcher is the only thing that restarts a process: it must not die
+                self.emit("error", f"process watcher: {exc!r}"[:160])
             time.sleep(0.25)
+
+    def _restart_dead(self, now: float) -> None:
+        for p in self.procs.values():
+            dead = p.popen is None or p.popen.poll() is not None
+            if dead and p.restart_at is None:
+                p.restart_at = now + 2.0  # an unplanned exit: restart like an orchestrator would
+            if dead and p.restart_at is not None and now >= p.restart_at:
+                self._spawn(p)
+                self.emit("restart", f"{p.label} restarted", proc=name_of(p))
 
     # -- views -------------------------------------------------------------
     def status(self) -> dict:

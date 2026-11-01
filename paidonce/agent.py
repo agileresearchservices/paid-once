@@ -42,6 +42,13 @@ TOOL = {
 POLICY_LIMIT_CENTS = 20000
 RETURN_WINDOW_DAYS = 30
 
+# One model call has to finish, retries included, well inside the 60 s the Lane 2 activity allows
+# (lane2/support_side.py): 2 attempts x 20 s, plus backoff.
+LLM_TIMEOUT_S = 20.0
+LLM_MAX_RETRIES = 1
+LLM_MAX_TOKENS = 2000  # thinking tokens count against this
+REASON_MAX_CHARS = 300
+
 
 def check_policy(ticket: Ticket) -> str | None:
     """The rule this ticket breaks, or None. A broken rule closes the ticket before a human sees it."""
@@ -70,14 +77,14 @@ def decide(ticket: Ticket) -> Proposal:
 
     import anthropic
 
-    client = anthropic.Anthropic(timeout=30.0, max_retries=2)
+    client = anthropic.Anthropic(timeout=LLM_TIMEOUT_S, max_retries=LLM_MAX_RETRIES)
     user = (
         f"Order {ticket.order_id} total: {ticket.amount_cents} cents.\n"
         f"Customer {ticket.customer} wrote:\n{_wrap_untrusted(ticket.message)}"
     )
     response = client.messages.create(
         model=config.MODEL,
-        max_tokens=2000,  # thinking tokens count against this
+        max_tokens=LLM_MAX_TOKENS,
         system=SYSTEM_PROMPT,
         tools=[TOOL],
         # Forced tool_choice is a 400 on Sonnet 5.5, so the prompt names the tool and strict=True
@@ -92,12 +99,13 @@ def decide(ticket: Ticket) -> Proposal:
             amount = max(0, int(args.get("amount_cents", 0)))  # strict schemas can't carry a minimum
             action = args.get("action", "deny")
             if action == "refund":
-                # Never let the model refund more than the order total.
-                amount = min(amount, ticket.amount_cents)
+                # The prompt asks for the full order amount. A refund of nothing is a malformed reply that a human
+                # would approve and payments would then reject, so it becomes the full amount too. Never more than that.
+                amount = min(amount, ticket.amount_cents) if amount > 0 else ticket.amount_cents
             return Proposal(
                 action=action,
                 amount_cents=amount,
-                reason=str(args.get("reason", ""))[:300],
+                reason=str(args.get("reason", ""))[:REASON_MAX_CHARS],
             )
     return Proposal(action="deny", amount_cents=0, reason="model returned no tool call")
 
