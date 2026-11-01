@@ -160,7 +160,9 @@ export function Walkthrough({ beat, flow }: { beat: string | null; flow?: Record
           ) : (
             <div className="review">
               <div className="review-ask">{`Refund ${amount}?`}</div>
-              <div className="review-quote">“{message}”</div>
+              <div className="review-quote"><span>“{message}”</span><BrokenMug /></div>
+              {/* The agent hands the proposal over with its policy check result, so the human knows why it was proposed */}
+              <div className="review-note"><b>Agent:</b> Policy check passed.</div>
               <div className="review-actions">
                 <span className={i >= 3 ? "act approve on" : "act approve"}>{i >= 3 ? "✓ Approved" : "Approve"}</span>
                 <span className="act deny">Deny</span>
