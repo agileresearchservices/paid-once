@@ -137,3 +137,27 @@ def test_redelivery_of_finished_ticket_is_a_noop(payments):
     store.redeliver(1)
     drain(worker)
     assert len(ledger.all_refunds("lane1")) == 1
+
+
+def test_slow_decide_is_not_redelivered_while_its_worker_is_alive(payments, monkeypatch):
+    """The agent call outlasts the visibility timeout. The worker's heartbeat keeps the job hidden, so a second
+    worker never starts a second agent run (which would overwrite a later status with awaiting_approval)."""
+    from paidonce import agent
+
+    real_decide = agent.decide
+
+    def slow_decide(ticket):
+        time.sleep(1.6)
+        return real_decide(ticket)
+
+    monkeypatch.setattr(config, "VISIBILITY_TIMEOUT_S", 0.6)
+    monkeypatch.setattr(agent, "decide", slow_decide)
+    submit()
+    worker = Worker()
+    t = threading.Thread(target=worker.run_one)
+    t.start()
+    time.sleep(1.2)  # twice the visibility timeout
+    assert store.claim_job() is None
+    t.join()
+    assert store.get_ticket("t1")["status"] == "awaiting_approval"
+    assert store.claim_job() is None  # completed, not just hidden
