@@ -311,7 +311,7 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
               {b.note && !down && <text className="n-sub" x={b.x + 14} y={b.y + 60}>{b.note}</text>}
               {/* Health dot: green while the process is up, red while it is down (the node and its DOWN badge agree).
                   No dot for a Temporal server the show did not start: it cannot be killed, so it has no status here. */}
-              {p && <circle className={down ? "n-dot bad" : "n-dot"} cx={b.x + b.w - 16} cy={b.y + 18} r={5.5} />}
+              {p && <circle className={down ? "n-dot bad" : "n-dot"} cx={b.x + b.w - 14} cy={b.y + 17} r={3.5} />}
               {/* Down gets its own solid badge on the node's bottom strip: on the title line it ran into the title */}
               {down && (
                 <g className="n-down">
