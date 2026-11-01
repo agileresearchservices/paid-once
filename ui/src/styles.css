@@ -131,7 +131,7 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 /* Ticket status icons (TicketIcon.tsx): used on the diagram and in the legend. Shape and colour both say the status. */
 .ti-ring { fill: none; stroke: var(--sky); stroke-opacity: 0.3; stroke-width: 2.6; }
 .ti-arc { fill: none; stroke: var(--sky); stroke-width: 2.6; stroke-linecap: round; }
-.ti-spin { transform-box: view-box; transform-origin: 0 0; animation: spin 2.8s linear infinite; }
+.ti-spin { transform-box: view-box; transform-origin: 0 0; animation: spin 9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .ti-face { fill: var(--page); stroke: var(--ink-2); stroke-width: 1.8; }
 .ti-ink-fill { fill: var(--ink); }
