@@ -109,9 +109,9 @@ Run of show, about ten minutes:
   helpdesk as grey dash badges.
 - **Steps 3-5** (workers die, double delivery, payments goes quiet): the same chaos hits both
   lanes; watch the ledger-based scoreboards diverge. The payments node's slots mark each ticket in the ledger
-  (`✓` paid once, `×2` paid twice, `∅` owed, never paid, `—` denied, nothing owed), and each lane shows what payments saw in the scene: calls, refunds booked, and
+  (`✓` paid once, `×2` paid twice, `∅` owed, never paid, `—` denied, nothing owed), and each lane shows what payments saw in the scene: calls, refunds paid, and
   calls answered from an existing key. On step 5 that line is the evidence: Temporal's retry is answered from the
-  ledger, the queue's is booked again.
+  ledger, the queue's is paid again.
 - **Step 6, Nexus** says what Nexus is and why it matters, then proves it. Two static pictures on top: **Without Nexus**,
   support's code reaches across the team line into payments' namespace, task queue, workflow type and retries; **With
   Nexus**, support makes one call (`issue_refund`) to one endpoint (`payments-endpoint`) and payments owns everything
@@ -120,8 +120,8 @@ Run of show, about ten minutes:
   worker, the payments worker and the Temporal server itself are killed, each for 5-6 seconds. The box a failure hits
   goes red. Support's box holds one check per refund (one call each, "no errors"); payments' box turns each refund into
   a `$` when the ledger books the money, with its retry count (`↻2`) underneath; the retry that finally succeeds is answered from
-  the ledger, not paid again. Hover a ticket for its detail; the namespace links open the first refund's history on each
-  side in the Temporal Web UI (http://127.0.0.1:8233), including the caller's Nexus Links tab. Three tiles at the bottom
+  the ledger, not paid again. Hover a ticket for its detail; both sides' histories are in the Temporal Web UI
+  (http://127.0.0.1:8233, namespaces `support` and `payments`), including the caller's Nexus Links tab. Three tiles at the bottom
   (errors support saw, retries payments absorbed, refunds paid once) read from the ledger. The Temporal kill
   needs a server the show started itself (`make demo` does, if nothing is listening on 7233); with a server you started,
   the scene skips that kill.

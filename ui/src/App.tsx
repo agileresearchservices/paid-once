@@ -28,7 +28,7 @@ function PaymentsCalls({ c }: { c?: { calls: number; booked: number; replays: nu
   if (!c || c.calls === 0) return null;
   return (
     <div className="calls">
-      <span className="muted">Payments:</span> <b>{c.calls}</b> calls · <b>{c.booked}</b> booked · <b>{c.replays}</b> replayed
+      <span className="muted">Payments:</span> <b>{c.calls}</b> calls · <b>{c.booked}</b> paid · <b>{c.replays}</b> replayed
     </div>
   );
 }
@@ -98,18 +98,17 @@ export function App() {
     wasRunning.current = sceneRunning;
   }, [sceneRunning, step.arch]);
 
-  // Arrows step, 1-8 jump, R runs this step's scene.
+  // Arrows step, 1-7 jump. Scenes run from the button only.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === "ArrowRight") go(1);
       else if (e.key === "ArrowLeft") go(-1);
       else if (/^[1-9]$/.test(e.key) && Number(e.key) <= STEPS.length) setIndex(Number(e.key) - 1);
-      else if ((e.key === "r" || e.key === "R") && step.scene && !running && !locked) void act(`/api/scenes/${step.scene}/run`);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [go, act, step.scene, running, locked]);
+  }, [go]);
 
   const onReset = () => {
     if (!confirmReset) {
@@ -177,7 +176,7 @@ export function App() {
         <div className="controls">
           {step.scene && (
             <button className="primary" disabled={running || !!locked} onClick={() => void act(`/api/scenes/${step.scene}/run`)}>
-              {locked ? "Locked by the test run" : thisRunning ? `Running ${elapsed}s…` : running ? "Another scene is running" : finished ? "Run again (R)" : `${step.runLabel ?? "Run this scene"} (R)`}
+              {locked ? "Locked by the test run" : thisRunning ? `Running ${elapsed}s…` : running ? "Another scene is running" : finished ? "Run again" : step.runLabel ?? "Run this scene"}
             </button>
           )}
           {status && <p className={`scene-status ${status.cls}`} role="status">{status.text}</p>}
@@ -197,7 +196,6 @@ export function App() {
           rows={onScreen ? snap.nexus : []}
           ran={onScreen}
           topology={snap.topology}
-          temporalUi={snap.temporal_ui}
           processes={snap.processes}
           run={run}
           finished={finished}
@@ -207,11 +205,12 @@ export function App() {
         />
       )}
 
+      {/* Page 1 leads with the walkthrough (customer, agent, human), then the architecture it runs on. */}
+      {step.arch && <Walkthrough beat={beat} flow={onScreen ? snap.flow : undefined} />}
+
       {(step.arch || (step.scene && !step.nexus)) && <Diagram snap={snap} scene={step.scene} />}
 
-      {step.arch ? (
-        <Walkthrough beat={beat} flow={onScreen ? snap.flow : undefined} />
-      ) : step.nexus ? null : (
+      {step.arch || step.nexus ? null : (
         <div className="lanes">
           {LANES.map((l) => (
             <article key={l.id} className={step.scene ? `lane ${l.id} compact` : `lane ${l.id}`}>

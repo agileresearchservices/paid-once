@@ -1,13 +1,13 @@
 import type { ReactNode } from "react";
 import { OUTCOME_GLYPH } from "./outcomes";
 import { TicketGlyph, type TicketKind } from "./TicketIcon";
-import { shortTicket, workflowLink } from "./nexusLinks";
+import { shortTicket } from "./nexusLinks";
 import type { FaultWindow, NexusRow, ProcStatus, RefundAttempt, Topology } from "./types";
 
 // The run, as two teams and the one door between them. Support's box holds each refund's single Nexus call (a check once
 // answered); payments' box holds the work behind it (a $ once the ledger books it, with its retry count underneath). The four failures are chips
 // across the top, and each one also turns the box it hits red. No time axis: the point is where the failures land and who
-// absorbs them, not when. Per-refund detail is on hover, and the team names open the histories in the Temporal UI.
+// absorbs them, not when. Per-refund detail is on hover.
 
 // The gauntlet, in order (Engine.scene_nexus_kill). Muted before it lands, red while it's on, then "survived".
 const PLANNED: { key: string; label: string }[] = [
@@ -66,7 +66,7 @@ function paymentsHover(r: NexusRow, t: Topology, now: number): string {
   return [
     `${shortTicket(r.ticket)} · ${t.payments.workflow} → ${t.payments.activity} · key refund-${r.ticket}`,
     ...lines,
-    booked != null ? "$ the ledger booked it once" : "",
+    booked != null ? "$ the ledger paid it once" : "",
   ]
     .filter(Boolean)
     .join("\n");
@@ -80,27 +80,10 @@ function Glyph({ kind }: { kind: TicketKind }) {
   );
 }
 
-// The Temporal UI link for the first refund's history on one side, or the team's namespace list before any refund.
-function historyLink(ui: string | null, r: NexusRow | undefined, side: "caller" | "handler", ns: string): string | null {
-  if (!ui) return null;
-  if (r && side === "caller") return workflowLink(ui, r.caller_namespace, r.caller_workflow_id, r.caller_run_id);
-  if (r && r.handler.namespace && r.handler.workflow_id) return workflowLink(ui, r.handler.namespace, r.handler.workflow_id, r.handler.run_id);
-  return `${ui}/namespaces/${encodeURIComponent(ns)}/workflows`;
-}
-
-function TeamHead({ name, ns, href }: { name: string; ns: string; href: string | null }) {
+function TeamHead({ name }: { name: string }) {
   return (
     <div className="tbox-head">
       <span className="tbox-name">{name}</span>
-      {href ? (
-        <a href={href} target="_blank" rel="noreferrer" title="Open in the Temporal UI">
-          namespace <code>{ns}</code> ↗
-        </a>
-      ) : (
-        <span className="muted">
-          namespace <code>{ns}</code>
-        </span>
-      )}
     </div>
   );
 }
@@ -120,7 +103,6 @@ function Status({ cls, children }: { cls: string; children: ReactNode }) {
 export function NexusTeams({
   rows,
   t,
-  ui,
   processes,
   faults,
   kills,
@@ -130,7 +112,6 @@ export function NexusTeams({
 }: {
   rows: NexusRow[];
   t: Topology;
-  ui: string | null;
   processes: Record<string, ProcStatus>;
   faults: FaultWindow[];
   kills: Record<string, number>;
@@ -163,7 +144,7 @@ export function NexusTeams({
 
       <div className="teams-row">
         <div className={down(processes.support_worker) ? "tbox down" : "tbox"}>
-          <TeamHead name="Support team" ns={t.support.namespace} href={historyLink(ui, sorted[0], "caller", t.support.namespace)} />
+          <TeamHead name="Support team" />
           <WorkerLine p={processes.support_worker} kills={kills.support_worker} />
           <div className="tickets">
             {sorted.length === 0 ? (
@@ -198,7 +179,7 @@ export function NexusTeams({
         </div>
 
         <div className={down(processes.payments_worker) ? "tbox down" : "tbox"}>
-          <TeamHead name="Payments team" ns={t.payments.namespace} href={historyLink(ui, sorted[0], "handler", t.payments.namespace)} />
+          <TeamHead name="Payments team" />
           <WorkerLine p={processes.payments_worker} kills={kills.payments_worker} quiet={stalling} />
           <div className="tickets">
             {sorted.length === 0 ? (
@@ -217,7 +198,7 @@ export function NexusTeams({
             )}
           </div>
           {rows.length > 0 &&
-            (open ? <Status cls="busy">retrying until it's booked…</Status> : <Status cls="ok">{OUTCOME_GLYPH.ok} all booked, once each</Status>)}
+            (open ? <Status cls="busy">retrying until it's paid…</Status> : <Status cls="ok">{OUTCOME_GLYPH.ok} all paid, once each</Status>)}
         </div>
       </div>
 

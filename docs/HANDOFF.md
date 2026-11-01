@@ -76,7 +76,7 @@ whoever changes the code next.
   Temporal's own framing (the caller doesn't know the handler's namespace or queue; each team owns its workers and
   retries). `NexusTeams` is the run with no time axis: four failure chips (next / now / survived / skipped), a support box
   and a payments box joined by the endpoint, one glyph per refund on each side (sorted, so they pair; no ticket numbers on screen),
-  support's a check once answered, payments' a `$` once booked with a `↻N` retry badge under it, one plain worker line per
+  support's a check once answered, payments' a `$` once paid (ledger `booked_at` set) with a `↻N` retry badge under it, one plain worker line per
   box (red only while that worker is down or the payments service is quiet), and a Temporal server bar along the bottom. The badges count retries with
   the same `retriesOf` as the "Payments absorbed" tile, so they add up to it (5 × ↻2 = 10). A box goes red when its
   worker is down; the endpoint and the bar go red when the Temporal server is. Per-refund detail and the call counts
@@ -90,12 +90,12 @@ whoever changes the code next.
   that failure (`procs.owns_temporal`). Don't pre-start Temporal for a side-port scenario run; let the show start it.
 - **Ticket IDs carry a scene-run number** (`<reset id>-<scene>-r<n>-<i>-<lane>`), so re-running a scene starts new
   workflows instead of colliding with the last run's IDs. The idempotency key is still `refund-<ticket_id>`.
-- **The show links into the Temporal Web UI** (`TEMPORAL_UI_URL`, default `http://127.0.0.1:8233`; the engine re-checks
-  it every 10 seconds and hides the links while it doesn't answer). On step 6 the namespace links in the team boxes open the first refund's caller history in `support` and
-  its handler history in `payments`.
-- **The UI is a stepper** for a laptop browser, full screen (`#1`..`#7` in the URL, arrow keys, 1-7, R runs the
-  scene). Nothing is built for tablet or phone. Step 1 is the architecture diagram plus the walkthrough
-  (below). The side-by-side table that used to sit under the diagram was removed; the walkthrough is a general outline
+- **The page has no Temporal Web UI links.** Step 6's team boxes used to link each namespace to the first refund's
+  history; they were removed as noise. Open `http://127.0.0.1:8233` directly (namespaces `support`, `payments`). The engine
+  still reports `temporal_ui` (`TEMPORAL_UI_URL`, re-checked every 10 seconds) in the snapshot; the UI ignores it.
+- **The UI is a stepper** for a laptop browser, full screen (`#1`..`#7` in the URL, arrow keys, 1-7; scenes
+  run from the button only, no R shortcut). Nothing is built for tablet or phone. Step 1 is the walkthrough (three role
+  panes: customer, agent, human in the loop, shown empty before the run) above the architecture diagram. The side-by-side table that used to sit under the diagram was removed; the walkthrough is a general outline
   (a support chat, no stack comparison); the per-stack notes it used to carry are in the private talk track.
 - **Running a scene scrolls the page** (`App.tsx`, on the scene starting): it scrolls down until the diagram (or the Nexus panel) is at the top, so the
   explanation above can scroll away and everything that updates stays on screen. Scene steps use a compact lane layout (`.lane.compact`:
