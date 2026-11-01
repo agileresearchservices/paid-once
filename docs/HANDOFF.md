@@ -11,7 +11,7 @@ whoever changes the code next.
   gives one refund; an approval sent while no worker is running survives; a human "no" ends `rejected` with no ledger
   row; a policy denial ends `denied` with no Nexus operation in its history). It runs on its own throwaway Temporal
   server (`scripts/test-temporal.sh`, port 7299), and passed with `make demo` running.
-- `make scenario`: runs the walkthrough and six scenes headless against both lanes and exits non-zero if Lane 2 breaks an invariant.
+- `make scenario`: runs the walkthrough and five scenes headless against both lanes and exits non-zero if Lane 2 breaks an invariant.
   Results, SHAs and caveats: `docs/scenario-results.md`. It also passed from a fresh clone with no `.env`.
 - Two guards on the show server, after a browser left open on :8100 wrecked two scenario runs. `make scenario` locks
   the controls (`PAIDONCE_SCENARIO_TOKEN`: reset, run and kill answer 423 without it, and the UI shows a "not the demo"
@@ -48,14 +48,21 @@ whoever changes the code next.
   `temperature` are rejected on current models, so the agent does not set any. Strict schemas reject `minimum` on
   integers; the amount floor is applied in code.
 - **For a workflow-run Nexus operation the caller's operation stays `STARTED, attempt 1`** while the payments-side
-  activity retries. The step 7 timeline (`ui/src/NexusTimeline.tsx`) needs each attempt's times, and history only
+  activity retries. The step 6 timeline (`ui/src/NexusTimeline.tsx`) needs each attempt's times, and history only
   records the last attempt, so `paidonce/show/engine.py` builds `attempts` by polling the refund workflow's pending
   activity (`_merge_attempts`) and closes them from its history (`_finish_attempts`). A StartToClose timeout ends an
   attempt at start + `REFUND_START_TO_CLOSE`. The server's `current_retry_interval` came back unusable (an
   epoch-sized number, on one poll only), so backoff comes from `REFUND_RETRY`. The caller's times come from its
   history (Nexus operation scheduled, started, completed), and each row's `ledger` (calls, replays, `booked_at`) from
   payments' counter and `GET /refunds`. Rows are kept after the operation completes, so the evidence stays on screen.
-- **Step 7 is a gauntlet: four failures on the same refunds.** `scene_nexus_kill` sets `commit_then_stall` on payments
+- **Step 3 is one scene for a crash and a deploy.** They were two scenes (`tip_over`, `deploy_wait`) that killed the same two
+  agent workers and differed only in when: mid-refund, or during the human wait. `scene_worker_crash` does both with one
+  kill. The cohort is 6 approvals plus the policy and human-denied tickets; payments stalls the first 3 refunds
+  (`WORKER_CRASH_IN_FLIGHT`) after booking, `approve_scene(only=...)` sends those 3 approvals, and 1.6 s later the workers
+  are killed, so 3 refunds are in flight and the other 3 tickets (and the human "no") are waiting for a human. After the
+  restart the human reviews the rest. Lane 1 pays the in-flight ones twice (new key per attempt) and loses the waiting
+  ones (the in-memory graph is gone); Lane 2 replays with the same key and the waiting workflows are untouched.
+- **Step 6 is a gauntlet: four failures on the same refunds.** `scene_nexus_kill` sets `commit_then_stall` on payments
   (count 5, 9 s, and 2 s of latency before each commit), then kills the support worker,
   the payments worker (after attempt 2 starts) and the Temporal server (`GAUNTLET_*` in `paidonce/show/engine.py`).
   Each failure is a window in `scene_runs[...]["faults"]`: `{key, label, effect, start, end, hit}`. A kill window opens
@@ -74,7 +81,7 @@ whoever changes the code next.
 - **The show links into the Temporal Web UI** (`TEMPORAL_UI_URL`, default `http://127.0.0.1:8233`; the engine re-checks
   it every 10 seconds and hides the links while it doesn't answer). Each timeline row links the caller's workflow history in `support` and the
   handler's in `payments`.
-- **The UI is a stepper** for a laptop browser, full screen (`#1`..`#8` in the URL, arrow keys, 1-8, R runs the
+- **The UI is a stepper** for a laptop browser, full screen (`#1`..`#7` in the URL, arrow keys, 1-7, R runs the
   scene). Nothing is built for tablet or phone. Step 1 is the architecture diagram plus the walkthrough
   (below). The side-by-side table that used to sit under the diagram was removed; the walkthrough boxes say what each
   stack does at each step, so keep `BEATS` in `ui/src/steps.ts` in step with `paidonce/lane1/` and `paidonce/lane2/`.
@@ -96,7 +103,7 @@ whoever changes the code next.
   "Not tested yet", not "Holds".
 - **Every scene panel is scoped to the scene on screen.** `lane1_view`, `lane2_view`, `flow` and `payments_calls` count
   only the current scene's tickets, and the UI shows Nexus rows and lane chips only when `snap.current` is the step's
-  scene, so step 7 reads "Not run yet" instead of step 6's rows. `lane1_view_all` (every ticket since reset) feeds the
+  scene, so step 6 reads "Not run yet" instead of step 5's rows. `lane1_view_all` (every ticket since reset) feeds the
   scoreboard's "its own job table says N done" line; it is the queue's claim, shown next to the ledger, never scored.
 - **Payments counts its calls** (`CALLS` in `paidonce/payments/service.py`, `GET /admin/calls`, cleared by
   `/admin/reset`): per lane and ticket, calls and how many the ledger answered from an existing key. The engine sums
@@ -154,7 +161,7 @@ whoever changes the code next.
 - `PAIDONCE_L1_STABLE_KEY=1` (off by default) makes Lane 1 derive its idempotency key from the ticket instead of the attempt. It exists only so the write-up can measure the one-line fix (duplicates drop to 0, the 7 lost tickets remain). Default runs, the UI and the demo are unchanged, so Lane 1 is still the competent-team-today system described above.
 - "Improve the current implementation" (outbox, sweeper, durable checkpointer) is argued in the write-up, not built as a third lane.
 - On screen the lane is "Queue + LangGraph" (it was "Job queue"). It names the stack the way "Temporal + Nexus" does,
-  including the part that fails in the crash and deploy scenes (LangGraph's in-memory checkpointer). Avoid labels such as
+  including the part that fails in the worker-crash scene (LangGraph's in-memory checkpointer). Avoid labels such as
   "traditional" or "hand-rolled": they read as a strawman. Behaviour is unchanged.
 
 ## Constraints that bite

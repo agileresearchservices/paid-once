@@ -10,7 +10,37 @@ What `make scenario` printed on the runs behind the case study. Everything here 
 - **Command:** `make scenario` (stub model, no API key, local Temporal dev server, about 4 minutes)
 - **Machine:** one laptop, all services as local processes
 
-## Latest: every scene with two tickets owed nothing (2026-10-31, `c085fb9`)
+## Latest: crash and deploy merged into one scene (2026-11-01, `main` at `8d59f79` plus the merge)
+
+`tip_over` and `deploy_wait` killed the same two agent workers and differed only in when. They are now one scene,
+`worker_crash`: payments stalls the first 3 approved refunds after booking, the human approves those 3, the workers are
+killed 1.6 s later (3 refunds in flight, 3 approvals plus the human "no" still waiting for a human), and the human
+reviews the rest after the restart. The tables below name the two old scenes; read them as that scene's two halves.
+Two full `make scenario` runs on side ports (default, then `PAIDONCE_L1_STABLE_KEY=1`), both `SCENARIO PASSED`.
+
+Per scene, Lane 1 duplicates / missing. Lane 2 was `ok = approved`, 0 elsewhere, and both lanes closed the two "no"
+tickets unpaid, in every scene.
+
+| Scene | Tickets (approved) | Default | `PAIDONCE_L1_STABLE_KEY=1` |
+|---|---|---|---|
+| `intro` | 7 (5) | 0 / 0 | 0 / 0 |
+| `worker_crash` | 8 (6) | 3 / 3 | 0 / 3 |
+| `double_delivery` | 7 (5) | 2 / 0 | 0 / 0 |
+| `payments_timeout` | 7 (5) | 4 / 0 | 0 / 0 |
+| `nexus_kill` | 7 (5), Lane 2 only | n/a | n/a |
+
+| | Submitted | Refunded once | Duplicates | Missing | Stuck | Unapproved | Denied, none paid (policy / human) |
+|---|---|---|---|---|---|---|---|
+| Lane 1, default | 30 | 10 | 9 | 3 | 0 | 0 | 4 / 4 |
+| Lane 1, stable key | 30 | 19 | 0 | 3 | 0 | 0 | 4 / 4 |
+| Lane 2, both runs | 37 | 27 | 0 | 0 | 0 | 0 | 5 / 5 |
+
+In `worker_crash` Lane 1 paid the 3 in-flight refunds twice (a new key per attempt) and lost the 3 waiting approvals
+(their in-memory graph died with the worker); the stable key removes the duplicates and leaves the 3 lost, as before.
+Lane 2 replayed with the same key and refunded all 6 once. In `nexus_kill` the payments-side activity attempt peaked at
+3 and the caller's operation at 1; every failure hit all 5 refunds.
+
+## Before the merge: every scene with two tickets owed nothing (2026-10-31, `c085fb9`)
 
 Each scene's cohort now adds one ticket outside the agent's policy and one a human denies (7 tickets per scene, 8 in
 `tip_over`). Both runs used side ports and their own data directory and Temporal server

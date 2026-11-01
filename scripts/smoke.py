@@ -1,6 +1,6 @@
 """Run scenes headlessly against the real stack and print the ledger scoreboard after each.
 
-Usage: python scripts/smoke.py [--check] intro tip_over ...    (needs the show server NOT already running)
+Usage: python scripts/smoke.py [--check] intro worker_crash ...    (needs the show server NOT already running)
 Set PAIDONCE_STUB_LLM=1 to avoid real model calls (`make scenario` does).
 
 The scoreboard is reset first, so each run starts from zero. Chaos is seeded (the engine's seed);
@@ -31,9 +31,8 @@ BASE = f"http://127.0.0.1:{PORT}"
 MUST_HAVE = [
     "walkthrough",
     "intro",
-    "tip_over",
+    "worker_crash",
     "double_delivery",
-    "deploy_wait",
     "payments_timeout",
     "nexus_kill",
 ]

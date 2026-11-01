@@ -129,6 +129,34 @@ function Ledger({ lane, label, dots, tickets }: { lane: LaneId; label: string; d
   );
 }
 
+// What the ledger's boxes mean, drawn in the Payments box between its two rows of boxes. Each entry is a copy of the real
+// slot, so it reads as the same mark.
+const LEDGER_KEY: { cls: string; glyph: string; text: string }[] = [
+  { cls: "ok", glyph: OUTCOME_GLYPH.ok, text: "paid once" },
+  { cls: "bad", glyph: OUTCOME_GLYPH.duplicate, text: "paid twice" },
+  { cls: "missing", glyph: OUTCOME_GLYPH.missing, text: "owed, never paid" },
+  { cls: "none", glyph: OUTCOME_GLYPH.denied, text: "denied, nothing owed" },
+];
+
+function LedgerKey() {
+  const x = NODES.payments.x + 16;
+  const y0 = ROW.lane1 + 95;
+  return (
+    <g className="ledger-key">
+      {LEDGER_KEY.map((k, i) => {
+        const y = y0 + i * 24;
+        return (
+          <g key={k.cls} className={`slot ${k.cls}`}>
+            <rect x={x} y={y} width={34} height={22} rx={5} />
+            <text x={x + 17} y={y + 17} textAnchor="middle">{k.glyph}</text>
+            <text className="key-label" x={x + 46} y={y + 17}>{k.text}</text>
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
 export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null }) {
   const run = scene ? snap.scene_runs?.[scene] : undefined;
   const onScreen = scene != null && snap.current === scene;
@@ -167,8 +195,7 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
           </span>
         ) : (
           <span className="legend">
-            {/* Two keys, two sources: the dots are where each stack thinks a ticket is; the boxes are what the payments
-                ledger actually paid. Each ledger key is a small copy of the real slot, so it reads as the same mark. */}
+            {/* The dots are where each stack thinks a ticket is. The ledger key sits in the Payments box (LedgerKey). */}
             <span className="lg-group">
               <b>Ticket</b>
               <span><i className="lg active" /> in progress</span>
@@ -176,13 +203,6 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
               <span><i className="lg paying" /> refund in flight</span>
               <span><i className="lg failed" /> job failed</span>
               <span><i className="lg closed" /> denied</span>
-            </span>
-            <span className="lg-group">
-              <b>Ledger</b>
-              <span><i className="lg-slot ok">{OUTCOME_GLYPH.ok}</i> paid once</span>
-              <span><i className="lg-slot bad">{OUTCOME_GLYPH.duplicate}</i> paid twice</span>
-              <span><i className="lg-slot missing">{OUTCOME_GLYPH.missing}</i> owed, never paid</span>
-              <span><i className="lg-slot none">{OUTCOME_GLYPH.denied}</i> denied, nothing owed</span>
               <span className="lg-stage">⏱ slowed on purpose</span>
             </span>
           </span>
@@ -290,6 +310,7 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
           <>
             <Ledger lane="lane1" label="Queue" dots={flow.lane1} tickets={audit("lane1")} />
             <Ledger lane="lane2" label="Temporal" dots={flow.lane2} tickets={audit("lane2")} />
+            <LedgerKey />
           </>
         )}
 
