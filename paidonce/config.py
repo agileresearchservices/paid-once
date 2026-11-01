@@ -33,10 +33,11 @@ LANE1_PORT = int(os.environ.get("PAIDONCE_LANE1_PORT", "8102"))
 
 # The payments service serves HTTPS with a self-signed certificate (paidonce/tls.py). "0" serves plain HTTP: the tests.
 PAYMENTS_TLS = os.environ.get("PAIDONCE_PAYMENTS_TLS", "1") != "0"
+LANE1_TLS = os.environ.get("PAIDONCE_LANE1_TLS", "1") != "0"  # the same, for the Lane 1 API
 PAYMENTS_URL = os.environ.get(
     "PAIDONCE_PAYMENTS_URL", f"{'https' if PAYMENTS_TLS else 'http'}://127.0.0.1:{PAYMENTS_PORT}"
 )
-LANE1_URL = os.environ.get("PAIDONCE_LANE1_URL", f"http://127.0.0.1:{LANE1_PORT}")
+LANE1_URL = os.environ.get("PAIDONCE_LANE1_URL", f"{'https' if LANE1_TLS else 'http'}://127.0.0.1:{LANE1_PORT}")
 
 TEMPORAL_ADDRESS = os.environ.get("TEMPORAL_ADDRESS", "127.0.0.1:7233")
 TEMPORAL_UI_URL = os.environ.get("TEMPORAL_UI_URL", "http://127.0.0.1:8233")

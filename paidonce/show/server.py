@@ -43,7 +43,7 @@ async def lifespan(_: FastAPI):
     setup_notes = await asyncio.to_thread(ensure_setup)
     engine = Engine(procs)
     state.update(procs=procs, engine=engine)
-    if config.PAYMENTS_TLS:
+    if config.PAYMENTS_TLS or config.LANE1_TLS:
         await asyncio.to_thread(tls.ensure_certs)  # before any process starts, so every caller finds the certificate
     procs.start_all()
     ready = await asyncio.to_thread(procs.wait_ready)

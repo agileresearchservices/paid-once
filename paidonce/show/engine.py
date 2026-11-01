@@ -175,7 +175,7 @@ class Engine:
     @property
     def http(self) -> httpx.AsyncClient:
         if self._http is None:
-            self._http = httpx.AsyncClient(timeout=5.0, verify=tls.client_verify())
+            self._http = httpx.AsyncClient(timeout=5.0, verify=tls.client_verify("payments", "lane1_api"))
         return self._http
 
     async def temporal(self) -> Client:

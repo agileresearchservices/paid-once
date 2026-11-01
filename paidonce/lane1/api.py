@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from paidonce import config
+from paidonce import config, tls
 from paidonce.lane1 import store
 
 
@@ -93,7 +93,9 @@ def reset() -> dict:
 def main() -> None:
     import uvicorn
 
-    uvicorn.run(app, host="127.0.0.1", port=config.LANE1_PORT, log_level="warning")
+    uvicorn.run(
+        app, host="127.0.0.1", port=config.LANE1_PORT, log_level="warning", **tls.server_ssl_kwargs("lane1_api")
+    )
 
 
 if __name__ == "__main__":

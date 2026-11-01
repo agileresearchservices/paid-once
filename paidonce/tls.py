@@ -1,12 +1,14 @@
-"""TLS for the payments service: a self-signed certificate it serves, and the trust its callers verify it against.
+"""TLS for the payments service and the Lane 1 API: a self-signed certificate each serves, and the trust their callers
+verify it against.
 
-The certificate is generated once, under data/tls/ (gitignored), the first time the show or the payments service
-starts. Callers do not skip verification: they load the certificate as their only trust anchor, so a different
-certificate on that port fails the handshake. Only the payments service has its private key (payments.pem, 0600);
-callers read the public certificate (payments.crt).
+Each service has its own certificate and key, generated once under data/tls/ (gitignored) the first time the show or
+the service starts. Callers do not skip verification: they load the certificate of the service they call as their only
+trust anchor, so a different certificate on that port fails the handshake, and the payments certificate does not open
+the Lane 1 API. Only a service has its private key (<name>.pem, 0600); callers read the public certificate
+(<name>.crt).
 
-PAIDONCE_PAYMENTS_TLS=0 turns this off and serves plain HTTP. The tests do that, because they start the payments app on
-a free port without a certificate.
+PAIDONCE_PAYMENTS_TLS=0 and PAIDONCE_LANE1_TLS=0 serve that service over plain HTTP. The tests do that for the
+payments app, which they start on a free port without a certificate.
 """
 
 from __future__ import annotations
@@ -25,33 +27,34 @@ from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
 from paidonce import config
 
+SERVICES = ("payments", "lane1_api")
 VALID_DAYS = 365
 RENEW_BEFORE_DAYS = 30
 
 
-def server_pem() -> Path:
-    """Private key + certificate: the payments service only."""
-    return config.TLS_DIR / "payments.pem"
+def server_pem(service: str) -> Path:
+    """Private key + certificate: that service only."""
+    return config.TLS_DIR / f"{service}.pem"
 
 
-def cert_path() -> Path:
-    """The certificate alone: what callers trust."""
-    return config.TLS_DIR / "payments.crt"
+def cert_path(service: str) -> Path:
+    """The certificate alone: what callers of the service trust."""
+    return config.TLS_DIR / f"{service}.crt"
 
 
-def _fresh() -> bool:
+def _fresh(service: str) -> bool:
     """Both files exist and the certificate has more than RENEW_BEFORE_DAYS left."""
     try:
-        cert = x509.load_pem_x509_certificate(cert_path().read_bytes())
+        cert = x509.load_pem_x509_certificate(cert_path(service).read_bytes())
         left = cert.not_valid_after_utc - datetime.datetime.now(datetime.UTC)
-        return server_pem().is_file() and left > datetime.timedelta(days=RENEW_BEFORE_DAYS)
+        return server_pem(service).is_file() and left > datetime.timedelta(days=RENEW_BEFORE_DAYS)
     except (OSError, ValueError):
         return False
 
 
-def _generate() -> None:
+def _generate(service: str) -> None:
     key = ec.generate_private_key(ec.SECP256R1())
-    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "paid-once payments (self-signed)")])
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, f"paid-once {service} (self-signed)")])
     now = datetime.datetime.now(datetime.UTC)
     cert = (
         x509.CertificateBuilder()
@@ -97,7 +100,7 @@ def _generate() -> None:
         serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
     )
     # Write beside the target and rename, so a reader never sees half a file. The private key goes first, 0600.
-    for path, data, mode in ((server_pem(), key_pem + cert_pem, 0o600), (cert_path(), cert_pem, 0o644)):
+    for path, data, mode in ((server_pem(service), key_pem + cert_pem, 0o600), (cert_path(service), cert_pem, 0o644)):
         tmp = path.with_suffix(path.suffix + ".tmp")
         fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
         with os.fdopen(fd, "wb") as f:
@@ -106,40 +109,60 @@ def _generate() -> None:
 
 
 def ensure_certs() -> Path:
-    """Create the certificate if it is missing or close to expiry. Safe to call from several processes at once."""
+    """Create each service's certificate if it is missing or close to expiry. Safe to call from several processes."""
     config.TLS_DIR.mkdir(parents=True, exist_ok=True)
-    if _fresh():
-        return cert_path()
+
+    def make_stale() -> None:
+        for service in SERVICES:
+            if not _fresh(service):
+                _generate(service)
+
+    if all(_fresh(service) for service in SERVICES):
+        return config.TLS_DIR
     try:
         import fcntl
-    except ImportError:  # no flock (Windows): the show server generates it before it starts anything else
-        _generate()
-        return cert_path()
+    except ImportError:  # no flock (Windows): the show server generates them before it starts anything else
+        make_stale()
+        return config.TLS_DIR
     with open(config.TLS_DIR / ".lock", "w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
-        if not _fresh():  # another process may have generated it while we waited
-            _generate()
-    return cert_path()
+        make_stale()  # another process may have generated them while we waited: only stale ones are made
+    return config.TLS_DIR
 
 
-def server_ssl_kwargs() -> dict:
-    """What uvicorn needs to serve the payments service over HTTPS, or nothing when TLS is off."""
-    if not config.PAYMENTS_TLS:
+def _enabled(service: str) -> bool:
+    return config.PAYMENTS_TLS if service == "payments" else config.LANE1_TLS
+
+
+def _url(service: str) -> str:
+    return config.PAYMENTS_URL if service == "payments" else config.LANE1_URL
+
+
+def server_ssl_kwargs(service: str) -> dict:
+    """What uvicorn needs to serve `service` over HTTPS, or nothing when its TLS is off."""
+    if not _enabled(service):
         return {}
     ensure_certs()
-    return {"ssl_certfile": str(server_pem()), "ssl_keyfile": str(server_pem())}
+    return {"ssl_certfile": str(server_pem(service)), "ssl_keyfile": str(server_pem(service))}
 
 
-@lru_cache(maxsize=1)
-def _trust() -> ssl.SSLContext:
-    cert = cert_path()
-    if not cert.is_file():
-        raise FileNotFoundError(
-            f"{cert} not found: the payments certificate is created when the show or the payments service starts"
-        )
-    return ssl.create_default_context(cafile=str(cert))  # this certificate only: no system roots
+@lru_cache(maxsize=4)
+def _trust(services: tuple[str, ...]) -> ssl.SSLContext:
+    certs = [cert_path(service) for service in services]
+    for cert in certs:
+        if not cert.is_file():
+            raise FileNotFoundError(f"{cert} not found: the certificate is created when the show or the service starts")
+    context = ssl.create_default_context(cafile=str(certs[0]))  # a cafile means no system roots
+    for cert in certs[1:]:
+        context.load_verify_locations(cafile=str(cert))
+    return context
 
 
-def client_verify(url: str | None = None):
-    """The `verify` argument for an httpx call to payments: the pinned certificate for https, the default otherwise."""
-    return _trust() if (url or config.PAYMENTS_URL).startswith("https://") else True
+def client_verify(*services: str):
+    """The `verify` argument for an httpx client that calls `services` (default: payments).
+
+    For each service served over https it trusts that service's certificate and nothing else; if none is, httpx's
+    default."""
+    services = services or ("payments",)
+    secure = tuple(s for s in services if _url(s).startswith("https://"))
+    return _trust(secure) if secure else True
