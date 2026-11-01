@@ -9,6 +9,7 @@ from dataclasses import asdict
 
 from langgraph.types import Command
 
+from paidonce import config
 from paidonce.lane1 import store
 from paidonce.lane1.graph import build_graph, execute_refund
 from paidonce.models import Ticket
@@ -76,10 +77,24 @@ class Worker:
                 detail="approved, but the in-memory graph state was lost on restart",
             )
 
+    @staticmethod
+    def _heartbeat(job: dict, done: threading.Event) -> None:
+        # Extends the lease while the worker is alive. A kill -9 stops it, so the job still reappears.
+        while not done.wait(config.VISIBILITY_TIMEOUT_S / 3):
+            try:
+                store.extend_lease(job["job_id"])
+            except Exception:
+                log.exception("lease heartbeat for job %s failed", job["job_id"])
+
     def run_one(self) -> bool:
         job = store.claim_job()
         if job is None:
             return False
+        done = threading.Event()
+        if job["kind"] == "decide":
+            # A decide job waits on an LLM call that can outlast the visibility timeout, and the queue would hand
+            # the same job to a second worker. Execute jobs are short HTTP calls and keep the plain timeout.
+            threading.Thread(target=self._heartbeat, args=(job, done), daemon=True).start()
         try:
             if job["kind"] == "decide":
                 self.handle_decide(job)
@@ -88,6 +103,8 @@ class Worker:
             store.complete_job(job)
         except Exception:
             log.exception("job %s failed", job["job_id"])
+        finally:
+            done.set()
         return True
 
     def loop(self) -> None:

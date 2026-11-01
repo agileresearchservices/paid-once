@@ -140,6 +140,7 @@ export interface Snapshot {
   // This scene's calls to payments, counted by payments: booked = new ledger rows, replays = answered from the key.
   payments_calls: Partial<Record<LaneId, { calls: number; booked: number; replays: number }>>;
   flow: Record<LaneId, FlowDot[]>; // this scene's tickets only
+  beat: { scene: string; id: string; at: number } | null; // the walkthrough's step waiting for its box to be dismissed
   temporal_ui: string | null; // Temporal Web UI base URL, or null when it is not answering
   topology: Topology;
   locked: string | null; // what owns the server's controls (`make scenario`), or null for a normal show

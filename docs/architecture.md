@@ -27,7 +27,8 @@ flowchart LR
 
 What makes it realistic, and what makes it fail:
 
-- The queue is at-least-once. A job whose visibility timeout expires is handed out again.
+- The queue is at-least-once. A job whose visibility timeout expires is handed out again. (A decide job's worker
+  heartbeats its lease while the Claude call runs, so only a dead worker's job comes back.)
 - The LangGraph checkpointer is `MemorySaver`, the tutorial default. The approval interrupt lives in the worker's
   memory and disappears when the worker restarts.
 - A recovery path re-drives tickets stuck in `executing`. That is what turns a crash after the payments commit

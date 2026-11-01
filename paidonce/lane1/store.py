@@ -181,6 +181,15 @@ def claim_job() -> dict | None:
     return dict(row)
 
 
+def extend_lease(job_id: int) -> None:
+    """Heartbeat: push a claimed job's visibility timeout out again while its worker is still alive."""
+    with connect(config.LANE1_DB) as conn:
+        conn.execute(
+            "UPDATE jobs SET lease_until = ? WHERE job_id = ?",
+            (time.time() + config.VISIBILITY_TIMEOUT_S, job_id),
+        )
+
+
 def complete_job(job: dict) -> None:
     with connect(config.LANE1_DB) as conn:
         conn.execute("DELETE FROM jobs WHERE job_id = ?", (job["job_id"],))
