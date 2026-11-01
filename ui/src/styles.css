@@ -110,7 +110,8 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .diagram .node.down > rect { fill: var(--critical-wash); stroke: var(--critical); }
 .diagram .n-title { fill: var(--ink); font-size: 15.5px; font-weight: 600; }
 .diagram .n-sub { fill: var(--muted); font-size: 13px; }
-.diagram .n-state { fill: var(--good-ink); font-size: 12px; font-weight: 700; letter-spacing: 0.05em; }
+.diagram .n-dot { fill: var(--good); }
+.diagram .n-dot.bad { fill: var(--critical); }
 .diagram .n-down rect { fill: var(--critical); }
 .diagram .n-down text { fill: #fff; font-size: 12.5px; font-weight: 700; letter-spacing: 0.04em; }
 /* The halo in the diagram's background colour cuts the node border behind the mark, so it reads as a label on it */
