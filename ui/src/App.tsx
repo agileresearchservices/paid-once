@@ -138,7 +138,7 @@ export function App() {
   const elapsed = run ? Math.max(0, Math.round(snap.now - run.started_at)) : 0;
   // The audit gives an approved ticket a fixed window to show up in the ledger before it counts it lost. A scene that
   // waits out that window says so, instead of just counting seconds.
-  const waits = LANES.map((l) => ({ lane: l, wait: auditWait(snap.audit[l.id].pending, snap.now) })).filter((w) => w.wait);
+  const waits = LANES.map((l) => ({ lane: l, wait: auditWait(snap.audit[l.id].pending, snap.flow?.[l.id] ?? [], snap.now) })).filter((w) => w.wait);
   let status: { text: string; cls: string } | null = null;
   if (finished && run?.ok === false) status = { text: `Scene failed: ${run.error ?? "see the server log"}`, cls: "fail" };
   else if (thisRunning && waits.length > 0) {
