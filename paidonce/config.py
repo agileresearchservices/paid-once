@@ -31,7 +31,11 @@ SCENARIO_TOKEN = os.environ.get("PAIDONCE_SCENARIO_TOKEN") or None
 PAYMENTS_PORT = int(os.environ.get("PAIDONCE_PAYMENTS_PORT", "8101"))
 LANE1_PORT = int(os.environ.get("PAIDONCE_LANE1_PORT", "8102"))
 
-PAYMENTS_URL = os.environ.get("PAIDONCE_PAYMENTS_URL", f"http://127.0.0.1:{PAYMENTS_PORT}")
+# The payments service serves HTTPS with a self-signed certificate (paidonce/tls.py). "0" serves plain HTTP: the tests.
+PAYMENTS_TLS = os.environ.get("PAIDONCE_PAYMENTS_TLS", "1") != "0"
+PAYMENTS_URL = os.environ.get(
+    "PAIDONCE_PAYMENTS_URL", f"{'https' if PAYMENTS_TLS else 'http'}://127.0.0.1:{PAYMENTS_PORT}"
+)
 LANE1_URL = os.environ.get("PAIDONCE_LANE1_URL", f"http://127.0.0.1:{LANE1_PORT}")
 
 TEMPORAL_ADDRESS = os.environ.get("TEMPORAL_ADDRESS", "127.0.0.1:7233")
@@ -55,6 +59,7 @@ VISIBILITY_TIMEOUT_S = float(os.environ.get("PAIDONCE_VISIBILITY_S", "10"))
 # What a typical client does against a slow downstream.
 PAYMENTS_CLIENT_TIMEOUT_S = float(os.environ.get("PAIDONCE_PAYMENTS_TIMEOUT_S", "3"))
 
+TLS_DIR = DATA_DIR / "tls"
 LEDGER_DB = DATA_DIR / "ledger.db"
 LANE1_DB = DATA_DIR / "lane1.db"
 AUDIT_DB = DATA_DIR / "audit.db"

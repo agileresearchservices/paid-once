@@ -12,7 +12,7 @@ needs a human decision, which can take hours or days; the human approves it or s
 money. Lane 1 is the stack a competent team ships today. Lane 2 runs the same agent logic on Temporal and
 reaches the payments team through a Nexus operation.
 
-## Lane 1: queue, in-memory graph, plain HTTP
+## Lane 1: queue, in-memory graph, HTTPS to payments
 
 ```mermaid
 flowchart LR
@@ -48,7 +48,7 @@ flowchart TB
     Endpoint --> Handler
     subgraph PaymentsNS["Namespace payments / task queue payments-nexus"]
         Handler["PaymentsServiceHandler<br/>workflow-run operation"] -->|"start refund-{ticket_id}<br/>conflict policy USE_EXISTING"| RefundWF["RefundWorkflow"]
-        RefundWF -->|"activity post_refund<br/>Idempotency-Key refund-{ticket_id}"| Post["HTTP call to payments"]
+        RefundWF -->|"activity post_refund<br/>Idempotency-Key refund-{ticket_id}"| Post["HTTPS call to payments"]
     end
     Post --> Payments[Payments service] --> Ledger[(Refund ledger)]
 ```

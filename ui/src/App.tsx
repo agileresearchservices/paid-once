@@ -7,7 +7,7 @@ import { post, useSnapshot } from "./useSnapshot";
 import { Walkthrough } from "./Walkthrough";
 
 const LANES = [
-  { id: "lane1" as const, name: "Queue + LangGraph", subtitle: "What most teams run today: queue, polling worker, in-memory agent state, HTTP to payments" },
+  { id: "lane1" as const, name: "Queue + LangGraph", subtitle: "What most teams run today: queue, polling worker, in-memory agent state, HTTPS to payments" },
   { id: "lane2" as const, name: "Temporal + Nexus", subtitle: "Durable workflow; support calls payments over Nexus" },
 ];
 

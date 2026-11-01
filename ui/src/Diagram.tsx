@@ -42,7 +42,7 @@ const HUMAN_X = HUMAN.x + HUMAN.w / 2;
 const WIRES: { id: string; x1: number; x2: number; lane: LaneId; label?: string }[] = [
   { id: "helpdesk>lane1_api", x1: 118, x2: 158, lane: "lane1" },
   { id: "lane1_api>lane1_worker", x1: 338, x2: 378, lane: "lane1" },
-  { id: "lane1_worker>payments", x1: 614, x2: 1170, lane: "lane1", label: "plain HTTP" },
+  { id: "lane1_worker>payments", x1: 614, x2: 1170, lane: "lane1", label: "HTTPS" },
   { id: "helpdesk>temporal", x1: 118, x2: 158, lane: "lane2" },
   { id: "temporal>support_worker", x1: 338, x2: 378, lane: "lane2" },
   { id: "support_worker>endpoint", x1: 614, x2: 650, lane: "lane2" },

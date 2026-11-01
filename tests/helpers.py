@@ -17,20 +17,24 @@ def free_port() -> int:
 
 
 class Server:
-    def __init__(self, app) -> None:
+    def __init__(self, app, **ssl_kwargs) -> None:
         self.port = free_port()
-        self.server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=self.port, log_level="error"))
+        self.scheme = "https" if ssl_kwargs else "http"
+        self.verify = ssl_kwargs.pop("verify", True)  # how the readiness probe checks a self-signed certificate
+        self.server = uvicorn.Server(
+            uvicorn.Config(app, host="127.0.0.1", port=self.port, log_level="error", **ssl_kwargs)
+        )
         self.thread = threading.Thread(target=self.server.run, daemon=True)
 
     @property
     def url(self) -> str:
-        return f"http://127.0.0.1:{self.port}"
+        return f"{self.scheme}://127.0.0.1:{self.port}"
 
     def __enter__(self):
         self.thread.start()
         for _ in range(100):
             try:
-                httpx.get(f"{self.url}/healthz", timeout=0.5)
+                httpx.get(f"{self.url}/healthz", timeout=0.5, verify=self.verify)
                 return self
             except httpx.HTTPError:
                 time.sleep(0.05)

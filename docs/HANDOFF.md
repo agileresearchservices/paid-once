@@ -117,6 +117,18 @@ whoever changes the code next.
 - The show reuses any Temporal server already listening on `TEMPORAL_ADDRESS` and will create its two namespaces
   and the Nexus endpoint there. Point `TEMPORAL_ADDRESS` somewhere else if that server belongs to something else.
 
+## Payments is served over HTTPS (`paidonce/tls.py`)
+- The payments service uses a self-signed certificate, generated once under `data/tls/` (gitignored) by the show server
+  before it starts anything, or by `python -m paidonce.payments` when run alone. `payments.pem` holds the key (0600) and
+  is read only by the payments service; callers read `payments.crt`.
+- Callers do not turn verification off. Lane 1's `call_payments`, Lane 2's `post_refund` activity and the show engine
+  load that one certificate as their only trust anchor (`tls.client_verify()`), so a different certificate on the port
+  fails the handshake. The certificate names `127.0.0.1`, `::1` and `localhost`, lasts a year, and is replaced
+  within 30 days of expiry.
+- `PAIDONCE_PAYMENTS_TLS=0` serves plain HTTP (the tests use it; they start the payments app on a free port with no
+  certificate). Lane 1's own API (:8102, the intake and approval calls) is still plain HTTP on loopback.
+- Fairness: both lanes pay the same handshake cost, and TLS does not change Lane 1's per-attempt key or its 3 s timeout.
+
 ## The walkthrough (step 1)
 - `Engine.scene_walkthrough` sends one $42.00 ticket to both lanes and stops at six steps with `Engine.await_beat`. The
   snapshot's `beat` names the step; the UI shows its panel under the diagram, in the space the old comparison table used (`ui/src/Walkthrough.tsx`, copy in `BEATS` in `steps.ts`) and
