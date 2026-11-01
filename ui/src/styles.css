@@ -248,11 +248,6 @@ svg.lg-icon, .diagram svg.lg-icon { display: inline-block; width: 26px; height: 
 .invariant.settling .inv-icon, .invariant.settling .inv-verdict { color: var(--warning); }
 .invariant.untested .inv-icon, .invariant.untested .inv-verdict { color: var(--muted); }
 
-.table-view { font-size: 14px; color: var(--ink-2); }
-.table-view summary { cursor: pointer; }
-.table-view table { border-collapse: collapse; width: 100%; margin-top: 6px; }
-.table-view th { text-align: left; font-weight: 400; color: var(--muted); padding: 2px 12px 2px 0; }
-.table-view td { font-variant-numeric: tabular-nums; }
 
 .nexus { display: grid; gap: 10px; border-radius: 12px; padding: 14px 24px 16px; }
 .nexus a { color: var(--accent-ink); text-decoration: none; white-space: nowrap; }
