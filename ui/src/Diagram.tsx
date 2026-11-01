@@ -7,9 +7,9 @@ import type { FlowDot, LaneId, ShowEvent, Snapshot } from "./types";
 // audit, never from a stack.
 
 const W = 1464;
-const H = 270;
-const ROW: Record<LaneId, number> = { lane1: 30, lane2: 170 }; // node top per row; the gap holds the human
-const NODE_H = 76;
+const H = 298;
+const ROW: Record<LaneId, number> = { lane1: 30, lane2: 184 }; // node top per row; the gap holds the human
+const NODE_H = 90; // three text lines (title, what it is, what the agent does) with the ticket dots below them
 
 interface Box {
   x: number;
@@ -36,7 +36,7 @@ const NODES: Record<string, Box> = {
 const mid = (lane: LaneId) => ROW[lane] + NODE_H / 2;
 
 // The human reviews proposals where approvals actually land: the Queue API and the Temporal server.
-const HUMAN = { x: 234, y: 124, w: 28, h: 28 }; // a round badge with a person in it
+const HUMAN = { x: 234, y: 138, w: 28, h: 28 }; // a round badge with a person in it
 const HUMAN_X = HUMAN.x + HUMAN.w / 2;
 
 // Wires: [from x, to x, row, id]. A wire is "busy" while a ticket is on it or in the node it feeds.
