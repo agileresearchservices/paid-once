@@ -1,4 +1,4 @@
-import { OUTCOME_GLYPH } from "./outcomes";
+import { auditWait, OUTCOME_GLYPH } from "./outcomes";
 import { LegendIcon, TicketGlyph, type TicketKind } from "./TicketIcon";
 import type { FlowDot, LaneId, ShowEvent, Snapshot } from "./types";
 
@@ -134,16 +134,26 @@ function Ledger({
   label,
   dots,
   tickets,
+  wait,
+  finished,
 }: {
   lane: LaneId;
   label: string;
   dots: FlowDot[];
   tickets: Record<string, string>;
+  wait: { count: number; secs: number } | null;
+  finished: boolean; // the scene has ended, so every ticket's verdict is in
 }) {
   const ids = dots.map((d) => d.ticket).sort();
   const x0 = NODES.payments.x + 16;
   const at = LEDGER_Y[lane];
-  const statuses = ids.map((id) => tickets[id] ?? "waiting");
+  // The audit knows a ticket is owed nothing (the harness wrote it to break the policy, or a human said no) from the
+  // moment it exists, long before any money moves. Like the other marks, "owed nothing" is a verdict: the slot shows it
+  // once the scene has finished, so the ledger doesn't open with a denial in it.
+  const statuses = ids.map((id) => {
+    const st = tickets[id] ?? "waiting";
+    return (st === "declined" || st === "rejected") && !finished ? "waiting" : st;
+  });
   const tally = tallyParts(statuses);
   return (
     <g className="ledger">
@@ -164,6 +174,12 @@ function Ledger({
           </g>
         );
       })}
+      {/* Approved, still no refund: the audit gives each ticket a fixed window before it counts it lost, so say so */}
+      {wait && (
+        <text x={x0} y={at.tally + 20} className="tally-wait">
+          {wait.count} unpaid · audit waits {wait.secs}s more
+        </text>
+      )}
       {tally.length > 0 && (
         <text x={x0} y={at.tally} className="tally">
           {tally.map((t, i) => (
@@ -208,6 +224,7 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
 
   const latency = (lane: LaneId) => snap.faults[lane]?.latency_s ?? 0;
   // The walkthrough's ticket is scored apart from the scoreboard, but its dot still belongs on step 1's ledger.
+  const wait = (lane: LaneId) => (onScreen ? auditWait(snap.audit[lane]?.pending, flow[lane], snap.now) : null);
   const audit = (lane: LaneId) => ({ ...(snap.audit[lane]?.tickets ?? {}), ...(snap.demo_audit[lane]?.tickets ?? {}) });
 
   return (
@@ -227,7 +244,6 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
               <span><LegendIcon kind="paying" /> refund in flight</span>
               <span><LegendIcon kind="failed" /> job failed</span>
               <span><LegendIcon kind="closed" /> denied</span>
-              <span className="lg-stage">⏱ slowed on purpose</span>
             </span>
           </span>
         )}
@@ -332,8 +348,8 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
 
         {scene != null && (
           <>
-            <Ledger lane="lane1" label="Queue" dots={flow.lane1} tickets={audit("lane1")} />
-            <Ledger lane="lane2" label="Temporal" dots={flow.lane2} tickets={audit("lane2")} />
+            <Ledger lane="lane1" label="Queue" dots={flow.lane1} tickets={audit("lane1")} wait={wait("lane1")} finished={run?.finished_at != null} />
+            <Ledger lane="lane2" label="Temporal" dots={flow.lane2} tickets={audit("lane2")} wait={wait("lane2")} finished={run?.finished_at != null} />
           </>
         )}
 

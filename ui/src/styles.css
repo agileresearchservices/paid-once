@@ -71,8 +71,9 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .story-text .watch { color: var(--ink); font-size: 22px; }
 .story-text .result { color: var(--ink); font-size: 22px; border-left: 3px solid var(--accent); padding-left: 10px; }
 .controls { display: grid; gap: 8px; align-content: start; min-width: 200px; }
-.scene-status { margin: 0; font-size: 15px; text-align: center; }
+.scene-status { margin: 0; font-size: 15px; text-align: center; min-height: 1.4em; }
 .scene-status.ok { color: var(--good-ink); }
+.scene-status.warn { color: var(--warning); font-size: 14px; font-weight: 600; }
 .scene-status.fail { font-size: 13px; text-align: left; overflow-wrap: anywhere; }
 .nav { display: flex; gap: 8px; }
 .nav button { flex: 1; }
@@ -83,7 +84,6 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .diagram-head { min-height: 52px; display: flex; align-items: center; font-size: 15px; }
 .legend { display: flex; gap: 22px; color: var(--ink-2); flex-wrap: wrap; }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
-.lg-stage { color: var(--warning); }
 .legend .lg-group { gap: 14px; }
 .lg-group b { color: var(--ink); font-weight: 600; }
 .lg-group + .lg-group { padding-left: 22px; border-left: 1px solid var(--axis); }
@@ -92,7 +92,6 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .diagram .legend .lg-group { display: flex; align-items: center; gap: 34px; padding: 0; border: 0; }
 .diagram .legend .lg-group span { gap: 10px; }
 .diagram .legend .lg-group b { width: 86px; font-size: 22px; }
-.diagram .legend .lg-stage { margin-left: auto; font-size: 18px; }
 .locked-banner {
   margin: 0 0 12px; padding: 10px 16px; border-radius: 10px; font-size: 16px;
   background: var(--warning-wash); border: 1px solid var(--warning); color: var(--ink);
@@ -157,6 +156,7 @@ svg.lg-icon, .diagram svg.lg-icon { display: inline-block; width: 26px; height: 
 .diagram .tally-ok { fill: var(--good-ink); }
 .diagram .tally-bad { fill: var(--critical-ink); }
 .diagram .tally-missing { fill: var(--serious); }
+.diagram .tally-wait { fill: var(--warning); font-size: 14px; font-weight: 700; }
 .diagram .slot.ok rect { fill: var(--good-wash); stroke: var(--good); stroke-dasharray: none; }
 .diagram .slot.ok text { fill: var(--good-ink); }
 .diagram .slot.missing rect { fill: var(--serious-wash); stroke: var(--serious); stroke-dasharray: none; }

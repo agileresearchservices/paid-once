@@ -58,7 +58,7 @@ export const STEPS: Step[] = [
     scene: "worker_crash",
     short: "Crash",
     title: "Crash or deploy: the agent workers die",
-    story: "Three refunds are in flight, the rest wait for a human. We kill the agent workers.",
+    story: "Three refunds are in flight, the rest wait for a human. We kill the agent workers, then give the audit 20 seconds to see which tickets never get paid.",
     watch: "In-flight refunds paid once? Waiting tickets still refunded?",
     result: "Queue + LangGraph: paid twice, tickets lost. Temporal: paid once, nothing lost.",
   },
