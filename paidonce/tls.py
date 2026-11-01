@@ -108,7 +108,7 @@ def _generate(service: str) -> None:
         os.replace(tmp, path)
 
 
-def ensure_certs() -> Path:
+def ensure_certs() -> None:
     """Create each service's certificate if it is missing or close to expiry. Safe to call from several processes."""
     config.TLS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -118,16 +118,15 @@ def ensure_certs() -> Path:
                 _generate(service)
 
     if all(_fresh(service) for service in SERVICES):
-        return config.TLS_DIR
+        return
     try:
         import fcntl
     except ImportError:  # no flock (Windows): the show server generates them before it starts anything else
         make_stale()
-        return config.TLS_DIR
+        return
     with open(config.TLS_DIR / ".lock", "w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         make_stale()  # another process may have generated them while we waited: only stale ones are made
-    return config.TLS_DIR
 
 
 def _enabled(service: str) -> bool:

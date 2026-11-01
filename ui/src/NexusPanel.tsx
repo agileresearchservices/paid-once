@@ -3,7 +3,7 @@ import { NexusTeams, retriesOf } from "./NexusTeams";
 import { NexusWhy } from "./NexusWhy";
 import type { NexusRow, ProcStatus, SceneRun, Topology } from "./types";
 
-// Page 6: why Nexus (two static pictures), the contract in one strip, then the run as two teams and the one door between them, then the receipts
+// Step 7: why Nexus (two static pictures), the contract in one strip, then the run as two teams and the one door between them, then the receipts
 // from the ledger. The receipts read the audit, never the lane's own state.
 
 export function NexusPanel({

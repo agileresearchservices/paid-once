@@ -49,14 +49,6 @@ def tickets() -> list[dict]:
     return store.list_tickets()
 
 
-@app.get("/tickets/{ticket_id}")
-def get_ticket(ticket_id: str) -> dict:
-    ticket = store.get_ticket(ticket_id)
-    if ticket is None:
-        raise HTTPException(404, "unknown ticket")
-    return ticket
-
-
 @app.post("/tickets/{ticket_id}/approve")
 def approve(ticket_id: str) -> dict:
     result = store.approve(ticket_id)

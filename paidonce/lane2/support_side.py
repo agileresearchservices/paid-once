@@ -62,7 +62,7 @@ class SupportTicketWorkflow:
         if not self._decision.approved:
             self._state = "rejected"
             return TicketOutcome(ticket.ticket_id, "rejected", detail="human said no", events=self._events)
-        self._events.append(f"approved by {self._decision.approver}")
+        self._events.append("approved by a human")
 
         self._state = "refunding"
         nexus = workflow.create_nexus_client(service=PaymentsService, endpoint=NEXUS_ENDPOINT)

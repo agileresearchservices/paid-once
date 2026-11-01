@@ -14,7 +14,7 @@ import subprocess
 import sys
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from paidonce import config
 
@@ -33,9 +33,6 @@ class Proc:
     popen: subprocess.Popen | None = None
     restart_at: float | None = None
     starts: int = 0
-    external: bool = False  # not ours to start or kill (e.g. a Temporal server already running)
-    started_at: float = 0.0
-    log: list[str] = field(default_factory=list)
 
 
 class ProcessManager:
@@ -107,7 +104,6 @@ class ProcessManager:
             start_new_session=True,
         )
         p.starts += 1
-        p.started_at = time.time()
         p.restart_at = None
 
     def start_all(self) -> None:
@@ -158,7 +154,7 @@ class ProcessManager:
                 p.restart_at = now + 2.0  # an unplanned exit: restart like an orchestrator would
             if dead and p.restart_at is not None and now >= p.restart_at:
                 self._spawn(p)
-                self.emit("restart", f"{p.label} restarted", proc=name_of(p))
+                self.emit("restart", f"{p.label} restarted", proc=p.name)
 
     # -- views -------------------------------------------------------------
     def status(self) -> dict:
@@ -179,7 +175,3 @@ class ProcessManager:
                 return True
             time.sleep(0.3)
         return False
-
-
-def name_of(p: Proc) -> str:
-    return p.name

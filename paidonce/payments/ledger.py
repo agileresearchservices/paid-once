@@ -32,7 +32,10 @@ def init() -> None:
 
 
 def record_refund(ticket_id: str, amount_cents: int, idem_key: str, lane: str) -> dict:
-    """Insert a refund unless the idempotency key was already used. Returns the stored row."""
+    """Insert a refund unless the idempotency key was already used.
+
+    Returns the stored row, plus `replayed`: True when the key was already there and nothing new was written.
+    """
     init()
     with connect(config.LEDGER_DB) as conn:
         conn.execute("BEGIN IMMEDIATE")

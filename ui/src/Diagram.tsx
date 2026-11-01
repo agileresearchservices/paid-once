@@ -182,7 +182,7 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
   // Only the scene that ran last is on screen: its dots, ledger, fault marks and kill badges all go together. Any other step
   // shows a bare diagram, however recently its own scene ran.
   const onScreen = scene != null && snap.current === scene;
-  const run = onScreen && scene ? snap.scene_runs?.[scene] : undefined;
+  const run = onScreen && scene ? snap.scene_runs[scene] : undefined;
   const flow: Record<LaneId, FlowDot[]> = onScreen && snap.flow ? snap.flow : { lane1: [], lane2: [] };
 
   // Faults from this scene's latest run: where they landed, and whether they just happened.
@@ -206,9 +206,9 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
       if (d.at === "endpoint") busy.add("support_worker>endpoint");
     }
 
-  const latency = (lane: LaneId) => snap.faults?.[lane]?.latency_s ?? 0;
-  // The walkthrough's ticket is scored apart from the scoreboard, but its dot still belongs on page 1's ledger.
-  const audit = (lane: LaneId) => ({ ...(snap.audit[lane]?.tickets ?? {}), ...(snap.demo_audit?.[lane]?.tickets ?? {}) });
+  const latency = (lane: LaneId) => snap.faults[lane]?.latency_s ?? 0;
+  // The walkthrough's ticket is scored apart from the scoreboard, but its dot still belongs on step 1's ledger.
+  const audit = (lane: LaneId) => ({ ...(snap.audit[lane]?.tickets ?? {}), ...(snap.demo_audit[lane]?.tickets ?? {}) });
 
   return (
     <section className="diagram" aria-label="Architecture, with where each fault lands">

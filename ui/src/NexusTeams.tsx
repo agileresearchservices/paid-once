@@ -1,11 +1,11 @@
 import type { ReactNode } from "react";
 import { OUTCOME_GLYPH } from "./outcomes";
 import { TicketGlyph, type TicketKind } from "./TicketIcon";
-import { shortTicket } from "./nexusLinks";
+import { shortTicket } from "./tickets";
 import type { FaultWindow, NexusRow, ProcStatus, RefundAttempt, Topology } from "./types";
 
 // The run, as two teams and the one door between them. Support's box holds each refund's single Nexus call (a check once
-// answered); payments' box holds the work behind it (a $ once the ledger books it, with its retry count underneath). The four failures are chips
+// answered); payments' box holds the work behind it (a $ once the ledger has paid it, with its retry count underneath). The four failures are chips
 // across the top, and each one also turns the box it hits red. No time axis: the point is where the failures land and who
 // absorbs them, not when. Per-refund detail is on hover.
 
@@ -17,9 +17,9 @@ const PLANNED: { key: string; label: string }[] = [
   { key: "temporal", label: "Temporal server killed" },
 ];
 
-type FaultState = "next" | "on" | "survived" | "skipped";
+type ChipState = "next" | "on" | "survived" | "skipped";
 
-function faultState(f: FaultWindow | undefined, now: number, finished: boolean): FaultState {
+function faultState(f: FaultWindow | undefined, now: number, finished: boolean): ChipState {
   if (f == null || f.start == null) return finished ? "skipped" : "next";
   return f.end == null || now < f.end ? "on" : "survived";
 }

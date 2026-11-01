@@ -67,8 +67,8 @@ class Worker:
         if self.graph.get_state(cfg).next:
             self.graph.invoke(Command(resume={"approved": True}), cfg)
         elif ticket["status"] == "executing" and ticket["proposal"]:
-            # Recovery path added after the first incident: the checkpoint is gone but the row says we
-            # were mid-flight, so drive the stored proposal again.
+            # Recovery path: the checkpoint is gone but the row says we were mid-flight, so drive the
+            # stored proposal again. This is what turns a crash after the payments commit into a second refund.
             execute_refund(ticket_id, ticket["proposal"]["amount_cents"])
         elif ticket["status"] == "approved":
             store.set_status(

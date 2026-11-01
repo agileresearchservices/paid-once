@@ -13,7 +13,7 @@ import pytest
 from temporalio.worker import Worker
 
 from paidonce import config
-from paidonce.lane2.client import connect
+from paidonce.lane2.client import connect_temporal
 from paidonce.lane2.payments_activities import post_refund
 from paidonce.lane2.payments_side import PaymentsServiceHandler, RefundWorkflow
 from paidonce.lane2.support_activities import run_agent
@@ -42,8 +42,8 @@ async def stack(monkeypatch):
     with Server(payments_app) as pay:
         monkeypatch.setattr(config, "PAYMENTS_URL", pay.url)
         monkeypatch.setattr(config, "PAYMENTS_CLIENT_TIMEOUT_S", 1.0)
-        support = await connect(config.SUPPORT_NAMESPACE)
-        payments = await connect(config.PAYMENTS_NAMESPACE)
+        support = await connect_temporal(config.SUPPORT_NAMESPACE)
+        payments = await connect_temporal(config.PAYMENTS_NAMESPACE)
         async with (
             Worker(
                 support,
@@ -121,8 +121,8 @@ async def test_approval_before_any_worker_is_picked_up_survives():
     """Signal a workflow while no support worker is running; start the worker afterwards."""
     with Server(payments_app) as pay:
         config.PAYMENTS_URL = pay.url
-        support = await connect(config.SUPPORT_NAMESPACE)
-        payments = await connect(config.PAYMENTS_NAMESPACE)
+        support = await connect_temporal(config.SUPPORT_NAMESPACE)
+        payments = await connect_temporal(config.PAYMENTS_NAMESPACE)
         t = new_ticket()
         handle = await support.start_workflow(
             SupportTicketWorkflow.run,

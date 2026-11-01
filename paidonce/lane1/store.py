@@ -32,10 +32,6 @@ CREATE TABLE IF NOT EXISTS job_log (
 def init() -> None:
     with connect(config.LANE1_DB) as conn:
         conn.executescript(SCHEMA)
-        # data/lane1.db outlives code changes: add columns that came after the table was made.
-        cols = {r["name"] for r in conn.execute("PRAGMA table_info(tickets)")}
-        if "order_age_days" not in cols:
-            conn.execute("ALTER TABLE tickets ADD COLUMN order_age_days INTEGER NOT NULL DEFAULT 3")
 
 
 def create_ticket(ticket: dict) -> bool:

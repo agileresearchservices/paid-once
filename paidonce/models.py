@@ -40,7 +40,6 @@ class RefundResult:
 @dataclass
 class ApprovalDecision:
     approved: bool
-    approver: str = "human"
 
 
 @dataclass

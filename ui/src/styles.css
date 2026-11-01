@@ -11,7 +11,9 @@
   --good-ink: #59fda0;
   --warning: #fec118;
   --warning-wash: #3a2d06;
-  --warning-wash-2: #5a4508;
+  --good-wash: #0b3a22;
+  --serious-wash: #4a2306;
+  --critical-flash: #5a1f19;
   --serious: #fd710a;
   --critical: #f23b2f; /* redder than Temporal's #ff643c, which sits too close to the orange */
   --critical-ink: #ff8a7a;
@@ -86,14 +88,14 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .lg-group b { color: var(--ink); font-weight: 600; }
 .lg-group + .lg-group { padding-left: 22px; border-left: 1px solid var(--axis); }
 /* The key to the ticket dots: one row, big enough to read from the back of a room. */
-.diagram .legend { display: grid; gap: 12px; width: 100%; font-size: 22px; }
+.diagram .legend { display: grid; gap: 12px; width: 100%; margin: 0 0 12px; font-size: 22px; }
 .diagram .legend .lg-group { display: flex; align-items: center; gap: 34px; padding: 0; border: 0; }
 .diagram .legend .lg-group span { gap: 10px; }
 .diagram .legend .lg-group b { width: 86px; font-size: 22px; }
 .diagram .legend .lg-stage { margin-left: auto; font-size: 18px; }
 .locked-banner {
   margin: 0 0 12px; padding: 10px 16px; border-radius: 10px; font-size: 16px;
-  background: #3a2c05; border: 1px solid var(--warning); color: var(--ink);
+  background: var(--warning-wash); border: 1px solid var(--warning); color: var(--ink);
 }
 
 .diagram .team { fill: none; stroke: var(--axis); stroke-dasharray: 6 6; }
@@ -114,7 +116,7 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 /* The halo in the diagram's background colour cuts the node border behind the mark, so it reads as a label on it */
 .diagram .n-mark { fill: var(--critical-ink); font-size: 13px; font-weight: 600; paint-order: stroke; stroke: var(--surface); stroke-width: 6px; stroke-linejoin: round; }
 .diagram .node.hit > rect { animation: hit 0.5s ease-in-out 4; }
-@keyframes hit { 50% { stroke: var(--critical); stroke-width: 4; fill: #5a1f19; } }
+@keyframes hit { 50% { stroke: var(--critical); stroke-width: 4; fill: var(--critical-flash); } }
 .diagram .node.hit { animation: shake 0.35s ease-in-out 3; }
 @keyframes shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
 .diagram .bolt { font-size: 38px; animation: bolt 0.9s ease-out 2; transform-box: fill-box; transform-origin: center; }
@@ -154,9 +156,9 @@ svg.lg-icon, .diagram svg.lg-icon { display: inline-block; width: 26px; height: 
 .diagram .tally-ok { fill: var(--good-ink); }
 .diagram .tally-bad { fill: var(--critical-ink); }
 .diagram .tally-missing { fill: var(--serious); }
-.diagram .slot.ok rect { fill: #0b3a22; stroke: var(--good); stroke-dasharray: none; }
+.diagram .slot.ok rect { fill: var(--good-wash); stroke: var(--good); stroke-dasharray: none; }
 .diagram .slot.ok text { fill: var(--good-ink); }
-.diagram .slot.missing rect { fill: #4a2306; stroke: var(--serious); stroke-dasharray: none; }
+.diagram .slot.missing rect { fill: var(--serious-wash); stroke: var(--serious); stroke-dasharray: none; }
 .diagram .slot.missing text { fill: var(--serious); }
 .diagram .slot.bad rect { fill: var(--critical-wash); stroke: var(--critical); stroke-dasharray: none; }
 .diagram .slot.bad text { fill: var(--critical-ink); }
@@ -179,14 +181,6 @@ svg.lg-icon, .diagram svg.lg-icon { display: inline-block; width: 26px; height: 
   border: 1px solid transparent;
   background: linear-gradient(var(--surface), var(--surface)) padding-box, var(--brand) border-box;
 }
-.tiles { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
-.tile { display: flex; align-items: center; gap: 8px; border: 1px solid var(--axis); border-radius: 8px; padding: 6px 10px; font-size: 16px; }
-.tile .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--good); }
-.tile.down { border-color: var(--critical); }
-.tile.down .dot { background: var(--critical); }
-.tile-state { font-weight: 700; font-size: 14px; letter-spacing: 0.05em; }
-.tile.down .tile-state { color: var(--critical-ink); }
-.tile-kills { color: var(--muted); font-size: 14px; }
 .believes { font-size: 20px; margin-bottom: 8px; }
 /* A scene step: one header line, a smaller number, the amount refunded twice beside it, tighter rows. Diagram plus both
    scoreboards must fit one screen so the whole run can be watched after pressing Run. */
@@ -211,7 +205,6 @@ svg.lg-icon, .diagram svg.lg-icon { display: inline-block; width: 26px; height: 
 .hero-of { color: var(--ink-2); font-size: 26px; }
 .loss { color: var(--critical-ink); font-weight: 600; font-size: 26px; margin: 4px 0 0; min-height: 1.45em; }
 .loss.none { color: var(--good-ink); font-weight: 400; }
-.hero-note { color: var(--muted); font-size: 14px; margin: 2px 0 0; }
 .believed { color: var(--ink-2); font-size: 22px; margin: 4px 0 0; }
 
 .bar { display: flex; gap: 2px; height: 56px; margin: 14px 0 16px; font-size: 20px; }
@@ -235,8 +228,6 @@ svg.lg-icon, .diagram svg.lg-icon { display: inline-block; width: 26px; height: 
 /* The label sits on a solid patch of the segment's own colour, so the texture never runs through the text. */
 .seg.striped > span { background-color: inherit; padding: 1px 6px; border-radius: 4px; }
 
-.legend { list-style: none; display: flex; gap: 14px; flex-wrap: wrap; padding: 0; margin: 0 0 12px; font-size: 15px; color: var(--ink-2); }
-.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; }
 
 .invariants { list-style: none; padding: 0; margin: 0 0 8px; display: grid; gap: 10px; }
 .invariant { display: grid; grid-template-columns: 30px 1fr auto; column-gap: 10px; font-size: 24px; }
@@ -333,7 +324,6 @@ svg.lg-icon, .diagram svg.lg-icon { display: inline-block; width: 26px; height: 
 @media (prefers-reduced-motion: reduce) {
   .teams * { animation: none !important; transition: none !important; }
 }
-.key-dollar { display: inline-block; width: 16px; height: 16px; border-radius: 50%; background: var(--good); color: var(--page); font-style: normal; font-weight: 800; font-size: 12px; text-align: center; line-height: 16px; }
 
 .headline { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .headline.payoff { grid-template-columns: repeat(3, 1fr); }
@@ -344,12 +334,12 @@ svg.lg-icon, .diagram svg.lg-icon { display: inline-block; width: 26px; height: 
 .headline-label { display: block; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
 
 
-/* The walkthrough's explanation panel: in the page under the diagram, so the diagram stays in view. */
+/* The walkthrough's explanation panel: in the page above the diagram. */
 .beat { min-height: 264px; padding: 10px 22px 12px; background: var(--surface); border: 2px solid var(--accent); border-radius: 14px; }
 /* The walkthrough: three panes, one per role, each showing only what that role sees. */
 .panes { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
 /* Step 1 fills the window: the walkthrough panel (above the diagram) takes whatever height is left, and the text grows with it (--wf), never below the
-   sizes that fit the smallest screen. 830 px is about what the rest of the page uses plus the panel's own chrome. */
+   sizes that fit the smallest screen. 753px is about what the rest of the page uses plus the panel's own chrome. */
 main.fill { display: flex; flex-direction: column; min-height: 100vh; }
 .beat { --wf: clamp(20px, calc((100vh - 753px) / 9), 34px); }
 main.fill > .beat { flex: 1 1 auto; display: flex; flex-direction: column; }
@@ -379,7 +369,7 @@ main.fill .pane { height: auto; min-height: 186px; }
 .review-note b { color: var(--ink); }
 .review-actions { display: flex; gap: 10px; margin-top: 2px; }
 .act { padding: 5px 16px; border: 1px solid var(--axis); border-radius: 8px; font-size: calc(var(--wf) * 0.95); font-weight: 600; color: var(--ink-2); }
-.act.approve.on { background: #0b3a22; border-color: var(--good); color: var(--good-ink); }
+.act.approve.on { background: var(--good-wash); border-color: var(--good); color: var(--good-ink); }
 .avatar { flex: none; width: calc(var(--wf) * 1.5); height: calc(var(--wf) * 1.5); border-radius: 50%; display: grid; place-items: center; background: var(--grid); color: var(--ink-2); font-size: calc(var(--wf) * 0.7); font-weight: 700; }
 .pane:nth-child(2) .avatar { background: var(--sky); color: var(--page); }
 .role-icon { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }

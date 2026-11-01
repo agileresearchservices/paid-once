@@ -11,25 +11,25 @@ from paidonce import config
 from paidonce.show import server
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def locked(monkeypatch):
     monkeypatch.setattr(config, "SCENARIO_TOKEN", "tok")
 
 
 @pytest.mark.parametrize("path", ["/api/reset", "/api/scenes/intro/run", "/api/faults/kill/payments"])
-def test_locked_server_refuses_controls_without_the_token(locked, path):
+def test_locked_server_refuses_controls_without_the_token(path):
     # No lifespan runs here: the guard must answer before anything touches the engine.
     r = TestClient(server.app).post(path)
     assert r.status_code == 423
     assert "make scenario" in r.json()["detail"]
 
 
-def test_locked_server_refuses_a_wrong_token(locked):
+def test_locked_server_refuses_a_wrong_token():
     r = TestClient(server.app).post("/api/reset", headers={server.SCENARIO_HEADER: "nope"})
     assert r.status_code == 423
 
 
-def test_guard_lets_the_runner_through(locked):
+def test_guard_lets_the_runner_through():
     req = server.Request({"type": "http", "headers": [(server.SCENARIO_HEADER.encode(), b"tok")]})
     server.guard(req)  # does not raise
 

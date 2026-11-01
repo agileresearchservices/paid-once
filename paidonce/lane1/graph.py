@@ -29,7 +29,6 @@ class State(TypedDict, total=False):
     proposal: Proposal
     approved: bool
     refund_id: str
-    outcome: str
 
 
 def call_payments(ticket_id: str, amount_cents: int) -> str:
@@ -78,24 +77,19 @@ def _decide(state: State) -> State:
 def _await_approval(state: State) -> State:
     proposal = state["proposal"]
     if proposal.action != "refund":
-        return {"outcome": "denied"}
+        return {"approved": False}  # nothing to approve: the ticket ends here
     decision = interrupt({"ticket_id": state["ticket"].ticket_id, "amount_cents": proposal.amount_cents})
     return {"approved": bool(decision.get("approved"))}
 
 
 def _execute(state: State) -> State:
     ticket, proposal = state["ticket"], state["proposal"]
-    return {
-        "refund_id": execute_refund(ticket.ticket_id, proposal.amount_cents),
-        "outcome": "refunded",
-    }
-
-
-def _after_decide(state: State) -> str:
-    return "await_approval"
+    return {"refund_id": execute_refund(ticket.ticket_id, proposal.amount_cents)}
 
 
 def _after_approval(state: State) -> str:
+    # The worker only ever resumes with approved=True: a human "no" is handled at the API, which closes the row
+    # and queues no job. The END branch is for a proposal that was not a refund.
     return "execute" if state.get("approved") else END
 
 

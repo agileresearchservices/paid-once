@@ -23,7 +23,7 @@ from paidonce import config
 from paidonce.lane2.contract import NEXUS_ENDPOINT
 
 
-async def connect(namespace: str) -> Client:
+async def connect_temporal(namespace: str) -> Client:
     return await Client.connect(config.TEMPORAL_ADDRESS, namespace=namespace)
 
 
@@ -42,7 +42,7 @@ async def _wait_usable(client: Client, namespace: str, timeout_s: float = 15.0) 
 
 async def _ensure_setup() -> list[str]:
     lines: list[str] = []
-    client = await connect("default")
+    client = await connect_temporal("default")
     for ns in (config.SUPPORT_NAMESPACE, config.PAYMENTS_NAMESPACE):
         try:
             await client.workflow_service.register_namespace(

@@ -1,7 +1,7 @@
 """The refund agent: policy rules in code, then a small LangGraph graph around one Anthropic call.
 
-Both lanes use the same decision logic. Lane 1 wraps it with an approval interrupt
-(see lane1/graph.py); Lane 2 runs it inside a Temporal activity.
+Both lanes use the same decision logic, `decide()`. Lane 1 calls it from its own graph, which adds the approval
+interrupt (lane1/graph.py); Lane 2 runs it inside a Temporal activity, through `run_decide_graph`.
 """
 
 from __future__ import annotations

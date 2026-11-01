@@ -1,7 +1,8 @@
 """The show engine: submits tickets to both lanes, plays the human approver, and injects the faults.
 
-Every scene runs the same story against Lane 1 (Queue + LangGraph) and Lane 2 (Temporal + Nexus) at the same time, so the audience watches
-two systems take identical hits. Scoring comes from the payments ledger (paidonce.audit), never from
+A scene runs the same story against Lane 1 (Queue + LangGraph) and Lane 2 (Temporal + Nexus) at the same
+time, so the audience watches two systems take identical hits. The exceptions are the walkthrough (one ticket)
+and the Nexus gauntlet (Lane 2 only). Scoring comes from the payments ledger (paidonce.audit), never from
 what either lane reports about itself.
 """
 
@@ -20,14 +21,13 @@ from temporalio.api.enums.v1 import PendingActivityState
 from temporalio.client import Client, WorkflowExecutionStatus
 
 from paidonce import audit, config, tls
-from paidonce.lane2.client import connect
+from paidonce.lane2.client import connect_temporal
 from paidonce.lane2.contract import NEXUS_ENDPOINT, PaymentsService
 from paidonce.lane2.payments_side import REFUND_RETRY, REFUND_START_TO_CLOSE, RefundWorkflow, refund_workflow_id
 from paidonce.lane2.support_side import SupportTicketWorkflow, ticket_workflow_id
 from paidonce.models import ApprovalDecision, RefundRequest, RefundResult, Ticket, TicketOutcome
 from paidonce.show.procs import ProcessManager
 
-SETTLE_S = 20.0
 # A scene stays "running" after its script until every ticket has landed, so Run again never appears mid-flight.
 SCENE_SETTLE_MAX_S = 45.0
 SCENE_QUIET_S = 3.0
@@ -39,12 +39,11 @@ AGENT_WORKERS = ["lane1_worker", "support_worker"]
 
 # The worker-crash scene (step 3): the first few approved refunds are in flight at payments when the workers die;
 # the rest of the cohort is still waiting for a human.
-WORKER_CRASH_APPROVED = 6
-DEMO_SCENES = (
-    "walkthrough",
-    "nexus_kill",
-)  # scored on their own; left out of the scoreboard totals (Nexus is its own page)
+WORKER_CRASH_COHORT = 6
 WORKER_CRASH_IN_FLIGHT = 3
+
+# Scored on their own and left out of the scoreboard totals: the walkthrough is a demonstration, and Nexus is its own step.
+DEMO_SCENES = ("walkthrough", "nexus_kill")
 
 # The Nexus gauntlet (step 7): four failures, each landing on refunds still in flight.
 GAUNTLET_STALL_S = 9.0  # payments holds its reply this long after booking: past the activity's 8 s timeout
@@ -98,7 +97,7 @@ TOPOLOGY = {
     "endpoint": NEXUS_ENDPOINT,
     "service": PaymentsService.__name__,
     "operation": "issue_refund",
-    # The contract's two messages, field by field, read off the dataclasses so page 6 can't drift from the code.
+    # The contract's two messages, field by field, read off the dataclasses so step 7 can't drift from the code.
     "sends": [f.name for f in fields(RefundRequest)],
     "returns": [f.name for f in fields(RefundResult)],
     "payments": {
@@ -127,11 +126,7 @@ class Engine:
         self._http: httpx.AsyncClient | None = None
         # Every Nexus operation seen in the current scene, kept after it completes so the evidence stays on screen.
         self.nexus_seen: dict[str, dict] = {}
-        self.temporal_ui: str | None = None
-        self._ui_probed_at = 0.0
-        self.lane1_view: dict[str, int] = {}  # this scene's tickets, by the queue's own status
         self.lane1_view_all: dict[str, int] = {}  # every ticket since reset: the scoreboard compares it with the ledger
-        self.lane2_view: dict[str, int] = {}
         # Every Lane 2 ticket's last-seen workflow status since reset, so the card header accumulates like the scoreboard.
         self.lane2_status: dict[str, str] = {}
         self.lane2_view_all: dict[str, int] = {}
@@ -151,7 +146,7 @@ class Engine:
         self.booked_at: dict[str, float] = {}
         # Where each stack thinks each of this scene's tickets is, for the architecture diagram.
         self.flow: dict[str, list[dict]] = {"lane1": [], "lane2": []}
-        # The walkthrough stops at each step until the presenter dismisses its box: {scene, id, at}, or None.
+        # The walkthrough beat on screen: {scene, id, at}, or None. It advances on its own dwell timers.
         self.beat: dict | None = None
         self._task: asyncio.Task | None = None
         self.procs.emit = self.emit_from_procs
@@ -199,12 +194,12 @@ class Engine:
 
     async def temporal(self) -> Client:
         if self._temporal is None:
-            self._temporal = await connect(config.SUPPORT_NAMESPACE)
+            self._temporal = await connect_temporal(config.SUPPORT_NAMESPACE)
         return self._temporal
 
     async def payments_temporal(self) -> Client:
         if self._payments_temporal is None:
-            self._payments_temporal = await connect(config.PAYMENTS_NAMESPACE)
+            self._payments_temporal = await connect_temporal(config.PAYMENTS_NAMESPACE)
         return self._payments_temporal
 
     # -- tickets and approvals --------------------------------------------------
@@ -266,7 +261,7 @@ class Engine:
 
     async def decide_ticket(self, lane: str, ticket_id: str, approved: bool) -> None:
         """A human clicks Approve or Deny. The decision is recorded the moment it is made, delivered or not."""
-        audit.record_decision(lane, ticket_id, approved, delivered=False)
+        audit.record_decision(lane, ticket_id, approved)
         self.decisions[ticket_id] = approved
         if lane == "lane1":
             action = "approve" if approved else "reject"
@@ -274,7 +269,6 @@ class Engine:
                 try:
                     r = await self.http.post(f"{config.LANE1_URL}/tickets/{ticket_id}/{action}")
                     if r.status_code == 200:
-                        audit.record_decision(lane, ticket_id, approved, delivered=True)
                         return
                 except httpx.HTTPError:
                     pass
@@ -285,7 +279,6 @@ class Engine:
                     client = await self.temporal()
                     handle = client.get_workflow_handle(ticket_workflow_id(ticket_id))
                     await handle.signal(SupportTicketWorkflow.approve, ApprovalDecision(approved))
-                    audit.record_decision(lane, ticket_id, approved, delivered=True)
                     return
                 except Exception:
                     await asyncio.sleep(0.5)
@@ -465,7 +458,7 @@ class Engine:
         scene = "worker_crash"
         self.emit("scene", "Some refunds are in flight, others wait for a human. The agent workers die.", scene=scene)
         await self.set_fault("all", "commit_then_stall", count=WORKER_CRASH_IN_FLIGHT, delay_s=9.0)
-        await self.submit_cohort(scene, WORKER_CRASH_APPROVED)
+        await self.submit_cohort(scene, WORKER_CRASH_COHORT)
         await self.wait_for_proposals(scene)
         # The human reaches the first few tickets before the fault: their refunds are the ones in flight.
         await self.approve_scene(scene, who="A human", only=lambda tid: _ticket_index(tid) < WORKER_CRASH_IN_FLIGHT)
@@ -622,7 +615,7 @@ class Engine:
         end = time.time() + SCENE_SETTLE_MAX_S
         quiet_since: float | None = None
         while time.time() < end:
-            board = await asyncio.to_thread(audit.compute_all, SETTLE_S)
+            board = await asyncio.to_thread(audit.compute_all)
             ledger = {lane: board[lane]["tickets"] for lane in board}
             if _unsettled(pairs, ledger, self.flow):
                 quiet_since = None
@@ -693,9 +686,7 @@ class Engine:
         self.payments_calls_all = {}
         self.payments_calls_by_ticket = {}
         self.lane2_status.clear()
-        self.lane1_view = {}
         self.lane1_view_all = {}
-        self.lane2_view = {}
         self.lane2_view_all = {}
         self.booked_at = {}
         self.nexus_seen = {}
@@ -712,7 +703,6 @@ class Engine:
         pairs = self._current_pairs()
         try:
             r = await self.http.get(f"{config.LANE1_URL}/tickets")
-            counts: dict[str, int] = {}
             counts_all: dict[str, int] = {}
             ours = {tid for lane, tid in pairs if lane == "lane1"}
             flow1 = []
@@ -720,12 +710,10 @@ class Engine:
                 if not _is_demo(t["ticket_id"]):
                     counts_all[t["status"]] = counts_all.get(t["status"], 0) + 1
                 if t["ticket_id"] in ours:
-                    counts[t["status"]] = counts.get(t["status"], 0) + 1
                     at, state = LANE1_STAGES.get(t["status"], ("lane1_api", t["status"]))
                     if t["status"] == "denied" and t.get("detail"):
                         state = f"{state}: {t['detail']}"
                     flow1.append({"ticket": t["ticket_id"], "at": at, "state": state})
-            self.lane1_view = counts
             self.lane1_view_all = counts_all
             self.flow["lane1"] = flow1
         except Exception:
@@ -758,9 +746,7 @@ class Engine:
             client = await self.temporal()
         except Exception:
             return
-        await self._probe_temporal_ui()
         seen = self.nexus_seen  # run_scene swaps in a new dict; never write a stale scene into it
-        states: dict[str, int] = {}
         lane2 = [tid for lane, tid in pairs if lane == "lane2"]
         flow2 = []
         for tid in lane2:
@@ -769,7 +755,6 @@ class Engine:
             if desc is None:
                 continue
             status = desc.status.name if desc.status else "UNKNOWN"
-            states[status] = states.get(status, 0) + 1
             if not _is_demo(tid):
                 self.lane2_status[tid] = status
             ops = desc.raw_description.pending_nexus_operations
@@ -801,29 +786,12 @@ class Engine:
                     handler.get("activity_attempt", 0),
                     prev.get("handler", {}).get("peak_activity_attempt", 0),
                 )
-                now = time.time()
-                state = _enum_name(op)
-                phases = list(prev.get("phases", []))
-                if not phases or phases[-1]["state"] != state:
-                    phases.append({"state": state, "at": now})
                 seen[tid] = {
                     "ticket": tid,
                     "live": True,
-                    "caller_workflow_id": ticket_workflow_id(tid),
-                    "caller_run_id": desc.run_id,
-                    "caller_namespace": config.SUPPORT_NAMESPACE,
                     "handler": handler,
-                    "endpoint": op.endpoint,
-                    "service": op.service,
-                    "operation": op.operation,
-                    "state": state,
-                    "phases": phases,
-                    "op_scheduled_at": _ts(op.scheduled_time) or prev.get("op_scheduled_at") or now,
-                    "op_closed_at": None,
-                    "attempts": _merge_attempts(prev.get("attempts", []), pending, now),
-                    "ledger": _ticket_ledger(self.payments_calls_by_ticket, self.booked_at, "lane2", tid),
-                    "attempt": op.attempt,
-                    "peak_attempt": max(op.attempt, prev.get("peak_attempt", 0)),
+                    "state": _enum_name(op),
+                    "attempts": _merge_attempts(prev.get("attempts", []), pending, time.time()),
                     "last_failure": failure,
                     "caller_saw_failure": bool(failure) or prev.get("caller_saw_failure", False),
                 }
@@ -839,22 +807,7 @@ class Engine:
                 attempts = _merge_attempts(row.get("attempts", []), pending, now)
                 if handler.get("status") not in (None, "RUNNING"):
                     attempts = _finish_attempts(attempts, await self._final_attempt(tid), now)
-                caller = await self._caller_op_times(client, ticket_workflow_id(tid))
-                phases = list(row.get("phases", []))
-                if caller.get("started_at") and not any(p["state"] == "STARTED" for p in phases):
-                    phases.append({"state": "STARTED", "at": caller["started_at"]})
-                for p in phases:  # history has the exact time payments accepted the operation
-                    if p["state"] == "STARTED" and caller.get("started_at"):
-                        p["at"] = caller["started_at"]
-                row.update(
-                    live=False,
-                    state=final_state,
-                    handler=handler,
-                    attempts=attempts,
-                    phases=phases,
-                    op_scheduled_at=caller.get("scheduled_at") or row.get("op_scheduled_at"),
-                    op_closed_at=caller.get("closed_at") or now,
-                )
+                row.update(live=False, state=final_state, handler=handler, attempts=attempts)
             elif row is not None and row.get("attempts") and any(a["outcome"] == "running" for a in row["attempts"]):
                 # Closed earlier, but the refund workflow hadn't finished then: try its history again.
                 if (await self._handler_view(tid)).get("status") not in (None, "RUNNING"):
@@ -862,7 +815,6 @@ class Engine:
             if tid in seen:
                 seen[tid]["ledger"] = _ticket_ledger(self.payments_calls_by_ticket, self.booked_at, "lane2", tid)
         if seen is self.nexus_seen:
-            self.lane2_view = states
             self.lane2_view_all = dict(Counter(self.lane2_status.values()))
             self.flow["lane2"] = flow2
 
@@ -886,44 +838,29 @@ class Engine:
         except Exception:
             return None
 
-    async def _probe_temporal_ui(self) -> None:
-        """Is the Temporal Web UI up? Links to it are shown only if it answers. Re-checked every 10s."""
-        if time.time() - self._ui_probed_at < 10:
-            return
-        self._ui_probed_at = time.time()
-        try:
-            r = await self.http.get(config.TEMPORAL_UI_URL, timeout=1.0)
-            self.temporal_ui = config.TEMPORAL_UI_URL if r.status_code < 500 else None
-        except httpx.HTTPError:
-            self.temporal_ui = None
-
     def snapshot(self) -> dict:
         # The scoreboard leaves out the walkthrough (a demonstration) and the Nexus scene (a page of its own, Temporal
         # only): the Lane 1 vs Lane 2 scenes are what add up. They are still scored on their own (`demo_audit`) so the
         # headless run and those pages can read them.
-        board = audit.compute_all(SETTLE_S, exclude_scenes=DEMO_SCENES)
-        demo = audit.compute_all(SETTLE_S, only_scenes=DEMO_SCENES)
+        board = audit.compute_all(exclude_scenes=DEMO_SCENES)
+        demo = audit.compute_all(only_scenes=DEMO_SCENES)
         return {
             "now": time.time(),
             "running": self.running,
             "current": self.current,
             "scene_runs": self.scene_runs,
-            "scenes": [{"id": s.id, "title": s.title} for s in SCENES],
             "audit": board,
             "demo_audit": demo,
             "processes": self.procs.status(),
             "events": self.events[-60:],
             "nexus": list(self.nexus_seen.values()),
-            "lane1_view": self.lane1_view,
             "lane1_view_all": self.lane1_view_all,
-            "lane2_view": self.lane2_view,
             "lane2_view_all": self.lane2_view_all,
             "faults": self.faults,
             "payments_calls": self.payments_calls,
             "payments_calls_all": self.payments_calls_all,
             "flow": self.flow,
             "beat": self.beat,
-            "temporal_ui": self.temporal_ui,
             "topology": TOPOLOGY,
         }
 
@@ -939,14 +876,8 @@ class Engine:
             acts = desc.raw_description.pending_activities
             act = acts[0] if acts else None
             return {
-                "workflow_id": refund_workflow_id(ticket_id),
-                "run_id": desc.run_id,
-                "namespace": config.PAYMENTS_NAMESPACE,
                 "status": desc.status.name if desc.status else "UNKNOWN",
                 "activity_attempt": act.attempt if act else 0,
-                "activity_failure": (
-                    act.last_failure.message[:120] if act and act.last_failure and act.last_failure.message else ""
-                ),
                 # Raw timings for the attempt timeline; refresh_views pops this before it reaches the UI.
                 "pending": (
                     {
@@ -995,25 +926,6 @@ class Engine:
             return final if final and final["ended_at"] else None
         except Exception:
             return None
-
-    @staticmethod
-    async def _caller_op_times(client: Client, workflow_id: str) -> dict:
-        """When support scheduled the Nexus operation, when payments accepted it, and when it closed."""
-        out: dict = {}
-        try:
-            async for e in client.get_workflow_handle(workflow_id).fetch_history_events():
-                kind = e.WhichOneof("attributes") or ""
-                if kind == "nexus_operation_scheduled_event_attributes":
-                    out["scheduled_at"] = _ts(e.event_time)
-                elif kind == "nexus_operation_started_event_attributes":
-                    out["started_at"] = _ts(e.event_time)
-                elif (
-                    kind.startswith("nexus_operation_") and kind != "nexus_operation_cancel_requested_event_attributes"
-                ):
-                    out["closed_at"] = _ts(e.event_time)
-        except Exception:
-            pass
-        return out
 
 
 # Lane 1 ticket status -> (diagram node or wire, what the queue believes). Read from its own table.

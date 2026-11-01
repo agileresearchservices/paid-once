@@ -5,13 +5,13 @@ import asyncio
 from temporalio.worker import Worker
 
 from paidonce import config
-from paidonce.lane2.client import connect
+from paidonce.lane2.client import connect_temporal
 from paidonce.lane2.payments_activities import post_refund
 from paidonce.lane2.payments_side import PaymentsServiceHandler, RefundWorkflow
 
 
 async def _run() -> None:
-    client = await connect(config.PAYMENTS_NAMESPACE)
+    client = await connect_temporal(config.PAYMENTS_NAMESPACE)
     worker = Worker(
         client,
         task_queue=config.PAYMENTS_TASK_QUEUE,

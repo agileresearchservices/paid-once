@@ -5,8 +5,8 @@ Three invariants per lane:
   2. No refund without an approval.                     (unapproved)
   3. No ticket lost or stuck.                           (missing, after a settle window)
 
-A ticket a human denied, or one the harness wrote to break the refund policy, is owed nothing: no refund for it is
-`rejected` or `declined`, and any refund is `unapproved`. `expect` is the harness's own note of what it wrote, a
+A ticket a human denied, or one the harness wrote to break the refund policy, is owed nothing: such a ticket
+scores `rejected` or `declined` while no money moved, and `unapproved` if a refund exists. `expect` is the harness's own note of what it wrote, a
 test oracle like the decision log, not a lane's state.
 """
 
@@ -26,22 +26,20 @@ CREATE TABLE IF NOT EXISTS tickets (
 );
 CREATE TABLE IF NOT EXISTS decisions (
   lane TEXT NOT NULL, ticket_id TEXT NOT NULL, decided_at REAL NOT NULL,
-  approved INTEGER NOT NULL, delivered INTEGER NOT NULL DEFAULT 0,
+  approved INTEGER NOT NULL,
   PRIMARY KEY (lane, ticket_id)
 );
-DROP TABLE IF EXISTS approvals;
 """
 
 LANES = ("lane1", "lane2")
+
+# An approved ticket with no refund yet counts as "in flight" for this long, and as missing after it.
+SETTLE_S = 20.0
 
 
 def init() -> None:
     with connect(config.AUDIT_DB) as conn:
         conn.executescript(SCHEMA)
-        # data/audit.db outlives code changes: add columns that came after the table was made.
-        cols = {r["name"] for r in conn.execute("PRAGMA table_info(tickets)")}
-        if "expect" not in cols:
-            conn.execute("ALTER TABLE tickets ADD COLUMN expect TEXT NOT NULL DEFAULT 'refund'")
 
 
 def record_ticket(lane: str, ticket_id: str, scene: str, amount_cents: int, expect: str = "refund") -> None:
@@ -55,14 +53,13 @@ def record_ticket(lane: str, ticket_id: str, scene: str, amount_cents: int, expe
         )
 
 
-def record_decision(lane: str, ticket_id: str, approved: bool, delivered: bool) -> None:
-    """A human approved or denied. `delivered` says whether the lane acknowledged it. The first decision stands."""
+def record_decision(lane: str, ticket_id: str, approved: bool) -> None:
+    """A human approved or denied. The first decision stands."""
     init()
     with connect(config.AUDIT_DB) as conn:
         conn.execute(
-            "INSERT INTO decisions (lane, ticket_id, decided_at, approved, delivered) VALUES (?, ?, ?, ?, ?) "
-            "ON CONFLICT(lane, ticket_id) DO UPDATE SET delivered = MAX(delivered, excluded.delivered)",
-            (lane, ticket_id, time.time(), int(approved), int(delivered)),
+            "INSERT OR IGNORE INTO decisions (lane, ticket_id, decided_at, approved) VALUES (?, ?, ?, ?)",
+            (lane, ticket_id, time.time(), int(approved)),
         )
 
 
@@ -75,7 +72,7 @@ def reset() -> None:
 
 def compute(
     lane: str,
-    settle_s: float = 25.0,
+    settle_s: float = SETTLE_S,
     now: float | None = None,
     exclude_scenes: tuple[str, ...] = (),
     only_scenes: tuple[str, ...] | None = None,
@@ -149,5 +146,5 @@ def compute(
     return out
 
 
-def compute_all(settle_s: float = 25.0, **scenes) -> dict:
+def compute_all(settle_s: float = SETTLE_S, **scenes) -> dict:
     return {lane: compute(lane, settle_s, **scenes) for lane in LANES}
