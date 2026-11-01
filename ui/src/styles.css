@@ -131,7 +131,7 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 /* Ticket status icons (TicketIcon.tsx): used on the diagram and in the legend. Shape and colour both say the status. */
 .ti-ring { fill: none; stroke: var(--sky); stroke-opacity: 0.3; stroke-width: 2.6; }
 .ti-arc { fill: none; stroke: var(--sky); stroke-width: 2.6; stroke-linecap: round; }
-.ti-spin { transform-box: view-box; transform-origin: 0 0; animation: spin 2.8s linear infinite; }
+.ti-spin { transform-box: view-box; transform-origin: 0 0; animation: spin 9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .ti-face { fill: var(--page); stroke: var(--ink-2); stroke-width: 1.8; }
 .ti-ink-fill { fill: var(--ink); }
@@ -365,6 +365,8 @@ main.fill .pane { height: auto; min-height: 186px; }
 .act.approve.on { background: #0b3a22; border-color: var(--good); color: var(--good-ink); }
 .avatar { flex: none; width: calc(var(--wf) * 1.5); height: calc(var(--wf) * 1.5); border-radius: 50%; display: grid; place-items: center; background: var(--grid); color: var(--ink-2); font-size: calc(var(--wf) * 0.7); font-weight: 700; }
 .pane:nth-child(2) .avatar { background: var(--sky); color: var(--page); }
+.role-icon { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.role-icon .role-eye { fill: currentColor; stroke: none; }
 .avatar .lg-icon { width: calc(var(--wf) * 1.2); height: calc(var(--wf) * 1.2); }
 .pane-row .lg-icon { width: calc(var(--wf) * 1.2); height: calc(var(--wf) * 1.2); }
 .typing { display: inline-flex; gap: 6px; align-items: center; height: calc(var(--wf) * 1.2); }
