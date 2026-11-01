@@ -1,4 +1,4 @@
-"""The payments service (owned by "the payments team"). Served over HTTPS with a self-signed certificate (paidonce/tls.py).
+"""The payments service, owned by "the payments team". HTTPS with a self-signed certificate (paidonce/tls.py).
 
 Fault injection lives here because a real payments provider is where "committed, then the
 response never arrived" happens. The fault injector flips the flag through /admin/fault. Faults are

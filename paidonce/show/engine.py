@@ -53,7 +53,8 @@ class Engine(HarnessMixin, SceneMixin, ViewsMixin):
         self.nexus_seen: dict[str, dict] = {}
         self.lane1_jobs: int | None = None  # jobs left in Lane 1's queue (None until read): a scene waits for zero
         self.lane1_view_all: dict[str, int] = {}  # every ticket since reset: the scoreboard compares it with the ledger
-        # Every Lane 2 ticket's last-seen workflow status since reset, so the card header accumulates like the scoreboard.
+        # Every Lane 2 ticket's last-seen workflow status since reset, so the card header accumulates like the
+        # scoreboard.
         self.lane2_status: dict[str, str] = {}
         self.lane2_view_all: dict[str, int] = {}
         # How each completed Lane 2 workflow ended (done, denied or rejected), read once from its result.

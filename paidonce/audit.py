@@ -6,8 +6,8 @@ Three invariants per lane:
   3. No ticket lost or stuck.                           (missing, after a settle window)
 
 A ticket a human denied, or one the harness wrote to break the refund policy, is owed nothing: such a ticket
-scores `rejected` or `declined` while no money moved, and `unapproved` if a refund exists. `expect` is the harness's own note of what it wrote, a
-test oracle like the decision log, not a lane's state.
+scores `rejected` or `declined` while no money moved, and `unapproved` if a refund exists. `expect` is the
+harness's own note of what it wrote, a test oracle like the decision log, not a lane's state.
 """
 
 from __future__ import annotations

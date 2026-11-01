@@ -35,7 +35,8 @@ from paidonce.show.catalog import (
 
 class SceneMixin:
     def fault(self, scene: str, msg: str, target: list[str], effect: str) -> None:
-        """A fault, with where it lands: diagram node ids (process names, or "temporal") and kill | duplicate | stall."""
+        """A fault, with where it lands: diagram node ids (process names, or "temporal"), and its effect
+        (kill, duplicate or stall)."""
         self.emit("fault", msg, scene=scene, target=target, effect=effect)
 
     def kill_window(self, scene: str, proc: str, label: str, down_s: float) -> bool:
