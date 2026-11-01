@@ -18,15 +18,16 @@ interface Box {
   h: number;
   title: string;
   sub: string;
+  note?: string; // a third line, hidden while the node is down (the DOWN badge takes that spot)
   proc?: string; // process name in snap.processes, if a process backs this node
 }
 
 const NODES: Record<string, Box> = {
   helpdesk: { x: 2, y: ROW.lane1, w: 116, h: ROW.lane2 + NODE_H - ROW.lane1, title: "Helpdesk", sub: "support tickets" },
   lane1_api: { x: 158, y: ROW.lane1, w: 180, h: NODE_H, title: "Queue API", sub: "jobs table (SQLite)", proc: "lane1_api" },
-  lane1_worker: { x: 378, y: ROW.lane1, w: 236, h: NODE_H, title: "Queue worker", sub: "agent · state in memory", proc: "lane1_worker" },
+  lane1_worker: { x: 378, y: ROW.lane1, w: 236, h: NODE_H, title: "Queue worker", sub: "agent · state in memory", note: "policy rules, then Claude", proc: "lane1_worker" },
   temporal: { x: 158, y: ROW.lane2, w: 180, h: NODE_H, title: "Temporal server", sub: "durable history" },
-  support_worker: { x: 378, y: ROW.lane2, w: 236, h: NODE_H, title: "Support worker", sub: "agent · SupportTicketWorkflow", proc: "support_worker" },
+  support_worker: { x: 378, y: ROW.lane2, w: 236, h: NODE_H, title: "Support worker", sub: "agent · SupportTicketWorkflow", note: "policy rules, then Claude", proc: "support_worker" },
   endpoint: { x: 650, y: ROW.lane2, w: 150, h: NODE_H, title: "Nexus endpoint", sub: "payments-endpoint" },
   payments_worker: { x: 860, y: ROW.lane2, w: 210, h: NODE_H, title: "Payments worker", sub: "RefundWorkflow", proc: "payments_worker" },
   payments: { x: 1170, y: ROW.lane1, w: 294, h: ROW.lane2 + NODE_H - ROW.lane1, title: "Payments service + ledger", sub: "the audit reads this ledger", proc: "payments" },
@@ -211,7 +212,6 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
           <rect x={HUMAN.x} y={HUMAN.y} width={HUMAN.w} height={HUMAN.h} rx={12} />
           <text x={HUMAN_X} y={HUMAN.y + 16.5} textAnchor="middle">Human: approve / deny</text>
         </g>
-        <text className="n-sub" x={NODES.lane1_worker.x + 14} y={HUMAN.y + 17}>both agents: policy rules, then Claude</text>
 
         {WIRES.map((w) => (
           <g key={w.id}>
@@ -263,6 +263,7 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
               <rect x={b.x} y={b.y} width={b.w} height={b.h} rx={10} />
               <text className="n-title" x={b.x + 14} y={b.y + 22}>{b.title}</text>
               <text className="n-sub" x={b.x + 14} y={b.y + 40}>{b.sub}</text>
+              {b.note && !down && <text className="n-sub" x={b.x + 14} y={b.y + 60}>{b.note}</text>}
               {p && !down && (
                 <text className="n-state" x={b.x + b.w - 12} y={b.y + 22} textAnchor="end">UP</text>
               )}
