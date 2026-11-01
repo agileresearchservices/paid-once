@@ -119,6 +119,13 @@ def main(scenes, check):
             for lane in ("lane1", "lane2"):
                 if snap["audit"][lane]["in_flight"]:
                     failures.append(f"{scene}: {lane} still in flight when the scene ended")
+            if scene == "walkthrough":
+                # The scoreboard leaves the walkthrough out; its one ticket is scored on its own.
+                for lane in ("lane1", "lane2"):
+                    d = snap["demo_audit"][lane]
+                    print(f"  {lane}: walkthrough ticket refunded once: {d['refunded_once']} of {d['approved']}")
+                    if d["refunded_once"] != 1 or d["violations"]:
+                        failures.append(f"walkthrough: {lane} did not refund its one ticket exactly once")
             l2 = snap["audit"]["lane2"]
             closed_unpaid = (
                 l2["rejected"] + l2["declined"] - prev["lane2"].get("rejected", 0) - prev["lane2"].get("declined", 0)

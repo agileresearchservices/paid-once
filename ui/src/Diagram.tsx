@@ -207,7 +207,8 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
     }
 
   const latency = (lane: LaneId) => snap.faults?.[lane]?.latency_s ?? 0;
-  const audit = (lane: LaneId) => snap.audit[lane]?.tickets ?? {};
+  // The walkthrough's ticket is scored apart from the scoreboard, but its dot still belongs on page 1's ledger.
+  const audit = (lane: LaneId) => ({ ...(snap.audit[lane]?.tickets ?? {}), ...(snap.demo_audit?.[lane]?.tickets ?? {}) });
 
   return (
     <section className="diagram" aria-label="Architecture, with where each fault lands">

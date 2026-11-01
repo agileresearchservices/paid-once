@@ -124,6 +124,13 @@ whoever changes the code next.
   only the current scene's tickets, and the UI shows Nexus rows and lane chips only when `snap.current` is the step's
   scene, so step 6 reads "Not run yet" instead of step 5's rows. `lane1_view_all` (every ticket since reset) feeds the
   scoreboard's "its own job table says N done" line; it is the queue's claim, shown next to the ledger, never scored.
+  The scoreboard card's header on steps 2-5 (job table chips, Lane 2 workflow status, payments call line) accumulates
+  since the reset like the numbers under it: `lane1_view_all`, `lane2_view_all` (each Lane 2 ticket's last-seen status,
+  cleared by reset) and `payments_calls_all`. Before this the header restarted every scene while the headline
+  accumulated, so the card never added up. They are the stacks' own claims, never scored.
+  The walkthrough's ticket (`DEMO_SCENES`) is left out of the scoreboard and of those header views (`_is_demo`, by ticket
+  id, so every run of step 1 is covered); `snapshot()['demo_audit']` scores it alone, `make scenario` checks it, and
+  step 1's diagram merges it back so its ledger dot still shows.
 - **Payments counts its calls** (`CALLS` in `paidonce/payments/service.py`, `GET /admin/calls`, cleared by
   `/admin/reset`): per lane and ticket, calls and how many the ledger answered from an existing key. The engine sums
   them per scene into the snapshot's `payments_calls` (`booked` = calls − replays). It observes only; the ledger and
@@ -187,7 +194,7 @@ whoever changes the code next.
   redelivery and the recovery path (both of which touch only execute jobs) never see it. That is how a team would
   build it; it is not weakened to make Lane 1 refund denied tickets.
 - A careful dedupe check exists for finished tickets, so redelivery after completion is a no-op. Duplicates only arise for in-flight work.
-- `PAIDONCE_L1_STABLE_KEY=1` (off by default) makes Lane 1 derive its idempotency key from the ticket instead of the attempt. It exists only so the write-up can measure the one-line fix (duplicates drop to 0, the 7 lost tickets remain). Default runs, the UI and the demo are unchanged, so Lane 1 is still the competent-team-today system described above.
+- `PAIDONCE_L1_STABLE_KEY=1` (off by default) makes Lane 1 derive its idempotency key from the ticket instead of the attempt. It exists only so the write-up can measure the one-line fix (duplicates drop to 0, the lost tickets remain: 7 on the earlier scenes, 3 on the current ones). Default runs, the UI and the demo are unchanged, so Lane 1 is still the competent-team-today system described above.
 - "Improve the current implementation" (outbox, sweeper, durable checkpointer) is argued in the write-up, not built as a third lane.
 - On screen the lane is "Queue + LangGraph" (it was "Job queue"). It names the stack the way "Temporal + Nexus" does,
   including the part that fails in the worker-crash scene (LangGraph's in-memory checkpointer). Avoid labels such as

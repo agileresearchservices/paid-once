@@ -132,15 +132,18 @@ export interface Snapshot {
   scene_runs: Record<string, SceneRun>; // last run of each scene since the last reset
   scenes: { id: string; title: string }[];
   audit: Record<LaneId, LaneAudit>;
+  demo_audit: Record<LaneId, LaneAudit>; // the walkthrough's ticket, scored on its own and left out of `audit`
   processes: Record<string, ProcStatus>;
   events: ShowEvent[];
   nexus: NexusRow[];
   lane1_view: Record<string, number>; // this scene's tickets, by the queue's own job table
   lane1_view_all: Record<string, number>; // every ticket since reset, by the queue's own job table
   lane2_view: Record<string, number>;
+  lane2_view_all: Record<string, number>; // every Lane 2 workflow since reset, by its Temporal status
   faults: Partial<Record<LaneId, FaultState>>;
   // This scene's calls to payments, counted by payments: booked = new ledger rows, replays = answered from the key.
   payments_calls: Partial<Record<LaneId, { calls: number; booked: number; replays: number }>>;
+  payments_calls_all: Partial<Record<LaneId, { calls: number; booked: number; replays: number }>>; // since reset
   flow: Record<LaneId, FlowDot[]>; // this scene's tickets only
   beat: { scene: string; id: string; at: number } | null; // the walkthrough step on screen
   temporal_ui: string | null; // Temporal Web UI base URL, or null when it is not answering
