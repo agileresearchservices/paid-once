@@ -46,6 +46,32 @@ function RoleIcon({ role }: { role: "customer" | "agent" }) {
   );
 }
 
+// The customer's photo of the broken mug, sent with their message: a small drawn "snapshot" (no image file), in fixed
+// colours so it reads as a photo on either theme. Two pieces split along one jagged crack, plus a few shards.
+function BrokenMug() {
+  const crack = "L54,34 L60,42 L52,51 L58,60 L54,68"; // the right piece's edge is the same points, reversed
+  return (
+    <svg className="mug-photo" viewBox="0 0 120 84" role="img" aria-label="Photo: the mug, broken in two">
+      <rect width="120" height="84" rx="8" className="mug-bg" />
+      <ellipse cx="62" cy="74" rx="44" ry="5" className="mug-shadow" />
+      {/* left piece, with the handle */}
+      <g className="mug">
+        <path d="M30,30 C16,30 16,56 30,56" className="mug-handle" />
+        <path d={`M30,24 H56 ${crack} H34 Q30,68 30,64 Z`} />
+        <path d="M30,24 H56 L55,29 H30 Z" className="mug-rim" />
+      </g>
+      {/* right piece, fallen a little away along the crack */}
+      <g className="mug" transform="translate(10 4) rotate(9 70 46)">
+        <path d="M56,24 H82 V64 Q82,68 78,68 H54 L58,60 L52,51 L60,42 L54,34 Z" />
+        <path d="M56,24 H82 V29 H55 Z" className="mug-rim" />
+      </g>
+      <polygon points="40,76 47,73 45,79" className="mug-shard" />
+      <polygon points="94,74 101,76 96,79" className="mug-shard" />
+      <polygon points="70,77 74,75 75,79" className="mug-shard" />
+    </svg>
+  );
+}
+
 // A pane is one role's window: it shows only what that role sees.
 function Pane({ who, avatar, chat, children }: { who: string; avatar: ReactNode; chat?: boolean; children: ReactNode }) {
   return (
@@ -99,7 +125,7 @@ export function Walkthrough({ beat, flow }: { beat: string | null; flow?: Record
   // The agent's answer to the customer on each step, kept as the chat goes on. It says what the customer needs to know,
   // not how: no policy check, proposal or approval. The last one waits for the money, then says it is on its way.
   const replies = [
-    "Thanks! I'm looking into it now.",
+    "So sorry about your mug! Looking into it now.",
     "I'm checking with a teammate.",
     "Good news, it's approved!",
     done ? `Your ${amount} refund is on its way.` : "Sending your refund now…",
@@ -114,7 +140,8 @@ export function Walkthrough({ beat, flow }: { beat: string | null; flow?: Record
       <div className="panes">
         {/* The customer talks only to the agent: a short answer per step, never the policy check or the approval. */}
         <Pane who="Customer view" avatar={<RoleIcon role="customer" />} chat>
-          {b && <div className="msg customer"><p>{message}</p></div>}
+          {/* The photo rides in the message's own bubble, so it costs the short chat pane almost no height */}
+          {b && <div className="msg customer"><p className="with-photo"><span>{message}</span><BrokenMug /></p></div>}
           {replies.map((r, n) => (
             <div className="msg support" key={n}><p>{r}</p></div>
           ))}

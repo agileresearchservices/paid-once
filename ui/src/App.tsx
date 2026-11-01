@@ -181,7 +181,7 @@ export function App() {
           )}
           {status && <p className={`scene-status ${status.cls}`} role="status">{status.text}</p>}
           <div className="nav">
-            <button onClick={() => go(-1)} disabled={index === 0}>← Back</button>
+            {index > 0 && <button onClick={() => go(-1)}>← Back</button>}{/* nothing to go back to on page 1 */}
             <button onClick={() => go(1)} disabled={index === STEPS.length - 1}>Next →</button>
           </div>
           <button className={confirmReset ? "danger" : ""} onClick={onReset} disabled={!!locked}>

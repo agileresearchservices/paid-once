@@ -364,10 +364,18 @@ main.fill .pane { height: auto; min-height: 186px; }
 .msg p { margin: 0; padding: 4px 14px; border-radius: 16px; font-size: var(--wf); line-height: 1.25; color: var(--ink); background: var(--surface); }
 .msg.customer { justify-content: flex-end; }
 .msg.customer p { background: var(--accent-wash); }
+/* The customer's photo (Walkthrough.tsx BrokenMug): fixed colours, so it reads as a photo on either theme */
+.pane-body.chat .msg p.with-photo { display: flex; align-items: center; gap: 10px; padding-top: 1px; padding-bottom: 1px; padding-right: 3px; }
+.mug-photo { width: 48px; height: 33px; flex: none; border-radius: 8px; }
+.mug-bg { fill: #ece3d6; }
+.mug-shadow { fill: #000; opacity: 0.12; }
+.mug path, .mug-shard { fill: #d0654a; stroke: #8e3a26; stroke-width: 1.2; stroke-linejoin: round; }
+.mug .mug-handle { fill: none; stroke: #d0654a; stroke-width: 6; stroke-linecap: round; }
+.mug .mug-rim { fill: #a84a33; stroke: none; }
 .msg { flex: none; }
 /* The customer chat grows downward like a real one: the newest line sits at the bottom and, when there is not room, the
    oldest scrolls off the top under a fade. Taller windows (see --wf) fit the whole conversation. */
-.pane-body.chat { contain: size; justify-content: flex-end; gap: 3px; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 18px); mask-image: linear-gradient(to bottom, transparent 0, #000 18px); }
+.pane-body.chat { contain: size; justify-content: flex-end; gap: 3px; padding-top: 2px; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 18px); mask-image: linear-gradient(to bottom, transparent 0, #000 18px); }
 .pane-body.chat .msg p { font-size: calc(18px + (var(--wf) - 20px) * 0.5); padding: 2px 12px; line-height: 1.2; }
 .review { display: flex; flex-direction: column; gap: 8px; }
 .review-ask { font-size: calc(var(--wf) * 1.2); font-weight: 700; color: var(--ink); }
