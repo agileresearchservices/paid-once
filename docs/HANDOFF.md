@@ -148,8 +148,8 @@ whoever changes the code next.
   skip the next one. `make scenario` releases the gates itself.
 - The panel is three panes, Customer, Agent and Human view, each showing only what that role sees (the customer never sees the
   policy check, proposal or approval). It outlines the flow and deliberately does not compare the stacks: that
-  starts with the scenes. The customer pane gets one agent reply per step (2-5), updated in place under the customer's message: there is no room for a
-  chat that grows five lines. The Agent pane's policy-check row is typing dots until both stacks show the ticket waiting for a
+  starts with the scenes. The customer pane is a chat that grows one agent reply per step (2-5), newest at the bottom; on a window shorter than ~945 px the
+  oldest line scrolls off the top under a fade (`.pane-body.chat`, `contain: size` so the chat never grows the page). The Agent pane's policy-check row is typing dots until both stacks show the ticket waiting for a
   human (`decided()` in `Walkthrough.tsx`, read from the snapshot's `flow`), so the step opens right after the ticket is
   submitted and the audience sees it travel to the agent and the decision arrive. `WALKTHROUGH_TICKET` in `steps.ts` mirrors the engine's `WALKTHROUGH_*`.
 - Payments latency is 2.5 s for the scene so the refund is visible in flight. It must stay under Lane 1's 3 s client

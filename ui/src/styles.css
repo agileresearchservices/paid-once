@@ -335,7 +335,7 @@ svg.lg-icon, .diagram svg.lg-icon { display: inline-block; width: 26px; height: 
 .beat.idle { display: grid; place-items: center; border-color: var(--grid); }
 .beat.idle p { margin: 0; max-width: 90ch; color: var(--muted); font-size: 26px; text-align: center; }
 /* The walkthrough: three panes, one per role, each showing only what that role sees. */
-.panes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.panes { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
 /* Step 1 fills the window: the bottom panel takes whatever height is left, and the text grows with it (--wf), never below the
    sizes that fit the smallest screen. 830 px is about what the rest of the page uses plus the panel's own chrome. */
 main.fill { display: flex; flex-direction: column; min-height: 100vh; }
@@ -352,6 +352,11 @@ main.fill .pane { height: auto; min-height: 186px; }
 .msg p { margin: 0; padding: 4px 14px; border-radius: 16px; font-size: var(--wf); line-height: 1.25; color: var(--ink); background: var(--surface); }
 .msg.customer { justify-content: flex-end; }
 .msg.customer p { background: var(--accent-wash); }
+.msg { flex: none; }
+/* The customer chat grows downward like a real one: the newest line sits at the bottom and, when there is not room, the
+   oldest scrolls off the top under a fade. Taller windows (see --wf) fit the whole conversation. */
+.pane-body.chat { contain: size; justify-content: flex-end; gap: 3px; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 18px); mask-image: linear-gradient(to bottom, transparent 0, #000 18px); }
+.pane-body.chat .msg p { font-size: calc(18px + (var(--wf) - 20px) * 0.5); padding: 2px 12px; line-height: 1.2; }
 .review { display: flex; flex-direction: column; gap: 8px; }
 .review-ask { font-size: calc(var(--wf) * 1.2); font-weight: 700; color: var(--ink); }
 .review-quote { font-size: calc(var(--wf) * 0.85); color: var(--ink-2); line-height: 1.25; }
