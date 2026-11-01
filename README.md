@@ -112,15 +112,18 @@ Run of show, about ten minutes:
   (`✓` paid once, `×2` paid twice, `∅` owed, never paid, `—` denied, nothing owed), and each lane shows what payments saw in the scene: calls, refunds booked, and
   calls answered from an existing key. On step 5 that line is the evidence: Temporal's retry is answered from the
   ledger, the queue's is booked again.
-- **Step 6, Nexus**: four failures while the refunds are in flight. Payments books each refund and goes quiet, then
-  the support worker, the payments worker and the Temporal server itself are killed, each for 5-6 seconds. A red row
-  per failure shows when it was down and how many refunds it hit. Under them, each approved refund has two tracks:
-  what support's code sees (one `STARTED` bar, no error) and what payments does (failed attempts, then one that
-  succeeds). A `$` marks when the ledger booked the money; the attempt that finally succeeds is answered from the
-  ledger, not paid again. Four beats light up as the story happens, and the tiles at the bottom read the result from
-  the ledger. The `support sees ↗` and `payments does ↗` labels open each side's history in the Temporal Web UI
-  (http://127.0.0.1:8233), including the caller's Nexus Links tab. The Temporal kill needs a server the show started
-  itself (`make demo` does, if nothing is listening on 7233); with a server you started, the scene skips that kill.
+- **Step 6, Nexus** says one thing: support makes one call and payments absorbs the failures. A top card shows the
+  boundary (support: one call, `issue_refund`; the Nexus endpoint `payments-endpoint`; payments: owns the queue, workflow
+  and retries behind it), each team with its own worker tile, which goes red when that process is killed. Four failures
+  then hit the refunds in flight: payments books each refund and goes quiet, then the support worker, the payments worker
+  and the Temporal server itself are killed, each for 5-6 seconds (one red bar per failure). Below, two blocks of five
+  thin bars, one per refund: **Support sees** (one calm bar each, "no errors") and **Payments does** (failed attempts,
+  then one that succeeds, "all done"). A `$` marks when the ledger booked the money; the attempt that finally succeeds is
+  answered from the ledger, not paid again. Hover a bar for that refund's detail; the two block names open the first
+  refund's history in the Temporal Web UI (http://127.0.0.1:8233), including the caller's Nexus Links tab. Three tiles at
+  the bottom (errors support saw, retries payments absorbed, refunds paid once) read from the ledger. The Temporal kill
+  needs a server the show started itself (`make demo` does, if nothing is listening on 7233); with a server you started,
+  the scene skips that kill.
 - **Step 7, Scoreboard**: the totals, and the queue's own job table next to what the ledger says.
 
 The Temporal wordmark and favicon are not in the repo. To show them, put `temporal-wordmark.svg` and `favicon.svg` in
