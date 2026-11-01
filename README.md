@@ -96,7 +96,7 @@ make ui                                 # builds the Vite UI (needs Node 22+)
 make demo                               # http://127.0.0.1:8100
 ```
 
-The page opens with the two architectures side by side. "Walk through one ticket" runs a single approved ticket
+The page opens with the two architectures. "Walk through one ticket" runs a single approved ticket
 through both stacks and stops at six steps: each shows a box explaining that step (what each stack stores, calls and
 waits on), and the scene does not move until you dismiss it (button, Space or →). Then it steps through six scenes. An architecture diagram shows
 where each fault lands and where each stack thinks each ticket is, above both lanes' ledger-based scoreboards; the
@@ -104,7 +104,7 @@ Nexus step shows the operations live. Arrow keys or 1-8 move between steps, R ru
 is built for a laptop browser in full screen. The scoreboard resets whenever the show server starts.
 
 Run of show, about ten minutes:
-- **Step 1, Two architectures**: the same refund flow built twice, and a side-by-side table of what differs.
+- **Step 1, Two architectures**: the same refund flow built twice, and a one-ticket walkthrough of how each stack handles it.
 - **Step 2, Happy path**: seven tickets per lane. The agent's policy check denies one, the human approves five and
   denies one; both lanes refund the five once and pay nothing on the two denied tickets, which go back to the
   helpdesk as grey dots.

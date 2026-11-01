@@ -165,15 +165,6 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
   .diagram *, .fault-caption { animation: none !important; transition: none !important; }
 }
 
-.compare table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 16px; }
-.compare th, .compare td { text-align: left; vertical-align: top; padding: 7px 14px; border-bottom: 1px solid var(--grid); }
-.compare thead th { font-size: 18px; color: var(--ink); border-bottom: 1px solid var(--axis); }
-.compare tbody th { color: var(--muted); font-weight: 500; width: 22%; }
-.compare td { width: 39%; color: var(--ink-2); }
-.compare td.t, .compare th.t { background: var(--accent-wash); }
-.compare thead th.t { border-radius: 8px 8px 0 0; }
-.compare .fair { margin: 10px 0 0; font-size: 14px; }
-
 .chip { display: inline-block; background: var(--surface); border: 1px solid var(--axis); border-radius: 999px; padding: 2px 10px; font-size: 14px; color: var(--ink-2); margin: 0 6px 4px 0; }
 .chip.warn { border-color: var(--warning); color: var(--ink); }
 
@@ -321,21 +312,17 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .headline-label { display: block; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
 
 
-/* The walkthrough's thinking box: docked at the bottom, so the diagram above it stays visible. */
-.beat {
-  position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 10;
-  width: min(1180px, calc(100vw - 48px)); padding: 16px 22px 18px;
-  background: var(--surface); border: 2px solid var(--accent); border-radius: 14px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6); animation: beat-in 0.25s ease-out;
-}
-@keyframes beat-in { from { opacity: 0; transform: translate(-50%, 12px); } }
+/* The walkthrough's explanation panel: in the page under the diagram, so the diagram stays in view. */
+.beat { min-height: 280px; padding: 16px 22px 18px; background: var(--surface); border: 2px solid var(--accent); border-radius: 14px; }
+.beat.idle { display: grid; place-items: center; border-color: var(--grid); }
+.beat.idle p { margin: 0; max-width: 90ch; color: var(--muted); font-size: 18px; text-align: center; }
 .beat-head { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
-.beat-head h3 { flex: 1; margin: 0; font-size: 22px; color: var(--ink); text-transform: none; letter-spacing: 0; }
+.beat-head h3 { flex: 1; margin: 0; font-size: 26px; color: var(--ink); text-transform: none; letter-spacing: 0; }
 .beat-n { color: var(--accent-ink); font-size: 14px; font-weight: 600; white-space: nowrap; }
 .beat kbd { font: 12px var(--mono); margin-left: 6px; padding: 1px 6px; border: 1px solid rgba(255, 255, 255, 0.5); border-radius: 4px; }
-.beat-intro { font-size: 18px; color: var(--ink); margin-bottom: 12px; }
+.beat-intro { font-size: 21px; color: var(--ink); margin-bottom: 12px; }
 .beat-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.beat-cols > div { padding: 10px 14px; border-radius: 10px; background: var(--page); font-size: 16px; color: var(--ink-2); }
+.beat-cols > div { padding: 10px 14px; border-radius: 10px; background: var(--page); font-size: 19px; color: var(--ink-2); }
 .beat-cols > div.t { background: var(--accent-wash); }
-.beat-cols b { display: block; margin-bottom: 4px; color: var(--ink); }
+.beat-cols b { display: block; margin-bottom: 6px; font-size: 17px; color: var(--ink); }
 .beat-cols p { margin: 0; }

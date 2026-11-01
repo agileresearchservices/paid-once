@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Compare } from "./Architecture";
 import { Diagram } from "./Diagram";
 import { NexusPanel } from "./NexusPanel";
 import { Scoreboard } from "./Scoreboard";
@@ -199,7 +198,7 @@ export function App() {
       {(step.arch || (step.scene && !step.nexus)) && <Diagram snap={snap} scene={step.scene} />}
 
       {step.arch ? (
-        <Compare />
+        <Walkthrough beat={beat} running={thisRunning} onContinue={onContinue} />
       ) : step.nexus ? null : (
         <div className="lanes">
           {LANES.map((l) => (
@@ -223,8 +222,6 @@ export function App() {
           ))}
         </div>
       )}
-
-      {beat && <Walkthrough beat={beat} onContinue={onContinue} />}
 
       {/* Scene steps show faults on the diagram, so the event log only appears on the scoreboard. */}
     </main>
