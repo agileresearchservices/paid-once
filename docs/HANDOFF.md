@@ -142,7 +142,8 @@ whoever changes the code next.
   snapshot's `beat` names the step; the UI shows its panel under the diagram, in the space the old comparison table used (`ui/src/Walkthrough.tsx`, copy in `BEATS` in `steps.ts`) and
   `POST /api/beat/continue?beat=<id>` releases the gate. The id must match the step on screen, so a double click cannot
   skip the next one. `make scenario` releases the gates itself.
-- The panel is a support chat plus one sentence per step. It outlines the flow and deliberately does not compare the stacks: that
+- The panel is three panes, Customer, Agent and Human view, each showing only what that role sees (the customer never sees the
+  policy check, proposal or approval). It outlines the flow and deliberately does not compare the stacks: that
   starts with the scenes. The agent's reply is typing dots until both stacks show the ticket waiting for a human (`decided()` in
   `Walkthrough.tsx`, read from the snapshot's `flow`), so the step opens right after the ticket is submitted and the audience
   sees it travel to the agent and the decision arrive. `WALKTHROUGH_TICKET` in `steps.ts` mirrors the engine's `WALKTHROUGH_*`.

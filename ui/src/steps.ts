@@ -18,19 +18,18 @@ export interface Step {
 // (Engine.scene_walkthrough). Every line says what this repo's code does (paidonce/lane1/, paidonce/lane2/).
 export interface Beat {
   id: string;
-  title: string;
-  line: string; // one plain sentence: what happens, in general. The comparison between the stacks starts with the scenes.
+  title: string; // the walkthrough's three panes (Walkthrough.tsx) tell the story; this is its headline
 }
 
 // The ticket the walkthrough sends. Mirrors WALKTHROUGH_MESSAGE and WALKTHROUGH_AMOUNT_CENTS in paidonce/show/engine.py.
 export const WALKTHROUGH_TICKET = { message: "The mug arrived in pieces. Please refund me.", amount: "$42.00" };
 
 export const BEATS: Beat[] = [
-  { id: "ticket", title: "A customer asks for a refund", line: "The helpdesk turns the chat into a ticket." },
-  { id: "agent", title: "The agent decides", line: "Policy rules run first, then Claude proposes." },
-  { id: "waiting", title: "Handed to a human", line: "The agent only proposes. A person decides." },
-  { id: "approve", title: "The human approves", line: "The decision goes back to the process." },
-  { id: "refund", title: "Payments moves the money", line: "Slowed 2.5 s so you can see it in flight." },
+  { id: "ticket", title: "A customer asks for a refund" },
+  { id: "agent", title: "The agent decides" },
+  { id: "waiting", title: "Handed to a human" },
+  { id: "approve", title: "The human approves" },
+  { id: "refund", title: "Payments moves the money" },
 ];
 
 export const STEPS: Step[] = [

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { BEATS, WALKTHROUGH_TICKET } from "./steps";
 import { LegendIcon, type TicketKind } from "./TicketIcon";
 import type { FlowDot, LaneId } from "./types";
@@ -16,10 +16,21 @@ function Typing() {
   );
 }
 
-function Note({ kind, children }: { kind: TicketKind; children: string }) {
+// One line in a pane: an icon and a sentence.
+function Row({ kind, children }: { kind: TicketKind; children: ReactNode }) {
   return (
-    <div className="chat-note">
-      <LegendIcon kind={kind} /> {children}
+    <div className="pane-row">
+      <LegendIcon kind={kind} /> <span>{children}</span>
+    </div>
+  );
+}
+
+// A pane is one role's window: it shows only what that role sees.
+function Pane({ who, avatar, children }: { who: string; avatar: ReactNode; children: ReactNode }) {
+  return (
+    <div className="pane" role="log" aria-label={who}>
+      <div className="pane-bar"><span className="avatar">{avatar}</span> {who}</div>
+      <div className="pane-body">{children}</div>
     </div>
   );
 }
@@ -77,6 +88,7 @@ export function Walkthrough({
   }
   const { message, amount } = WALKTHROUGH_TICKET;
   const agentDone = i >= 2 || decided(flow);
+  const done = i >= 4 && refunded(flow);
   return (
     <section className="beat" aria-label={`Step ${i + 1} of ${BEATS.length}: ${b.title}`}>
       <div className="beat-head">
@@ -88,38 +100,37 @@ export function Walkthrough({
           </button>
         )}
       </div>
-      <div className="beat-body">
-        <div className="chat" role="log" aria-label="Support chat">
-          <div className="chat-bar">
-            <span className="chat-live" /> Support chat <span className="chat-sub">refund request · {amount}</span>
-          </div>
-          <div className="chat-msgs">
-            <div className="msg customer">
-              <span className="avatar">C</span>
-              <p>{message}</p>
+      <div className="panes">
+        {/* The customer talks only to the agent: no policy check, proposal or approval, just the answer. */}
+        <Pane who="Customer view" avatar="C">
+          <div className="msg customer"><p>{message}</p></div>
+          {i >= 1 && !done && (
+            <div className="msg support"><p><Typing /></p></div>
+          )}
+          {done && <div className="msg support"><p>{`Your ${amount} refund is on its way.`}</p></div>}
+        </Pane>
+        <Pane who="Agent view" avatar="AI">
+          <Row kind={i >= 1 ? "done" : "active"}>{`New ticket · ${amount}`}</Row>
+          {i >= 1 && (agentDone ? <Row kind="done">Policy check passed</Row> : <div className="pane-row"><Typing /></div>)}
+          {/* One row for the human: proposed, then approved, in place */}
+          {i >= 2 && (i >= 3 ? <Row kind="done">Human approved</Row> : <Row kind="waiting">Proposed it to a human</Row>)}
+          {i >= 4 && (done ? <Row kind="done">Refunded. Customer told.</Row> : <Row kind="paying">Asking payments…</Row>)}
+        </Pane>
+        {/* The human sees the proposal and decides; nothing about payments. */}
+        <Pane who="Human view" avatar={<LegendIcon kind="waiting" />}>
+          {i < 2 ? (
+            <p className="pane-empty">Nothing to review</p>
+          ) : (
+            <div className="review">
+              <div className="review-ask">{`Refund ${amount}?`}</div>
+              <div className="review-quote">“{message}”</div>
+              <div className="review-actions">
+                <span className={i >= 3 ? "act approve on" : "act approve"}>{i >= 3 ? "✓ Approved" : "Approve"}</span>
+                <span className="act deny">Deny</span>
+              </div>
             </div>
-            {i >= 1 && (
-              <div className="msg agent">
-                <span className="avatar">AI</span>
-                <p>{agentDone ? `Within policy. I propose a ${amount} refund.` : <Typing />}</p>
-              </div>
-            )}
-            {i >= 2 && <Note kind="waiting">Waiting for a human to approve</Note>}
-            {i >= 3 && (
-              <div className="msg human">
-                <span className="avatar"><LegendIcon kind="waiting" /></span>
-                <p>Approved.</p>
-              </div>
-            )}
-            {i >= 4 &&
-              (refunded(flow) ? (
-                <Note kind="done">{`Refunded ${amount}. The ledger has it.`}</Note>
-              ) : (
-                <Note kind="paying">{`Asking payments for ${amount}…`}</Note>
-              ))}
-          </div>
-        </div>
-        <p className="beat-line">{i === BEATS.length - 1 && refunded(flow) ? "Refunded once. The ledger agrees." : b.line}</p>
+          )}
+        </Pane>
       </div>
     </section>
   );
