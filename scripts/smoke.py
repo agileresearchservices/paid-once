@@ -23,19 +23,14 @@ import time
 import httpx
 
 from paidonce import config
+from paidonce.show.catalog import SCENES
 from paidonce.show.procs import port_open
+from paidonce.show.server import SCENARIO_HEADER
 
 # PAIDONCE_SHOW_PORT. With the other PAIDONCE_*_PORT, PAIDONCE_DATA and TEMPORAL_ADDRESS a run can sit beside the demo.
 PORT = config.SHOW_PORT
 BASE = f"http://127.0.0.1:{PORT}"
-MUST_HAVE = [
-    "walkthrough",
-    "intro",
-    "worker_crash",
-    "double_delivery",
-    "payments_timeout",
-    "nexus_kill",
-]
+MUST_HAVE = [s.id for s in SCENES if s.id != "free_roam"]  # the walkthrough and the five scenes
 FIELDS = (
     "submitted",
     "approved",
@@ -48,7 +43,7 @@ FIELDS = (
     "declined",
     "waiting",
 )
-# Each cohort carries one ticket outside the refund policy and one the human denies (Engine.submit_cohort).
+# Each cohort carries one ticket outside the refund policy and one the human denies (HarnessMixin.submit_cohort).
 NO_PER_COHORT = 2
 # The walkthrough is one approved ticket: no denials.
 COHORTS = {"free_roam": 4, "walkthrough": 0}
@@ -95,7 +90,7 @@ def handler_attempts(snap):
     rows = snap["nexus"]
     return (
         max((r.get("handler", {}).get("peak_activity_attempt", 0) for r in rows), default=0),
-        max((r["attempt"] for r in rows), default=0),
+        max((r["peak_attempt"] for r in rows), default=0),
     )
 
 
@@ -105,7 +100,7 @@ def main(scenes, check):
         raise SystemExit(f"Port {PORT} is busy: stop `make demo` (or the other show server) first.")
     # Locks the server's controls to this runner, so a browser left open on the show's port can't reset or run scenes.
     token = secrets.token_hex(8)
-    headers = {"x-paidonce-scenario": token}
+    headers = {SCENARIO_HEADER: token}
     srv = subprocess.Popen(
         [sys.executable, "-m", "paidonce.show"], env={**os.environ, "PAIDONCE_SCENARIO_TOKEN": token}
     )

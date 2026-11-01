@@ -70,6 +70,8 @@ export interface NexusRow {
   state: string; // the caller's operation state (STARTED while payments retries), or COMPLETED / FAILED once closed
   last_failure: string;
   caller_saw_failure: boolean;
+  attempt: number; // support's own start attempts of the operation (not payments' retries); read by `make scenario`
+  peak_attempt: number;
   // What payments did (every attempt of the refund activity) and what the ledger says.
   attempts: RefundAttempt[];
   ledger: { calls: number; replays: number; booked_at: number | null };

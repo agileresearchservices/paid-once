@@ -55,6 +55,7 @@ class ProcessManager:
             ),
         }
         self._stop = threading.Event()
+        self._lock = threading.Lock()  # the watcher thread restarts processes while the loop kills and stops them
         self._thread = threading.Thread(target=self._watch, daemon=True)
 
     # -- lifecycle ---------------------------------------------------------
@@ -113,9 +114,10 @@ class ProcessManager:
         self._thread.start()
 
     def stop_all(self) -> None:
-        self._stop.set()
-        for p in self.procs.values():
-            self._terminate(p)
+        with self._lock:  # after this, the watcher can no longer start anything
+            self._stop.set()
+            for p in self.procs.values():
+                self._terminate(p)
 
     @staticmethod
     def _terminate(p: Proc) -> None:
@@ -129,13 +131,14 @@ class ProcessManager:
     def kill(self, name: str, restart_after: float = 4.0) -> bool:
         """kill -9 a process. It comes back after `restart_after` seconds."""
         p = self.procs[name]
-        if p.popen is None or p.popen.poll() is not None:
-            return False
-        try:
-            os.killpg(p.popen.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            return False
-        p.restart_at = time.time() + restart_after
+        with self._lock:
+            if p.popen is None or p.popen.poll() is not None:
+                return False
+            try:
+                os.killpg(p.popen.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                return False
+            p.restart_at = time.time() + restart_after
         self.emit("kill", f"kill -9 {p.label}", proc=name)
         return True
 
@@ -148,13 +151,19 @@ class ProcessManager:
             time.sleep(0.25)
 
     def _restart_dead(self, now: float) -> None:
-        for p in self.procs.values():
-            dead = p.popen is None or p.popen.poll() is not None
-            if dead and p.restart_at is None:
-                p.restart_at = now + 2.0  # an unplanned exit: restart like an orchestrator would
-            if dead and p.restart_at is not None and now >= p.restart_at:
-                self._spawn(p)
-                self.emit("restart", f"{p.label} restarted", proc=p.name)
+        restarted = []
+        with self._lock:
+            if self._stop.is_set():
+                return
+            for p in self.procs.values():
+                dead = p.popen is None or p.popen.poll() is not None
+                if dead and p.restart_at is None:
+                    p.restart_at = now + 2.0  # an unplanned exit: restart like an orchestrator would
+                if dead and p.restart_at is not None and now >= p.restart_at:
+                    self._spawn(p)
+                    restarted.append(p)
+        for p in restarted:
+            self.emit("restart", f"{p.label} restarted", proc=p.name)
 
     # -- views -------------------------------------------------------------
     def status(self) -> dict:
