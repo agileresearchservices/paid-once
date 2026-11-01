@@ -36,7 +36,7 @@ const NODES: Record<string, Box> = {
 const mid = (lane: LaneId) => ROW[lane] + NODE_H / 2;
 
 // The human reviews proposals where approvals actually land: the Queue API and the Temporal server.
-const HUMAN = { x: 163, y: 126, w: 170, h: 24 };
+const HUMAN = { x: 234, y: 124, w: 28, h: 28 }; // a round badge with a person in it
 const HUMAN_X = HUMAN.x + HUMAN.w / 2;
 
 // Wires: [from x, to x, row, id]. A wire is "busy" while a ticket is on it or in the node it feeds.
@@ -207,11 +207,17 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
         {/* Under its row, lined up with the Queue label above its own: the human's bubble sits between the rows */}
         <text className="row-label" x={158} y={ROW.lane2 + NODE_H + 18}>TEMPORAL + NEXUS</text>
 
-        <g className={humanNow ? "human now" : "human"}>
+        <g className={humanNow ? "human now" : "human"} role="img" aria-label="A human approves or denies">
           <line className="wire" x1={HUMAN_X} x2={HUMAN_X} y1={HUMAN.y} y2={ROW.lane1 + NODE_H + 3} markerEnd="url(#arrow)" />
           <line className="wire" x1={HUMAN_X} x2={HUMAN_X} y1={HUMAN.y + HUMAN.h} y2={ROW.lane2 - 3} markerEnd="url(#arrow)" />
-          <rect x={HUMAN.x} y={HUMAN.y} width={HUMAN.w} height={HUMAN.h} rx={12} />
-          <text x={HUMAN_X} y={HUMAN.y + 16.5} textAnchor="middle">Human: approve / deny</text>
+          <circle className="badge" cx={HUMAN_X} cy={HUMAN.y + HUMAN.h / 2} r={HUMAN.w / 2} />
+          {/* A person: head and shoulders */}
+          <circle className="glyph" cx={HUMAN_X} cy={HUMAN.y + 10} r={4.2} />
+          <path
+            className="glyph"
+            d={`M${HUMAN_X - 7.5},${HUMAN.y + 22} Q${HUMAN_X - 7.5},${HUMAN.y + 15} ${HUMAN_X},${HUMAN.y + 15} Q${HUMAN_X + 7.5},${HUMAN.y + 15} ${HUMAN_X + 7.5},${HUMAN.y + 22} Z`}
+          />
+          <title>Human: approve / deny</title>
         </g>
 
         {WIRES.map((w) => (
@@ -247,8 +253,8 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
             </g>
             {/* Temporal's duplicate is the human's decision signal, replayed: it comes down from the review */}
             <g className="packet" style={{ ["--dx" as string]: "0px", ["--dy" as string]: "24px" }}>
-              <rect x={HUMAN_X + 8} y={HUMAN.y + 2} width={30} height={22} rx={5} />
-              <text x={HUMAN_X + 23} y={HUMAN.y + 18} textAnchor="middle">×2</text>
+              <rect x={HUMAN_X + 20} y={HUMAN.y + 3} width={30} height={22} rx={5} />
+              <text x={HUMAN_X + 35} y={HUMAN.y + 19} textAnchor="middle">×2</text>
             </g>
           </>
         )}
