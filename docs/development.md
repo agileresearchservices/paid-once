@@ -46,8 +46,8 @@ never scored. The walkthrough and the Nexus scene (`DEMO_SCENES`) are left out o
 1. Add `SceneInfo("my_scene", "Title")` to `SCENES` in `show/catalog.py`.
 2. Write `async def scene_my_scene(self)` in `show/scenes.py`. Use `submit_cohort` to send the same tickets to both
    lanes, `approve_scene` to play the human, and the fault primitives (`kill_window`, `set_fault`, `fault`) so the
-   page can draw where each fault landed. Do not end a scene with a fixed sleep: `Engine.settle` holds it until the ledger has decided every ticket, both stacks
-   have stopped, and Lane 1's queue is empty, then clears the faults.
+   page can draw where each fault landed. Do not end a scene with a fixed sleep: `Engine.settle` holds it until the
+   ledger has decided every ticket, both stacks have stopped, and Lane 1's queue is empty, then clears the faults.
 3. Add a `Step` to `STEPS` in `ui/src/steps.ts` (copy is read from a projector: short, concrete sentences).
 4. `scripts/smoke.py` runs every scene in `SCENES` and `make scenario` checks it, so there is nothing to register there.
 
