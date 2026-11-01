@@ -104,6 +104,16 @@ export function Walkthrough({
   const { message, amount } = WALKTHROUGH_TICKET;
   const agentDone = i >= 2 || decided(flow);
   const done = i >= 4 && refunded(flow);
+  // The agent's answer to the customer on each step: one line that updates in place (there is no room for a chat that
+  // grows five lines). It says what the customer needs to know, not how: no policy check, proposal or approval.
+  const replies = [
+    null,
+    "Thanks! I'm looking into it now.",
+    "I'm checking with a teammate.",
+    "Good news, it's approved!",
+    done ? `Your ${amount} refund is on its way.` : "Sending your refund now…",
+  ];
+  const reply = replies[i];
   return (
     <section className="beat" aria-label={`Step ${i + 1} of ${BEATS.length}: ${b.title}`}>
       <div className="beat-head">
@@ -116,13 +126,10 @@ export function Walkthrough({
         )}
       </div>
       <div className="panes">
-        {/* The customer talks only to the agent: no policy check, proposal or approval, just the answer. */}
+        {/* The customer talks only to the agent: each step gets a short answer, never the policy check or the approval. */}
         <Pane who="Customer view" avatar="C">
           <div className="msg customer"><p>{message}</p></div>
-          {i >= 1 && !done && (
-            <div className="msg support"><p><Typing /></p></div>
-          )}
-          {done && <div className="msg support"><p>{`Your ${amount} refund is on its way.`}</p></div>}
+          {reply && <div className="msg support"><p>{reply}</p></div>}
         </Pane>
         <Pane who="Agent view" avatar="AI">
           <Row kind={i >= 1 ? "done" : "active"}>{`New ticket · ${amount}`}</Row>
