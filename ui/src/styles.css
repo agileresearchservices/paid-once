@@ -71,9 +71,9 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .story-text .watch { color: var(--ink); font-size: 22px; }
 .story-text .result { color: var(--ink); font-size: 22px; border-left: 3px solid var(--accent); padding-left: 10px; }
 .controls { display: grid; gap: 8px; align-content: start; min-width: 200px; }
-.scene-status { margin: 0; font-size: 15px; text-align: center; }
+.scene-status { margin: 0; font-size: 15px; text-align: center; min-height: 1.4em; }
 .scene-status.ok { color: var(--good-ink); }
-.scene-status.warn { color: var(--warning); font-size: 13px; }
+.scene-status.warn { color: var(--warning); font-size: 14px; font-weight: 600; }
 .scene-status.fail { font-size: 13px; text-align: left; overflow-wrap: anywhere; }
 .nav { display: flex; gap: 8px; }
 .nav button { flex: 1; }

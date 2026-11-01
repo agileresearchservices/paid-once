@@ -144,7 +144,7 @@ export function App() {
   else if (thisRunning && waits.length > 0) {
     const w = waits[0];
     status = {
-      text: `Waiting on the audit: ${w.wait!.count} approved ticket${w.wait!.count === 1 ? "" : "s"} in ${w.lane.name} still unpaid. Counted lost in ${w.wait!.secs}s.`,
+      text: `Audit waiting: ${w.wait!.count} unpaid, counted lost in ${w.wait!.secs}s`,
       cls: "warn",
     };
   } else if (finished && settling) status = { text: "Done, settling…", cls: "muted" };
@@ -191,7 +191,8 @@ export function App() {
               {locked ? "Locked by the test run" : thisRunning ? `Running ${elapsed}s…` : running ? "Another scene is running" : finished ? "Run again" : step.runLabel ?? "Run this scene"}
             </button>
           )}
-          {status && <p className={`scene-status ${status.cls}`} role="status">{status.text}</p>}
+          {/* Always rendered on a scene step, so the buttons below don't jump when a message appears */}
+          {step.scene && <p className={`scene-status ${status?.cls ?? ""}`} role="status">{status?.text}</p>}
           <div className="nav">
             {index > 0 && <button type="button" onClick={() => go(-1)}>← Back</button>}{/* nothing to go back to on step 1 */}
             <button type="button" onClick={() => go(1)} disabled={index === STEPS.length - 1}>Next →</button>
