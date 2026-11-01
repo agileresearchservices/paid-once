@@ -35,7 +35,6 @@ class RefundResult:
     refund_id: str
     ticket_id: str
     amount_cents: int
-    replayed: bool = False
 
 
 @dataclass

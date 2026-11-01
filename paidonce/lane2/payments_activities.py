@@ -29,4 +29,5 @@ async def post_refund(req: RefundRequest) -> RefundResult:
         )
     resp.raise_for_status()  # 5xx: let Temporal retry
     d = resp.json()
-    return RefundResult(d["refund_id"], d["ticket_id"], d["amount_cents"], d["replayed"])
+    # Whether the ledger answered from an existing key stays inside payments: the contract carries the refund only.
+    return RefundResult(d["refund_id"], d["ticket_id"], d["amount_cents"])
