@@ -79,14 +79,18 @@ export function Walkthrough({ beat, flow }: { beat: string | null; flow?: Record
   const shown = at >= 0; // a step is up
 
   // When a step opens, bring all three panes into view. The header above may scroll away; the panel's own top must not
-  // (the scroll stops there). The diagram sits below the panel.
+  // (the scroll stops there). The diagram sits below the panel. The target is an absolute page position, not a scrollBy:
+  // a smooth scrollBy issued while the last step's scroll is still moving adds to that scroll's destination, so steps
+  // a few seconds apart stacked up and pushed the step title off the top.
   useEffect(() => {
     if (!shown) return;
     const panel = document.querySelector(".beat");
     if (!panel) return;
     const r = panel.getBoundingClientRect();
-    const hidden = r.bottom - window.innerHeight + 12;
-    if (hidden > 0) window.scrollBy({ top: Math.min(hidden, Math.max(r.top - 8, 0)), behavior: "smooth" });
+    const top = window.scrollY + r.top - 8; // never scroll past this
+    const fit = window.scrollY + r.bottom + 12 - window.innerHeight; // enough to show the panel's bottom
+    const target = Math.min(top, fit);
+    if (target > window.scrollY + 1) window.scrollTo({ top: target, behavior: "smooth" });
   }, [shown, at]);
 
   const { message, amount } = WALKTHROUGH_TICKET;
