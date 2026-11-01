@@ -14,7 +14,7 @@ export interface Step {
   runLabel?: string; // the run button, when "Run this scene" doesn't say what it does
 }
 
-// The walkthrough on step 1 stops at each of these until the presenter dismisses the box. `id` is the engine's beat id
+// The walkthrough on step 1 plays these in order, each on screen for a few seconds. `id` is the engine's beat id
 // (Engine.scene_walkthrough). Every line says what this repo's code does (paidonce/lane1/, paidonce/lane2/).
 export interface Beat {
   id: string;

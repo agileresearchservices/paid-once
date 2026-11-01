@@ -2,9 +2,11 @@
 Nexus timeline's attempts and ledger fields."""
 
 import asyncio
+import time
 from types import SimpleNamespace
 
 from paidonce.models import TicketOutcome
+from paidonce.show import engine as engine_mod
 from paidonce.show.engine import (
     LANE1_STAGES,
     Engine,
@@ -267,71 +269,20 @@ def test_a_second_restart_does_not_move_a_closed_window():
     assert eng.scene_runs["nexus_kill"]["faults"][0]["end"] == end
 
 
-def _stepper() -> SimpleNamespace:
-    return SimpleNamespace(beat=None, _beat_gate=None)
+def test_a_walkthrough_step_stays_on_screen_for_its_dwell_time(monkeypatch):
+    monkeypatch.setitem(engine_mod.WALKTHROUGH_DWELL_S, "ticket", 0.3)
+    eng = SimpleNamespace(beat=None)
 
-
-def test_walkthrough_waits_on_a_step_until_its_box_is_dismissed():
-    async def go() -> list[str]:
-        eng = _stepper()
-        log: list[str] = []
-
-        async def scene() -> None:
-            await Engine.await_beat(eng, "walkthrough", "ticket")
-            log.append("after ticket")
-            await Engine.await_beat(eng, "walkthrough", "agent")
-            log.append("after agent")
-
-        task = asyncio.create_task(scene())
-        await asyncio.sleep(0.05)
-        assert eng.beat["id"] == "ticket" and log == []
-        assert Engine.continue_beat(eng, "ticket") is True
-        await asyncio.sleep(0.05)
-        assert eng.beat["id"] == "agent" and log == ["after ticket"]
-        assert Engine.continue_beat(eng, "agent") is True
-        await task
-        assert eng.beat is None
-        return log
-
-    assert asyncio.run(go()) == ["after ticket", "after agent"]
-
-
-def test_a_late_click_for_an_earlier_step_does_not_skip_the_next_one():
     async def go() -> None:
-        eng = _stepper()
-
-        async def scene() -> None:
-            await Engine.await_beat(eng, "walkthrough", "ticket")
-            await Engine.await_beat(eng, "walkthrough", "agent")
-
-        task = asyncio.create_task(scene())
-        await asyncio.sleep(0.05)
-        assert Engine.continue_beat(eng, "ticket") is True
-        await asyncio.sleep(0.05)
-        assert Engine.continue_beat(eng, "ticket") is False  # a double-click lands on the next step's box
-        assert eng.beat["id"] == "agent"
-        assert not task.done()
-        Engine.continue_beat(eng, "agent")
-        await task
-
-    asyncio.run(go())
-
-
-def test_continue_with_no_step_waiting_does_nothing():
-    assert Engine.continue_beat(_stepper(), "ticket") is False
-
-
-def test_cancelling_the_scene_clears_the_step():
-    async def go() -> None:
-        eng = _stepper()
-        task = asyncio.create_task(Engine.await_beat(eng, "walkthrough", "ticket"))
-        await asyncio.sleep(0.05)
-        task.cancel()
-        try:
-            await task
-        except asyncio.CancelledError:
-            pass
-        assert eng.beat is None and eng._beat_gate is None
+        started = Engine.start_beat(eng, "walkthrough", "ticket")
+        assert eng.beat == {"scene": "walkthrough", "id": "ticket", "at": started}
+        t0 = time.time()
+        await Engine.hold_beat(eng, started, "ticket")
+        assert 0.25 <= time.time() - t0 < 1.0
+        # Time already spent on the step (the agent was deciding) counts towards its dwell.
+        t0 = time.time()
+        await Engine.hold_beat(eng, started - 5, "ticket")
+        assert time.time() - t0 < 0.1
 
     asyncio.run(go())
 

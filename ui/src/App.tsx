@@ -81,9 +81,6 @@ export function App() {
   }, []);
 
   const beat = snap?.beat && snap.beat.scene === step.scene ? snap.beat.id : null;
-  const onContinue = useCallback(() => {
-    if (beat) void act(`/api/beat/continue?beat=${beat}`);
-  }, [beat, act]);
 
   // Pressing Run on a scene step: scroll down so the diagram and the scoreboards below it are on screen together, and
   // stop at the diagram's top (the explanation above may scroll away). The first step does its own scrolling (Walkthrough).
@@ -213,7 +210,7 @@ export function App() {
       {(step.arch || (step.scene && !step.nexus)) && <Diagram snap={snap} scene={step.scene} />}
 
       {step.arch ? (
-        <Walkthrough beat={beat} flow={onScreen ? snap.flow : undefined} onContinue={onContinue} />
+        <Walkthrough beat={beat} flow={onScreen ? snap.flow : undefined} />
       ) : step.nexus ? null : (
         <div className="lanes">
           {LANES.map((l) => (
