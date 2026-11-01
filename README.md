@@ -97,7 +97,7 @@ make demo                               # http://127.0.0.1:8100
 ```
 
 The page opens with the two architectures. "Walk through one ticket" runs a single approved ticket
-through both stacks and stops at six steps. Under the diagram, a support chat grows one line per step (the customer's request, the agent's proposal, the hand-off to a human, the approval, the refund) next to one plain sentence. This page outlines the flow; it does not compare the stacks yet. The scene does not move until you dismiss each step (button, Space or →). Then it steps through five scenes. An architecture diagram shows
+through both stacks and stops at five steps. Under the diagram, a support chat grows one line per step (the customer's request, the agent's proposal, the hand-off to a human, the approval, the refund) next to one plain sentence. This page outlines the flow; it does not compare the stacks yet. The scene does not move until you dismiss each step (button, Space or →). Then it steps through five scenes. An architecture diagram shows
 where each fault lands and where each stack thinks each ticket is, above both lanes' ledger-based scoreboards; the
 Nexus step shows the operations live. Arrow keys or 1-7 move between steps, R runs the current scene, and the step is kept in the URL (`#5`), so a refresh stays put. It
 is built for a laptop browser in full screen. The scoreboard resets whenever the show server starts.

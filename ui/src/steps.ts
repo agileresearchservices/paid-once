@@ -31,7 +31,6 @@ export const BEATS: Beat[] = [
   { id: "waiting", title: "Handed to a human", line: "The agent only proposes. A person decides." },
   { id: "approve", title: "The human approves", line: "The decision goes back to the process." },
   { id: "refund", title: "Payments moves the money", line: "Slowed 2.5 s so you can see it in flight." },
-  { id: "ledger", title: "The ledger is the record", line: "The scoreboard reads payments' ledger, not either stack." },
 ];
 
 export const STEPS: Step[] = [

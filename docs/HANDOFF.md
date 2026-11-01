@@ -83,8 +83,8 @@ whoever changes the code next.
   handler's in `payments`.
 - **The UI is a stepper** for a laptop browser, full screen (`#1`..`#7` in the URL, arrow keys, 1-7, R runs the
   scene). Nothing is built for tablet or phone. Step 1 is the architecture diagram plus the walkthrough
-  (below). The side-by-side table that used to sit under the diagram was removed; the walkthrough boxes say what each
-  stack does at each step, so keep `BEATS` in `ui/src/steps.ts` in step with `paidonce/lane1/` and `paidonce/lane2/`.
+  (below). The side-by-side table that used to sit under the diagram was removed; the walkthrough is a general outline
+  (a support chat, no stack comparison); the per-stack notes it used to carry are in the private talk track.
 - **Faults are drawn where they land.** One architecture diagram (`ui/src/Diagram.tsx`) on step 1 and the scene steps
   replaces the old toast, payments strip and process tiles. Fault events carry `target` (diagram node ids: process
   names or `temporal`) and `effect` (`kill`, `duplicate`, `stall`), set in `Engine.fault()`, so the UI never parses
@@ -138,7 +138,7 @@ whoever changes the code next.
 - Fairness: both lanes pay the same handshake cost, and TLS does not change Lane 1's per-attempt key or its 3 s timeout.
 
 ## The walkthrough (step 1)
-- `Engine.scene_walkthrough` sends one $42.00 ticket to both lanes and stops at six steps with `Engine.await_beat`. The
+- `Engine.scene_walkthrough` sends one $42.00 ticket to both lanes and stops at five steps with `Engine.await_beat`; the refund is the last, and the scene ends when the ledger has it. The
   snapshot's `beat` names the step; the UI shows its panel under the diagram, in the space the old comparison table used (`ui/src/Walkthrough.tsx`, copy in `BEATS` in `steps.ts`) and
   `POST /api/beat/continue?beat=<id>` releases the gate. The id must match the step on screen, so a double click cannot
   skip the next one. `make scenario` releases the gates itself.

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { BEATS, WALKTHROUGH_TICKET } from "./steps";
 import { LegendIcon, type TicketKind } from "./TicketIcon";
 import type { FlowDot, LaneId } from "./types";
@@ -30,22 +30,32 @@ function decided(flow: Record<LaneId, FlowDot[]> | undefined): boolean {
   return dots.length >= 2 && dots.every((d) => d.state.startsWith("waiting"));
 }
 
+// Whether both stacks show the ticket refunded.
+function refunded(flow: Record<LaneId, FlowDot[]> | undefined): boolean {
+  const dots = flow ? [...flow.lane1, ...flow.lane2] : [];
+  return dots.length >= 2 && dots.every((d) => d.state === "refunded");
+}
+
 export function Walkthrough({
   beat,
-  running,
   flow,
   onContinue,
 }: {
   beat: string | null;
-  running: boolean;
   flow?: Record<LaneId, FlowDot[]>;
   onContinue: () => void;
 }) {
-  const i = BEATS.findIndex((b) => b.id === beat);
+  // Between steps the chat stays as it was, without a button, so the panel never flashes a message or jumps.
+  const last = useRef(-1);
+  const at = BEATS.findIndex((b) => b.id === beat);
+  if (at >= 0) last.current = at;
+  else if (!flow) last.current = -1; // reset, or another scene is on screen: back to the hint
+  const i = last.current;
   const b = BEATS[i];
+  const waiting = at >= 0;
 
   useEffect(() => {
-    if (!b) return;
+    if (!waiting) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
       if (e.key === " " || e.key === "Enter" || e.key === "ArrowRight") {
@@ -56,16 +66,12 @@ export function Walkthrough({
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [b, onContinue]);
+  }, [waiting, onContinue]);
 
   if (!b) {
     return (
       <section className="beat idle" aria-label="Walkthrough">
-        <p>
-          {running
-            ? "Working on the next step…"
-            : "Press R to walk one ticket through. Space or → moves to the next step."}
-        </p>
+        <p>Press R to walk one ticket through. Space or → moves to the next step.</p>
       </section>
     );
   }
@@ -76,9 +82,11 @@ export function Walkthrough({
       <div className="beat-head">
         <span className="beat-n">Step {i + 1} of {BEATS.length}</span>
         <h3>{b.title}</h3>
-        <button className="primary" autoFocus onClick={onContinue}>
-          {i === BEATS.length - 1 ? "Finish ✓" : "Continue →"} <kbd>space</kbd>
-        </button>
+        {waiting && (
+          <button className="primary" autoFocus onClick={onContinue}>
+            Continue → <kbd>space</kbd>
+          </button>
+        )}
       </div>
       <div className="beat-body">
         <div className="chat" role="log" aria-label="Support chat">
@@ -103,11 +111,15 @@ export function Walkthrough({
                 <p>Approved.</p>
               </div>
             )}
-            {i >= 4 && <Note kind="paying">{`Asking payments for ${amount}…`}</Note>}
-            {i >= 5 && <Note kind="done">{`Refunded ${amount}. The ledger has it.`}</Note>}
+            {i >= 4 &&
+              (refunded(flow) ? (
+                <Note kind="done">{`Refunded ${amount}. The ledger has it.`}</Note>
+              ) : (
+                <Note kind="paying">{`Asking payments for ${amount}…`}</Note>
+              ))}
           </div>
         </div>
-        <p className="beat-line">{b.line}</p>
+        <p className="beat-line">{i === BEATS.length - 1 && refunded(flow) ? "Refunded once. The ledger agrees." : b.line}</p>
       </div>
     </section>
   );

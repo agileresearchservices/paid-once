@@ -435,8 +435,9 @@ class Engine:
             # the diagram has caught up, or the refund may already be booked by the time it appears.
             await asyncio.sleep(0.6)
             await self.await_beat(scene, "refund")
-            await self.wait_for_stage(scene, {"done"}, {"done"}, timeout=30.0)
-            await self.await_beat(scene, "ledger")
+            await self.wait_for_stage(
+                scene, {"done"}, {"done"}, timeout=30.0
+            )  # the last step; the refund ends the scene
         finally:
             await self.clear_faults()
 

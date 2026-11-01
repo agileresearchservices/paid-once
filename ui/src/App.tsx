@@ -197,7 +197,7 @@ export function App() {
       {(step.arch || (step.scene && !step.nexus)) && <Diagram snap={snap} scene={step.scene} />}
 
       {step.arch ? (
-        <Walkthrough beat={beat} running={thisRunning} flow={onScreen ? snap.flow : undefined} onContinue={onContinue} />
+        <Walkthrough beat={beat} flow={onScreen ? snap.flow : undefined} onContinue={onContinue} />
       ) : step.nexus ? null : (
         <div className="lanes">
           {LANES.map((l) => (
