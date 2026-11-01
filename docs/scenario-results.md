@@ -109,7 +109,8 @@ Cumulative audit at the end of each run:
 
 In `nexus_kill`, the payments-side activity attempt peaked at 2 in both runs while the caller's Nexus operation
 stayed at attempt 1, `STARTED`. Retries inside the handler's workflow are not visible as retries on the caller. All
-five refund workflows finished with `replayed: true` (the ledger returned the stored row for the retry).
+five refund workflows finished with `replayed: true` (the ledger returned the stored row for the retry). The
+refund result no longer carries `replayed` (it was payments-internal); the show counts replays from the payments service.
 
 `nexus_kill` is now a gauntlet (four failures on the same in-flight refunds: payments stalls after booking, then
 the support worker, the payments worker and the Temporal server are killed). On a side-port run at `2603d71`, with

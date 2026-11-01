@@ -94,6 +94,8 @@ export interface Topology {
   endpoint: string;
   service: string;
   operation: string;
+  sends: string[]; // RefundRequest's fields, in order
+  returns: string[]; // RefundResult's fields, in order
   payments: { namespace: string; task_queue: string; workflow: string; activity: string };
 }
 

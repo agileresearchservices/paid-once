@@ -97,7 +97,7 @@ make demo                               # http://127.0.0.1:8100
 ```
 
 The page opens with the two architectures. "Walk through one ticket" runs a single approved ticket
-through both stacks and stops at five steps. Under the diagram, three panes show what each role sees as the ticket moves: the customer (their message, then the agent's replies), the agent (ticket, policy check, human approval, refund) and the human (the proposal and Approve/Deny). This page outlines the flow; it does not compare the stacks yet. The scene plays on its own, a few seconds per step, and the customer pane is a chat that grows an agent reply per step. Then it steps through five scenes. An architecture diagram shows
+through both stacks and stops at five steps. Under the diagram, three panes show what each role sees as the ticket moves: the customer (their message with a photo of the broken mug, then the agent's replies), the agent (ticket, policy check, human approval, refund) and the human (the proposal and Approve/Deny). This page outlines the flow; it does not compare the stacks yet. The scene plays on its own, a few seconds per step, and the customer pane is a chat that grows an agent reply per step. Then it steps through five scenes. An architecture diagram shows
 where each fault lands and where each stack thinks each ticket is, above both lanes' ledger-based scoreboards; the
 Nexus step shows the operations live. Arrow keys or 1-7 move between steps, R runs the current scene (the page then scrolls so the diagram and both scoreboards are on screen together), and the step is kept in the URL (`#5`), so a refresh stays put. It
 is built for a laptop browser in full screen. The scoreboard resets whenever the show server starts.
@@ -115,7 +115,9 @@ Run of show, about ten minutes:
 - **Step 6, Nexus** says what Nexus is and why it matters, then proves it. Two static pictures on top: **Without Nexus**,
   support's code reaches across the team line into payments' namespace, task queue, workflow type and retries; **With
   Nexus**, support makes one call (`issue_refund`) to one endpoint (`payments-endpoint`) and payments owns everything
-  behind it. Below, the run as two team boxes joined by the endpoint. Four failures hit the refunds in flight, shown as
+  behind it. Under them, one strip spells out the contract: support sends `ticket_id` and `amount_cents` to
+  `issue_refund`, payments answers `refund_id`, `ticket_id` and `amount_cents`, and nothing else crosses (the field names
+  are read from the dataclasses). Below, the run as two team boxes joined by the endpoint. Four failures hit the refunds in flight, shown as
   chips that go red when they land and read "survived" after: payments books each refund and goes quiet, then the support
   worker, the payments worker and the Temporal server itself are killed, each for 5-6 seconds. The box a failure hits
   goes red. Support's box holds one check per refund (one call each, "no errors"); payments' box turns each refund into

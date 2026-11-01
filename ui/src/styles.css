@@ -279,6 +279,17 @@ svg.lg-icon, .diagram svg.lg-icon { display: inline-block; width: 26px; height: 
 .why-op { fill: var(--good-ink); font-size: 16px; }
 .why-caption { fill: var(--ink-2); font-size: 18px; }
 
+/* The contract strip (NexusContract.tsx): what crosses the endpoint, and nothing else. */
+.contract { display: grid; gap: 4px; border: 1.5px dashed var(--violet); border-radius: 12px; padding: 10px 20px; background: var(--page); }
+.ct-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 18px; }
+.ct-label { font-size: 20px; font-weight: 700; margin-right: 8px; }
+.ct-side { color: var(--ink-2); }
+.ct-fields { display: inline-flex; gap: 6px; }
+.ct-field { padding: 2px 8px; border-radius: 6px; background: var(--surface); border: 1px solid var(--axis); font-size: 16px; cursor: help; }
+.ct-op { color: var(--good-ink); font-weight: 700; font-size: 17px; }
+.ct-arrow { color: var(--good); font-weight: 700; }
+.ct-plain { color: var(--ink-2); font-size: 17px; }
+
 /* The run as two teams and one door (NexusTeams.tsx). */
 .teams { display: grid; gap: 10px; }
 .fchips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
@@ -353,10 +364,18 @@ main.fill .pane { height: auto; min-height: 186px; }
 .msg p { margin: 0; padding: 4px 14px; border-radius: 16px; font-size: var(--wf); line-height: 1.25; color: var(--ink); background: var(--surface); }
 .msg.customer { justify-content: flex-end; }
 .msg.customer p { background: var(--accent-wash); }
+/* The customer's photo (Walkthrough.tsx BrokenMug): fixed colours, so it reads as a photo on either theme */
+.pane-body.chat .msg p.with-photo { display: flex; align-items: center; gap: 10px; padding-top: 1px; padding-bottom: 1px; padding-right: 3px; }
+.mug-photo { width: 48px; height: 33px; flex: none; border-radius: 8px; }
+.mug-bg { fill: #ece3d6; }
+.mug-shadow { fill: #000; opacity: 0.12; }
+.mug path, .mug-shard { fill: #d0654a; stroke: #8e3a26; stroke-width: 1.2; stroke-linejoin: round; }
+.mug .mug-handle { fill: none; stroke: #d0654a; stroke-width: 6; stroke-linecap: round; }
+.mug .mug-rim { fill: #a84a33; stroke: none; }
 .msg { flex: none; }
 /* The customer chat grows downward like a real one: the newest line sits at the bottom and, when there is not room, the
    oldest scrolls off the top under a fade. Taller windows (see --wf) fit the whole conversation. */
-.pane-body.chat { contain: size; justify-content: flex-end; gap: 3px; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 18px); mask-image: linear-gradient(to bottom, transparent 0, #000 18px); }
+.pane-body.chat { contain: size; justify-content: flex-end; gap: 3px; padding-top: 2px; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 18px); mask-image: linear-gradient(to bottom, transparent 0, #000 18px); }
 .pane-body.chat .msg p { font-size: calc(18px + (var(--wf) - 20px) * 0.5); padding: 2px 12px; line-height: 1.2; }
 .review { display: flex; flex-direction: column; gap: 8px; }
 .review-ask { font-size: calc(var(--wf) * 1.2); font-weight: 700; color: var(--ink); }
