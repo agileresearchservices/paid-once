@@ -379,7 +379,9 @@ main.fill .pane { height: auto; min-height: 186px; }
 .pane-body.chat .msg p { font-size: calc(18px + (var(--wf) - 20px) * 0.5); padding: 2px 12px; line-height: 1.2; }
 .review { display: flex; flex-direction: column; gap: 8px; }
 .review-ask { font-size: calc(var(--wf) * 1.2); font-weight: 700; color: var(--ink); }
-.review-quote { font-size: calc(var(--wf) * 0.85); color: var(--ink-2); line-height: 1.25; }
+.review-quote { font-size: calc(var(--wf) * 0.85); color: var(--ink-2); line-height: 1.25; display: flex; align-items: center; gap: 10px; }
+.review-note { font-size: calc(var(--wf) * 0.85); color: var(--ink-2); line-height: 1.25; }
+.review-note b { color: var(--ink); }
 .review-actions { display: flex; gap: 10px; margin-top: 2px; }
 .act { padding: 5px 16px; border: 1px solid var(--axis); border-radius: 8px; font-size: calc(var(--wf) * 0.95); font-weight: 600; color: var(--ink-2); }
 .act.approve.on { background: #0b3a22; border-color: var(--good); color: var(--good-ink); }
