@@ -204,7 +204,8 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
         <rect className="team" x={822} y={4} width={W - 824} height={H - 8} rx={14} />
         <text className="row-label" x={838} y={20}>PAYMENTS TEAM</text>
         <text className="row-label" x={158} y={20}>QUEUE + LANGGRAPH</text>
-        <text className="row-label" x={HUMAN.x + HUMAN.w + 18} y={ROW.lane2 - 9}>TEMPORAL + NEXUS · SUPPORT TEAM</text>
+        {/* Under its row, lined up with the Queue label above its own: the human's bubble sits between the rows */}
+        <text className="row-label" x={158} y={ROW.lane2 + NODE_H + 18}>TEMPORAL + NEXUS · SUPPORT TEAM</text>
 
         <g className={humanNow ? "human now" : "human"}>
           <line className="wire" x1={HUMAN_X} x2={HUMAN_X} y1={HUMAN.y} y2={ROW.lane1 + NODE_H + 3} markerEnd="url(#arrow)" />
