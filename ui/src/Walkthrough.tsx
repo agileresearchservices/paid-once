@@ -65,6 +65,20 @@ export function Walkthrough({
   const b = BEATS[i];
   const waiting = at >= 0;
 
+  // When a step opens, bring the diagram and all three panes into view together. The header above may scroll away; the
+  // diagram must not be cut off (so the focus below does not scroll by itself, and the scroll stops at the diagram's top).
+  const button = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!waiting) return;
+    button.current?.focus({ preventScroll: true });
+    const panel = button.current?.closest(".beat");
+    const diagram = document.querySelector(".diagram");
+    if (!panel || !diagram) return;
+    const hidden = panel.getBoundingClientRect().bottom - window.innerHeight + 12;
+    const room = diagram.getBoundingClientRect().top - 8;
+    if (hidden > 0) window.scrollBy({ top: Math.min(hidden, Math.max(room, 0)), behavior: "smooth" });
+  }, [waiting, at]);
+
   useEffect(() => {
     if (!waiting) return;
     const onKey = (e: KeyboardEvent) => {
@@ -95,7 +109,7 @@ export function Walkthrough({
         <span className="beat-n">Step {i + 1} of {BEATS.length}</span>
         <h3>{b.title}</h3>
         {waiting && (
-          <button className="primary" autoFocus onClick={onContinue}>
+          <button ref={button} className="primary" onClick={onContinue}>
             Continue → <kbd>space</kbd>
           </button>
         )}
