@@ -462,7 +462,7 @@ class Engine:
         await asyncio.sleep(1.0)
         self.fault(
             "double_delivery",
-            "Fault: the same work is delivered twice (queue: redelivery, Temporal: replayed approval signals)",
+            "Fault: every message delivered twice",
             ["lane1_api", "temporal"],
             "duplicate",
         )
@@ -480,7 +480,7 @@ class Engine:
         await self.submit_cohort("deploy_wait", 5)
         await self.wait_for_proposals("deploy_wait")
         self.fault(
-            "deploy_wait", "Fault: both agent workers restart while approvals are pending", AGENT_WORKERS, "kill"
+            "deploy_wait", "Fault: a deploy restarts both workers", AGENT_WORKERS, "kill"
         )
         self.procs.kill("lane1_worker", restart_after=3.0)
         self.procs.kill("support_worker", restart_after=3.0)
@@ -498,7 +498,7 @@ class Engine:
         await self.submit_cohort("payments_timeout", 5)
         await self.wait_for_proposals("payments_timeout")
         await self.approve_scene("payments_timeout")
-        self.fault("payments_timeout", "Fault: payments holds its response after the commit", ["payments"], "stall")
+        self.fault("payments_timeout", "Fault: payments goes quiet after booking", ["payments"], "stall")
         await asyncio.sleep(20)
         await self.clear_faults()
 
@@ -519,7 +519,7 @@ class Engine:
         await self.wait_for_proposals(scene)
         await self.approve_scene(scene, then="; each approval becomes a Nexus operation to payments")
         self.fault(
-            scene, "Fault: payments books each refund, then holds its reply past the timeout", ["payments"], "stall"
+            scene, "Fault: payments goes quiet after booking", ["payments"], "stall"
         )
         # Filled in from the ledger as the bookings land: see _stall_window.
         self.scene_runs[scene]["faults"].append(

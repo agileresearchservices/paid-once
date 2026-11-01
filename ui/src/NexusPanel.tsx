@@ -56,8 +56,6 @@ function BoundaryStrip({
           ) : (
             <>
               Team boundary
-              <br />
-              the only name in support's code
             </>
           )}
         </span>
@@ -105,15 +103,15 @@ function beatsFor(
   const latest = on[on.length - 1];
   const allBack = landed > 0 && faults.every((f) => f.start != null && f.end != null);
   const beats = [
-    { text: `Support starts ${n || "the"} refund${n === 1 ? "" : "s"} on the endpoint` },
+    { text: `Support starts ${n || "the"} refund${n === 1 ? "" : "s"}` },
     {
       text:
         landed === 0
-          ? `⚡ ${planned} failures while they're in flight`
+          ? `⚡ ${planned} failures while in flight`
           : `⚡ Failure ${landed} of ${planned}: ${latest.effect === "stall" ? "payments goes quiet" : `${latest.label} killed`}`,
     },
-    { text: "Everything back up: payments retries with the same key" },
-    { text: done ? verdict : "The ledger decides: was each refund paid once?" },
+    { text: "Back up: payments retries, same key" },
+    { text: done ? verdict : "Ledger: was each refund paid once?" },
   ];
   const reached = done ? 4 : allBack ? 3 : landed > 0 ? 2 : n > 0 ? 1 : 0;
   return { beats, reached };
@@ -153,14 +151,13 @@ export function NexusPanel({
   const paidTwice = scene.filter(([, v]) => v === "duplicate").length;
   const missing = scene.filter(([, v]) => v === "missing").length;
   const errors = rows.filter((r) => r.caller_saw_failure || r.state === "FAILED").length;
-  const maxStarts = Math.max(0, ...rows.map((r) => r.peak_attempt));
   const retries = rows.reduce((n, r) => n + Math.max(0, r.attempts.length - 1, (r.handler.peak_activity_attempt ?? 0) - 1), 0);
   const show = finished && allClosed;
   const landed = faults.filter((f) => f.start != null);
   const verdict =
     paidTwice || missing || errors
       ? `⚠ ${[paidTwice && `${paidTwice} paid twice`, missing && `${missing} never paid`, errors && `support saw ${errors} error${errors === 1 ? "" : "s"}`].filter(Boolean).join(", ")}`
-      : "Each refund paid once; support's code saw no errors";
+      : "Each refund paid once; support saw no errors";
   const planned = processes.temporal ? 4 : 3; // the Temporal kill needs a server the show started itself
   const { beats, reached } = beatsFor(rows, faults, planned, show, verdict);
 
@@ -175,8 +172,7 @@ export function NexusPanel({
         kills={ran && run ? run.kills : {}}
       />
       <p className="without">
-        <b>Without Nexus,</b> support's code would name payments' namespace, task queue and workflow, and own their
-        retries.
+        <b>Without Nexus,</b> support would name payments' queue and own its retries.
       </p>
 
       {ran ? (
@@ -189,8 +185,7 @@ export function NexusPanel({
         </ol>
       ) : (
         <p className="beats-pre">
-          Press Run: 7 tickets, the approved ones go to payments over Nexus. Then, while they're in flight, payments
-          goes quiet and the support worker, the payments worker and the Temporal server itself are killed.
+          Press Run. Four failures hit refunds in flight.
         </p>
       )}
 
@@ -203,8 +198,7 @@ export function NexusPanel({
               : " "}
           </span>
           <span>
-            <i className="key-dollar">$</i> the ledger booked the refund · support would only see a failure after the
-            10-minute schedule-to-close timeout
+            <i className="key-dollar">$</i> booked in the ledger · support sees an error only after the 10-minute timeout
           </span>
         </div>
       </div>
@@ -214,19 +208,19 @@ export function NexusPanel({
           <span className="headline-label">Failures</span>
           {show ? (
             <>
-              <b>{landed.length}</b> <span className="muted">· each with {Math.min(...landed.map((f) => f.hit))}+ refunds in flight</span>
+              <b>{landed.length}</b> <span className="muted">· each hit {Math.min(...landed.map((f) => f.hit))}+ refunds</span>
             </>
           ) : (
             <b className="muted">…</b>
           )}
         </div>
         <div>
-          <span className="headline-label">Support's code saw</span>
+          <span className="headline-label">Support saw</span>
           {show ? (
             <>
               <b className={errors ? "n-bad" : "n-good"}>{errors}</b> error{errors === 1 ? "" : "s"}{" "}
               <span className="muted">
-                · {rows.length} operations, {maxStarts === 1 ? "1 start attempt each" : `up to ${maxStarts} start attempts`}
+                · {rows.length} operations
               </span>
             </>
           ) : (
@@ -237,7 +231,7 @@ export function NexusPanel({
           <span className="headline-label">Payments absorbed</span>
           {show ? (
             <>
-              <b>{retries}</b> retr{retries === 1 ? "y" : "ies"} <span className="muted">· inside its own namespace</span>
+              <b>{retries}</b> retr{retries === 1 ? "y" : "ies"} <span className="muted">· on its own</span>
             </>
           ) : (
             <b className="muted">…</b>
@@ -247,15 +241,13 @@ export function NexusPanel({
           <span className="headline-label">The ledger</span>
           {show ? (
             <>
-              <b className={paidTwice || missing ? "n-bad" : "n-good"}>{paidOnce}</b> refund{paidOnce === 1 ? "" : "s"}, each
-              paid once
+              <b className={paidTwice || missing ? "n-bad" : "n-good"}>{paidOnce}</b> paid once
               {paidTwice > 0 && <b className="n-bad"> · {paidTwice} paid twice</b>}
               {missing > 0 && <b className="n-bad"> · {missing} never paid</b>}
               {calls && (
                 <span className="muted">
                   {" "}
-                  · {calls.calls} calls: {calls.booked} booked, {calls.replays} answered from the ledger by{" "}
-                  <code>refund-&lt;ticket&gt;</code>
+                  · {calls.calls} calls: {calls.booked} booked, {calls.replays} replayed
                 </span>
               )}
             </>

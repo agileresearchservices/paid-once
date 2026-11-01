@@ -42,6 +42,7 @@ h1 { font-size: 20px; margin: 0; white-space: nowrap; display: flex; align-items
 .wordmark-text { font-weight: 400; color: var(--muted); }
 .tagline { font-size: 15px; font-weight: 400; color: var(--muted); }
 h2 { font-size: 22px; margin: 0 0 4px; }
+.story h2 { font-size: 32px; margin-bottom: 6px; }
 h3 { font-size: 14px; margin: 0 0 8px; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.04em; }
 p { margin: 0 0 8px; }
 .muted { color: var(--muted); }
@@ -64,9 +65,9 @@ button.primary:disabled { background: var(--surface); border-color: var(--axis);
 button.danger { border-color: var(--critical); color: #fff; background: var(--critical-wash); }
 
 .story { display: grid; grid-template-columns: 1fr auto; gap: 24px; background: var(--surface); border-radius: 12px; padding: 16px 24px; }
-.story-text p { max-width: 110ch; color: var(--ink-2); font-size: 18px; margin-bottom: 6px; }
-.story-text .watch { color: var(--ink); font-size: 16px; }
-.story-text .result { color: var(--ink); font-size: 16px; border-left: 3px solid var(--accent); padding-left: 10px; }
+.story-text p { max-width: 70ch; color: var(--ink-2); font-size: 24px; margin-bottom: 6px; }
+.story-text .watch { color: var(--ink); font-size: 22px; }
+.story-text .result { color: var(--ink); font-size: 22px; border-left: 3px solid var(--accent); padding-left: 10px; }
 .story-text .result.pending { visibility: hidden; }
 .controls { display: grid; gap: 8px; align-content: start; min-width: 200px; }
 .scene-status { margin: 0; font-size: 15px; text-align: center; }
@@ -78,7 +79,7 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 /* The architecture diagram: faults land on the node they hit, dots are tickets. */
 .diagram { background: var(--surface); border: 1px solid var(--grid); border-radius: 12px; padding: 8px 12px 4px; }
 .diagram svg { display: block; width: 100%; height: auto; }
-.diagram-head { min-height: 30px; display: flex; align-items: center; font-size: 15px; }
+.diagram-head { min-height: 82px; display: flex; align-items: center; font-size: 15px; }
 .legend { display: flex; gap: 22px; color: var(--ink-2); flex-wrap: wrap; }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .lg { display: inline-block; width: 11px; height: 11px; border-radius: 50%; }
@@ -100,11 +101,15 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .lg-slot.missing { background: #4a2306; border-color: var(--serious); color: var(--serious); }
 .lg-slot.bad { background: var(--critical-wash); border-color: var(--critical); color: var(--critical-ink); }
 .lg-slot.none { color: var(--ink-2); }
-.fault-caption {
-  background: var(--critical-wash); border: 1px solid var(--critical); color: var(--ink); border-radius: 8px;
-  padding: 3px 12px; font-size: 16px; animation: flash 0.9s ease-in-out 2;
-}
-@keyframes flash { 50% { background: #5a1f19; } }
+/* The key to the dots and boxes: two rows, big enough to read from the back of a room. */
+.diagram .legend { display: grid; gap: 12px; width: 100%; font-size: 22px; }
+.diagram .legend .lg-group { display: flex; align-items: center; gap: 34px; padding: 0; border: 0; }
+.diagram .legend .lg-group span { gap: 10px; }
+.diagram .legend .lg-group b { width: 86px; font-size: 22px; }
+.diagram .legend .lg { width: 18px; height: 18px; }
+.diagram .legend .lg.waiting { border-width: 3px; }
+.diagram .legend .lg-slot { min-width: 34px; height: 28px; font-size: 17px; border-radius: 5px; }
+.diagram .legend .lg-stage { margin-left: auto; font-size: 18px; }
 .locked-banner {
   margin: 0 0 12px; padding: 10px 16px; border-radius: 10px; font-size: 16px;
   background: #3a2c05; border: 1px solid var(--warning); color: var(--ink);
@@ -162,7 +167,7 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .diagram .slot.none rect { stroke: var(--muted); stroke-dasharray: none; }
 .diagram .slot.none text { fill: var(--ink-2); }
 @media (prefers-reduced-motion: reduce) {
-  .diagram *, .fault-caption { animation: none !important; transition: none !important; }
+  .diagram * { animation: none !important; transition: none !important; }
 }
 
 .chip { display: inline-block; background: var(--surface); border: 1px solid var(--axis); border-radius: 999px; padding: 2px 10px; font-size: 14px; color: var(--ink-2); margin: 0 6px 4px 0; }
@@ -313,16 +318,16 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 
 
 /* The walkthrough's explanation panel: in the page under the diagram, so the diagram stays in view. */
-.beat { min-height: 280px; padding: 16px 22px 18px; background: var(--surface); border: 2px solid var(--accent); border-radius: 14px; }
+.beat { min-height: 230px; padding: 16px 22px 18px; background: var(--surface); border: 2px solid var(--accent); border-radius: 14px; }
 .beat.idle { display: grid; place-items: center; border-color: var(--grid); }
-.beat.idle p { margin: 0; max-width: 90ch; color: var(--muted); font-size: 18px; text-align: center; }
+.beat.idle p { margin: 0; max-width: 90ch; color: var(--muted); font-size: 26px; text-align: center; }
 .beat-head { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
-.beat-head h3 { flex: 1; margin: 0; font-size: 26px; color: var(--ink); text-transform: none; letter-spacing: 0; }
+.beat-head h3 { flex: 1; margin: 0; font-size: 34px; color: var(--ink); text-transform: none; letter-spacing: 0; }
 .beat-n { color: var(--accent-ink); font-size: 14px; font-weight: 600; white-space: nowrap; }
 .beat kbd { font: 12px var(--mono); margin-left: 6px; padding: 1px 6px; border: 1px solid rgba(255, 255, 255, 0.5); border-radius: 4px; }
-.beat-intro { font-size: 21px; color: var(--ink); margin-bottom: 12px; }
+.beat-intro { font-size: 28px; color: var(--ink); margin-bottom: 12px; }
 .beat-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.beat-cols > div { padding: 10px 14px; border-radius: 10px; background: var(--page); font-size: 19px; color: var(--ink-2); }
+.beat-cols > div { padding: 10px 14px; border-radius: 10px; background: var(--page); font-size: 26px; color: var(--ink-2); }
 .beat-cols > div.t { background: var(--accent-wash); }
-.beat-cols b { display: block; margin-bottom: 6px; font-size: 17px; color: var(--ink); }
+.beat-cols b { display: block; margin-bottom: 6px; font-size: 20px; color: var(--ink); }
 .beat-cols p { margin: 0; }

@@ -64,12 +64,12 @@ export function Scoreboard({ audit, name, believedDone, note }: { audit: LaneAud
     <section className="scoreboard" aria-label={`${name} scoreboard`}>
       <div className="hero">
         <span className="hero-num">{audit.refunded_once}</span>
-        <span className="hero-of">of {audit.approved} approved refunded exactly once</span>
+        <span className="hero-of">of {audit.approved} approved refunded once</span>
       </div>
       {note && <p className="hero-note">{note}</p>}
       {believedDone !== undefined && (
         <p className="believed">
-          Its own job table says <b>{believedDone}</b> done. The ledger says <b>{audit.refunded_once}</b> refunded exactly once.
+          Job table says <b>{believedDone}</b> done. Ledger says <b>{audit.refunded_once}</b> paid once.
         </p>
       )}
       {/* Always rendered, so the lane doesn't jump when the first duplicate lands. A clean lane shows its $0.00. */}
@@ -100,21 +100,21 @@ export function Scoreboard({ audit, name, believedDone, note }: { audit: LaneAud
           <li key={p.key}>
             <i className={`swatch ${p.className}`} aria-hidden="true" />
             {p.icon} {p.label} <b>{p.value}</b>
-            {p.key === "none" && ` (${a.declined} outside the policy, ${a.rejected} a human said no)`}
+            {p.key === "none" && ` (${a.declined} policy, ${a.rejected} human)`}
           </li>
         ))}
       </ul>
 
       <ul className="invariants">
         <Invariant
-          text="Every approved ticket refunded exactly once"
+          text="Every approved ticket refunded once"
           verdict={exactlyOnce}
           detail={`${audit.duplicates} duplicated, ${audit.missing} missing`}
         />
         <Invariant
           text="No refund without an approval"
           verdict={untested ? "untested" : audit.unapproved > 0 ? "violated" : "holds"}
-          detail={`${audit.unapproved} refunded without approval · ${audit.rejected + audit.declined} denied tickets, none paid`}
+          detail={`${audit.unapproved} unapproved · ${audit.rejected + audit.declined} denied, none paid`}
         />
         <Invariant
           text="No ticket lost or stuck"

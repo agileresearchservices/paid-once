@@ -52,7 +52,6 @@ const WIRES: { id: string; x1: number; x2: number; lane: LaneId; label?: string 
 ];
 
 const FLASH_S = 2.5;
-const CAPTION_S = 8;
 
 function dotPos(at: string, i: number, lane: LaneId): { x: number; y: number; gone?: boolean } {
   if (at === "done") return { x: NODES.payments.x + 12, y: mid(lane), gone: true };
@@ -139,8 +138,6 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
   const faults: ShowEvent[] = run
     ? snap.events.filter((e) => e.kind === "fault" && e.ts >= run.started_at && (e.scene === scene || e.scene?.startsWith(`${scene}_`)))
     : [];
-  const latest = faults[faults.length - 1];
-  const caption = latest && snap.now - latest.ts < CAPTION_S ? latest : undefined;
   const hitNow = new Set(faults.filter((e) => snap.now - e.ts < FLASH_S).flatMap((e) => e.target ?? []));
   const marks: Record<string, string> = {};
   for (const e of faults) for (const t of e.target ?? []) if (e.effect && EFFECT_MARK[e.effect]) marks[t] = EFFECT_MARK[e.effect];
@@ -167,10 +164,8 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
       <div className="diagram-head">
         {scene == null ? (
           <span className="legend">
-            <span>Same tickets, same human approver, same payments service. Only the architecture differs.</span>
+            <span>Same tickets, same approver, same payments. Only the architecture differs.</span>
           </span>
-        ) : caption ? (
-          <span className="fault-caption" role="status">{caption.msg}</span>
         ) : (
           <span className="legend">
             {/* Two keys, two sources: the dots are where each stack thinks a ticket is; the boxes are what the payments
@@ -189,8 +184,8 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
               <span><i className="lg-slot bad">{OUTCOME_GLYPH.duplicate}</i> paid twice</span>
               <span><i className="lg-slot missing">{OUTCOME_GLYPH.missing}</i> owed, never paid</span>
               <span><i className="lg-slot none">{OUTCOME_GLYPH.denied}</i> denied, nothing owed</span>
+              <span className="lg-stage">⏱ slowed on purpose</span>
             </span>
-            <span className="lg-stage">⏱ slowed on purpose, so a fault lands mid-call</span>
           </span>
         )}
       </div>

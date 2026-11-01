@@ -36,7 +36,7 @@ export function Walkthrough({
         <p>
           {running
             ? "Working on the next step…"
-            : "Walk through one ticket (R) sends a single approved refund through both stacks and stops at each step. The explanation appears here; Space or → moves on."}
+            : "Press R to walk one ticket through both stacks. Space or → moves to the next step."}
         </p>
       </section>
     );
