@@ -25,6 +25,27 @@ function Row({ kind, children }: { kind: TicketKind; children: ReactNode }) {
   );
 }
 
+// The panes' role icons, drawn like the ticket icons (TicketIcon.tsx): a chat bubble for the customer, a robot for the agent.
+function RoleIcon({ role }: { role: "customer" | "agent" }) {
+  return (
+    <svg className="lg-icon role-icon" viewBox="-10 -10 20 20" aria-hidden="true">
+      {role === "customer" ? (
+        <g>
+          <path d="M-6.5,-5.5 H6.5 V3.5 H-1.5 L-5,6.5 V3.5 H-6.5 Z" />
+          <path d="M-3.4,-1 H3.4" />
+        </g>
+      ) : (
+        <g>
+          <rect x={-6.5} y={-3.5} width={13} height={10} rx={2.6} />
+          <path d="M0,-3.5 V-6.8" />
+          <circle cx={-2.6} cy={1.4} r={1.35} className="role-eye" />
+          <circle cx={2.6} cy={1.4} r={1.35} className="role-eye" />
+        </g>
+      )}
+    </svg>
+  );
+}
+
 // A pane is one role's window: it shows only what that role sees.
 function Pane({ who, avatar, chat, children }: { who: string; avatar: ReactNode; chat?: boolean; children: ReactNode }) {
   return (
@@ -95,13 +116,13 @@ export function Walkthrough({ beat, flow }: { beat: string | null; flow?: Record
       </div>
       <div className="panes">
         {/* The customer talks only to the agent: a short answer per step, never the policy check or the approval. */}
-        <Pane who="Customer view" avatar="C" chat>
+        <Pane who="Customer view" avatar={<RoleIcon role="customer" />} chat>
           <div className="msg customer"><p>{message}</p></div>
           {replies.map((r, n) => (
             <div className="msg support" key={n}><p>{r}</p></div>
           ))}
         </Pane>
-        <Pane who="Agent view" avatar="AI">
+        <Pane who="Agent view" avatar={<RoleIcon role="agent" />}>
           <Row kind={i >= 1 ? "done" : "active"}>{`New ticket · ${amount}`}</Row>
           {i >= 1 && (agentDone ? <Row kind="done">Policy check passed</Row> : <div className="pane-row"><Typing /></div>)}
           {/* One row for the human: proposed, then approved, in place */}

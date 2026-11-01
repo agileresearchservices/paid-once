@@ -365,6 +365,8 @@ main.fill .pane { height: auto; min-height: 186px; }
 .act.approve.on { background: #0b3a22; border-color: var(--good); color: var(--good-ink); }
 .avatar { flex: none; width: calc(var(--wf) * 1.5); height: calc(var(--wf) * 1.5); border-radius: 50%; display: grid; place-items: center; background: var(--grid); color: var(--ink-2); font-size: calc(var(--wf) * 0.7); font-weight: 700; }
 .pane:nth-child(2) .avatar { background: var(--sky); color: var(--page); }
+.role-icon { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.role-icon .role-eye { fill: currentColor; stroke: none; }
 .avatar .lg-icon { width: calc(var(--wf) * 1.2); height: calc(var(--wf) * 1.2); }
 .pane-row .lg-icon { width: calc(var(--wf) * 1.2); height: calc(var(--wf) * 1.2); }
 .typing { display: inline-flex; gap: 6px; align-items: center; height: calc(var(--wf) * 1.2); }
