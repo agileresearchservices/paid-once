@@ -146,8 +146,14 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .diagram .human.now .badge { stroke: var(--sky); stroke-width: 2.5; }
 .diagram .slot rect { fill: none; stroke: var(--axis); stroke-dasharray: 3 3; }
 .diagram .slot text { font-size: 12px; font-weight: 700; }
-.diagram .ledger-key .slot text { font-size: 17px; }
-.diagram .ledger-key .slot .key-label { font-size: 18px; font-weight: 400; fill: var(--ink-2); }
+.diagram .ledger .slot text { font-size: 15px; }
+.diagram .slot { cursor: default; }
+.diagram .ledger-name { fill: var(--ink-2); font-size: 15px; font-weight: 600; }
+.diagram .tally { font-size: 17px; font-weight: 700; }
+.diagram .tally.good { fill: var(--good-ink); }
+.diagram .tally.bad { fill: var(--critical-ink); }
+.diagram .hint rect { fill: var(--ink); }
+.diagram .hint text { fill: var(--page); font-size: 18px; font-weight: 600; }
 .diagram .slot.ok rect { fill: #0b3a22; stroke: var(--good); stroke-dasharray: none; }
 .diagram .slot.ok text { fill: var(--good-ink); }
 .diagram .slot.missing rect { fill: #4a2306; stroke: var(--serious); stroke-dasharray: none; }

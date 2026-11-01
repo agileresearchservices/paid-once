@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { OUTCOME_GLYPH } from "./outcomes";
 import type { FlowDot, LaneId, ShowEvent, Snapshot } from "./types";
 
@@ -99,65 +100,108 @@ function Dots({ lane, dots }: { lane: LaneId; dots: FlowDot[] }) {
   );
 }
 
-// This scene's refunds as the ledger has them: one slot per ticket, filled when the audit sees the refund.
-function Ledger({ lane, label, dots, tickets }: { lane: LaneId; label: string; dots: FlowDot[]; tickets: Record<string, string> }) {
+// Where each lane's ledger sits inside the Payments box: its name, the row of boxes, then one line with the result.
+const LEDGER_Y: Record<LaneId, { label: number; slots: number; tally: number }> = {
+  lane1: { label: 98, slots: 106, tally: 150 },
+  lane2: { label: 200, slots: 208, tally: 252 },
+};
+const SLOT_W = 24;
+const SLOT_PITCH = 28;
+
+interface Hint {
+  x: number;
+  y: number;
+  text: string;
+}
+
+// What a box means, shown on hover. The boxes carry no key: the presenter points at one and this says what it is.
+function slotMeaning(st: string): string {
+  if (st === "ok") return "paid once";
+  if (st === "duplicate") return "paid twice";
+  if (st === "missing") return "owed, never paid";
+  if (st === "unapproved") return "paid with no approval";
+  if (st === "rejected" || st === "declined") return "denied, nothing owed";
+  return "not paid yet";
+}
+
+// The result in words, so the outcome reads without decoding the boxes: problems first, or "all N paid once".
+function tallyText(statuses: string[]): { text: string; bad: boolean } | null {
+  const n = (st: string) => statuses.filter((x) => x === st).length;
+  const parts = [
+    [n("duplicate"), "paid twice"],
+    [n("missing"), "owed"],
+    [n("unapproved"), "unapproved"],
+  ].filter(([c]) => (c as number) > 0);
+  if (parts.length) return { text: parts.map(([c, t]) => `${c} ${t}`).join(" · "), bad: true };
+  const ok = n("ok");
+  const open = statuses.filter((x) => x === "waiting" || x === "settling").length;
+  return ok > 0 && open === 0 ? { text: `all ${ok} paid once`, bad: false } : null;
+}
+
+// This scene's refunds as the ledger has them: one box per ticket, filled when the audit sees the refund.
+function Ledger({
+  lane,
+  label,
+  dots,
+  tickets,
+  onHint,
+}: {
+  lane: LaneId;
+  label: string;
+  dots: FlowDot[];
+  tickets: Record<string, string>;
+  onHint: (h: Hint | null) => void;
+}) {
   const ids = dots.map((d) => d.ticket).sort();
   const x0 = NODES.payments.x + 16;
-  const y = mid(lane) + 8;
+  const at = LEDGER_Y[lane];
+  const statuses = ids.map((id) => tickets[id] ?? "waiting");
+  const tally = tallyText(statuses);
   return (
     <g className="ledger">
-      <text x={x0} y={y + 13} className="n-sub">{label}</text>
-      {ids.length === 0 && <text x={x0 + 82} y={y + 13} className="n-sub">no tickets this scene</text>}
+      <text x={x0} y={at.label} className="ledger-name">{label}</text>
+      {ids.length === 0 && <text x={x0} y={at.slots + 16} className="n-sub">no tickets this scene</text>}
       {ids.map((id, i) => {
-        const st = tickets[id] ?? "waiting";
-        const x = x0 + 82 + i * 24;
+        const st = statuses[i];
+        const x = x0 + i * SLOT_PITCH;
         // Same colours as the scoreboard: twice and unapproved are critical (red), never refunded is serious (orange).
         // Owed nothing and paid nothing (a denial, or a ticket outside the policy) is neutral.
         const owedNothing = st === "rejected" || st === "declined";
         const cls = st === "ok" ? "slot ok" : st === "duplicate" || st === "unapproved" ? "slot bad" : st === "missing" ? "slot missing" : owedNothing ? "slot none" : "slot";
         const glyph = owedNothing ? OUTCOME_GLYPH.denied : st === "ok" || st === "duplicate" || st === "missing" || st === "unapproved" ? OUTCOME_GLYPH[st] : "";
-        const what = st === "ok" ? "refunded once" : st === "duplicate" ? "refunded more than once" : owedNothing ? "denied, nothing owed" : st;
         return (
-          <g key={id} className={cls}>
-            <rect x={x} y={y} width={22} height={18} rx={4} />
-            <text x={x + 11} y={y + 13.5} textAnchor="middle">{glyph}</text>
-            <title>{`${id}: ${what}`}</title>
+          <g
+            key={id}
+            className={cls}
+            onMouseEnter={() => onHint({ x: x + SLOT_W / 2, y: at.slots, text: slotMeaning(st) })}
+            onMouseLeave={() => onHint(null)}
+          >
+            <rect x={x} y={at.slots} width={SLOT_W} height={22} rx={4} />
+            <text x={x + SLOT_W / 2} y={at.slots + 16.5} textAnchor="middle">{glyph}</text>
           </g>
         );
       })}
+      {tally && (
+        <text x={x0} y={at.tally} className={tally.bad ? "tally bad" : "tally good"}>{tally.text}</text>
+      )}
     </g>
   );
 }
 
-// What the ledger's boxes mean, drawn in the Payments box between its two rows of boxes. Each entry is a copy of the real
-// slot, so it reads as the same mark.
-const LEDGER_KEY: { cls: string; glyph: string; text: string }[] = [
-  { cls: "ok", glyph: OUTCOME_GLYPH.ok, text: "paid once" },
-  { cls: "bad", glyph: OUTCOME_GLYPH.duplicate, text: "paid twice" },
-  { cls: "missing", glyph: OUTCOME_GLYPH.missing, text: "owed, never paid" },
-  { cls: "none", glyph: OUTCOME_GLYPH.denied, text: "denied, nothing owed" },
-];
-
-function LedgerKey() {
-  const x = NODES.payments.x + 16;
-  const y0 = ROW.lane1 + 95;
+// A large tooltip above the box under the pointer, clamped to the diagram so it never runs off the edge.
+function HintBubble({ hint }: { hint: Hint }) {
+  const w = hint.text.length * 10.5 + 24;
+  const x = Math.min(W - w - 4, Math.max(4, hint.x - w / 2));
   return (
-    <g className="ledger-key">
-      {LEDGER_KEY.map((k, i) => {
-        const y = y0 + i * 24;
-        return (
-          <g key={k.cls} className={`slot ${k.cls}`}>
-            <rect x={x} y={y} width={34} height={22} rx={5} />
-            <text x={x + 17} y={y + 17} textAnchor="middle">{k.glyph}</text>
-            <text className="key-label" x={x + 46} y={y + 17}>{k.text}</text>
-          </g>
-        );
-      })}
+    <g className="hint" pointerEvents="none">
+      <rect x={x} y={hint.y - 38} width={w} height={30} rx={6} />
+      <text x={x + w / 2} y={hint.y - 17} textAnchor="middle">{hint.text}</text>
     </g>
   );
 }
 
 export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null }) {
+  const [hint, setHint] = useState<Hint | null>(null);
   const run = scene ? snap.scene_runs?.[scene] : undefined;
   const onScreen = scene != null && snap.current === scene;
   const flow: Record<LaneId, FlowDot[]> = onScreen && snap.flow ? snap.flow : { lane1: [], lane2: [] };
@@ -195,7 +239,7 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
           </span>
         ) : (
           <span className="legend">
-            {/* The dots are where each stack thinks a ticket is. The ledger key sits in the Payments box (LedgerKey). */}
+            {/* The dots are where each stack thinks a ticket is. The ledger boxes explain themselves on hover. */}
             <span className="lg-group">
               <b>Ticket</b>
               <span><i className="lg active" /> in progress</span>
@@ -277,8 +321,8 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
           const p = b.proc ? snap.processes[b.proc] : undefined;
           const down = p ? !p.alive : false;
           const cls = ["node", down && "down", hitNow.has(id) && "hit", id === "endpoint" && "door"].filter(Boolean).join(" ");
-          // Payments' bottom strip holds the Temporal ledger row, so its badge sits under the Queue + LangGraph row instead.
-          const badgeY = id === "payments" ? b.y + 72 : b.y + b.h - 27;
+          // Payments' bottom strip holds the Temporal ledger, so its badge sits in the gap between the two ledgers instead.
+          const badgeY = id === "payments" ? b.y + 128 : b.y + b.h - 27;
           return (
             <g key={id} className={cls}>
               <rect x={b.x} y={b.y} width={b.w} height={b.h} rx={10} />
@@ -308,14 +352,14 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
 
         {scene != null && (
           <>
-            <Ledger lane="lane1" label="Queue" dots={flow.lane1} tickets={audit("lane1")} />
-            <Ledger lane="lane2" label="Temporal" dots={flow.lane2} tickets={audit("lane2")} />
-            <LedgerKey />
+            <Ledger lane="lane1" label="Queue" dots={flow.lane1} tickets={audit("lane1")} onHint={setHint} />
+            <Ledger lane="lane2" label="Temporal" dots={flow.lane2} tickets={audit("lane2")} onHint={setHint} />
           </>
         )}
 
         <Dots lane="lane1" dots={flow.lane1} />
         <Dots lane="lane2" dots={flow.lane2} />
+        {hint && <HintBubble hint={hint} />}
       </svg>
     </section>
   );
