@@ -63,24 +63,25 @@ export function Walkthrough({
   else if (!flow) last.current = -1; // reset, or another scene is on screen: back to the hint
   const i = last.current;
   const b = BEATS[i];
-  const waiting = at >= 0;
+  const shown = at >= 0; // a step is up
+  const gated = shown && at < BEATS.length - 1; // all but the last wait for a click; the refund ends the scene on its own
 
   // When a step opens, bring the diagram and all three panes into view together. The header above may scroll away; the
   // diagram must not be cut off (so the focus below does not scroll by itself, and the scroll stops at the diagram's top).
   const button = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    if (!waiting) return;
+    if (!shown) return;
     button.current?.focus({ preventScroll: true });
-    const panel = button.current?.closest(".beat");
+    const panel = document.querySelector(".beat");
     const diagram = document.querySelector(".diagram");
     if (!panel || !diagram) return;
     const hidden = panel.getBoundingClientRect().bottom - window.innerHeight + 12;
     const room = diagram.getBoundingClientRect().top - 8;
     if (hidden > 0) window.scrollBy({ top: Math.min(hidden, Math.max(room, 0)), behavior: "smooth" });
-  }, [waiting, at]);
+  }, [shown, at]);
 
   useEffect(() => {
-    if (!waiting) return;
+    if (!gated) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
       if (e.key === " " || e.key === "Enter" || e.key === "ArrowRight") {
@@ -91,7 +92,7 @@ export function Walkthrough({
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [waiting, onContinue]);
+  }, [gated, onContinue]);
 
   if (!b) {
     return (
@@ -108,7 +109,7 @@ export function Walkthrough({
       <div className="beat-head">
         <span className="beat-n">Step {i + 1} of {BEATS.length}</span>
         <h3>{b.title}</h3>
-        {waiting && (
+        {gated && (
           <button ref={button} className="primary" onClick={onContinue}>
             Continue → <kbd>space</kbd>
           </button>

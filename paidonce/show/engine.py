@@ -434,10 +434,10 @@ class Engine:
             # Both calls start within a moment and stay in flight for the 2.5 s of latency: show the box now, not after
             # the diagram has caught up, or the refund may already be booked by the time it appears.
             await asyncio.sleep(0.6)
-            await self.await_beat(scene, "refund")
-            await self.wait_for_stage(
-                scene, {"done"}, {"done"}, timeout=30.0
-            )  # the last step; the refund ends the scene
+            # The last step has no gate: it shows while the refund lands, and the scene ends when the ledger has it.
+            self.beat = {"scene": scene, "id": "refund", "at": time.time()}
+            await self.wait_for_stage(scene, {"done"}, {"done"}, timeout=30.0)
+            self.beat = None
         finally:
             await self.clear_faults()
 

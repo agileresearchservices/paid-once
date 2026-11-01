@@ -138,7 +138,7 @@ whoever changes the code next.
 - Fairness: both lanes pay the same handshake cost, and TLS does not change Lane 1's per-attempt key or its 3 s timeout.
 
 ## The walkthrough (step 1)
-- `Engine.scene_walkthrough` sends one $42.00 ticket to both lanes and stops at five steps with `Engine.await_beat`; the refund is the last, and the scene ends when the ledger has it. The
+- `Engine.scene_walkthrough` sends one $42.00 ticket to both lanes and stops at the first four steps with `Engine.await_beat`; step 5, the refund, has no gate (the engine just sets `beat`), and the scene ends when the ledger has it. The
   snapshot's `beat` names the step; the UI shows its panel under the diagram, in the space the old comparison table used (`ui/src/Walkthrough.tsx`, copy in `BEATS` in `steps.ts`) and
   `POST /api/beat/continue?beat=<id>` releases the gate. The id must match the step on screen, so a double click cannot
   skip the next one. `make scenario` releases the gates itself.
