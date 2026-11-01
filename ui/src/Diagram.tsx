@@ -179,8 +179,10 @@ function Ledger({
 }
 
 export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null }) {
-  const run = scene ? snap.scene_runs?.[scene] : undefined;
+  // Only the scene that ran last is on screen: its dots, ledger, fault marks and kill badges all go together. Any other step
+  // shows a bare diagram, however recently its own scene ran.
   const onScreen = scene != null && snap.current === scene;
+  const run = onScreen && scene ? snap.scene_runs?.[scene] : undefined;
   const flow: Record<LaneId, FlowDot[]> = onScreen && snap.flow ? snap.flow : { lane1: [], lane2: [] };
 
   // Faults from this scene's latest run: where they landed, and whether they just happened.
