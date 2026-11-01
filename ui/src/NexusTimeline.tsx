@@ -4,21 +4,21 @@ import { shortTicket, workflowLink } from "./nexusLinks";
 
 // The Nexus scene over time. x = seconds since the scene started, on an axis fixed at 0-30 s (it only grows if a
 // run takes longer), so bars grow into it with the clock and nothing rescales. Each approved ticket gets two
-// tracks: what support's code sees (the caller's Nexus operation) and what payments does about it (the refund
-// activity's attempts, with the moment the ledger booked the money). Above them, one row per failure the scene
+// thin tracks: what support's code sees (the caller's Nexus operation: one calm bar) and what payments does about it
+// (the refund activity's attempts, with the moment the ledger booked the money). Each track's words sit in a status
+// column on the right; the details of an attempt are on hover. Above them, one row per failure the scene
 // injects, in the order they land, each washing faintly down through the tickets it hit.
 
 const W = 1400; // viewBox width; the SVG scales to the panel
-const LABEL = 172; // left column: ticket number and the two track labels
-const RIGHT = 12;
-const FAULT_ROW = 17;
-const TICKS = 22;
-const TRACK = 18;
-const TRACK_GAP = 5;
-const ROW_GAP = 13;
+const LABEL = 196; // left column: ticket number and the two track labels
+const RIGHT = 250; // reserved on the right for each track's status text, so it never moves while a bar grows
+const FAULT_ROW = 21;
+const TICKS = 26;
+const TRACK = 14; // thin strips: the story is the shape (one calm bar over a busy strip), the words are in the status column
+const TRACK_GAP = 4;
+const ROW_GAP = 14;
 const ROW = TRACK * 2 + TRACK_GAP + ROW_GAP;
 const MIN_ROWS = 5; // the scene approves five: reserve their height so the page doesn't jump when they arrive
-const CHAR = 7.4; // rough width of one 13px character, to decide whether a label fits inside its bar
 const MIN_SPAN = 30; // seconds on the axis before it ever grows
 
 // The gauntlet, in order. Shown muted before the run, so the audience sees what's coming; each fills as it lands.
@@ -66,7 +66,7 @@ export function NexusTimeline({ rows, t0, now, faults, temporalUi }: Props) {
 
       {rows.length === 0 && (
         <text className="empty" x={LABEL + 12} y={TOP + ROW}>
-          {t0 == null ? "Each approved refund gets two tracks here when the scene runs." : "Waiting for the first approved refund…"}
+          {t0 == null ? "Press Run. Four failures hit refunds in flight." : "Waiting for the first approved refund…"}
         </text>
       )}
 
@@ -123,17 +123,17 @@ function Ticket({ r, y, x, now, ui }: { r: NexusRow; y: number; x: (ts: number) 
   const h = r.handler;
   return (
     <g className="ticket-row">
-      <text className="tnum" x={8} y={y + TRACK + 3}>
+      <text className="tnum" x={8} y={y + TRACK + TRACK_GAP + 6}>
         {shortTicket(r.ticket)}
       </text>
       <TrackLabel
-        x={56}
+        x={64}
         y={y}
         text="support sees"
         href={ui ? workflowLink(ui, r.caller_namespace, r.caller_workflow_id, r.caller_run_id) : null}
       />
       <TrackLabel
-        x={56}
+        x={64}
         y={yPay}
         text="payments does"
         href={ui && h.namespace && h.workflow_id ? workflowLink(ui, h.namespace, h.workflow_id, h.run_id) : null}
@@ -146,7 +146,7 @@ function Ticket({ r, y, x, now, ui }: { r: NexusRow; y: number; x: (ts: number) 
 
 function TrackLabel({ x, y, text, href }: { x: number; y: number; text: string; href: string | null }) {
   const label = (
-    <text className={href ? "track-label link" : "track-label"} x={x} y={y + TRACK - 4}>
+    <text className={href ? "track-label link" : "track-label"} x={x} y={y + TRACK - 1}>
       {text}
       {href ? " ↗" : ""}
     </text>
@@ -168,31 +168,34 @@ function SupportTrack({ r, y, x, now }: { r: NexusRow; y: number; x: (ts: number
   const phases = r.phases.length ? r.phases : [{ state: r.state, at: r.op_scheduled_at }];
   const failed = r.state === "FAILED";
   const startAttempts = `${r.peak_attempt} start attempt${r.peak_attempt === 1 ? "" : "s"}`;
+  const bad = failed || r.caller_saw_failure;
   const label = failed
-    ? `FAILED · ${r.last_failure || "the operation failed"}`
+    ? `✕ FAILED · ${r.last_failure || "the operation failed"}`
     : r.caller_saw_failure
       ? `${r.state} · ${startAttempts} · saw: ${r.last_failure}`
-      : "STARTED · no error";
-  const x0 = x(r.op_scheduled_at);
-  const x1 = x(end);
+      : r.live
+        ? "STARTED · no error"
+        : `${OUTCOME_GLYPH.ok} completed · no error`;
   return (
     <g className="support-track">
       {phases.map((p, i) => {
         const from = i === 0 ? r.op_scheduled_at : p.at;
         const to = phases[i + 1]?.at ?? end;
         const cls = p.state === "STARTED" ? "seg calm" : "seg waiting";
-        return <rect key={i} className={cls} x={x(from)} y={y} width={Math.max(2, x(to) - x(from))} height={TRACK} rx={4} />;
+        return <rect key={i} className={cls} x={x(from)} y={y} width={Math.max(2, x(to) - x(from))} height={TRACK} rx={3} />;
       })}
-      {/* Always anchored at the bar's start: the bar grows under it, so the label never jumps while live. */}
-      <text className={`seg-text inside ${failed || r.caller_saw_failure ? "warn" : ""}`} x={x0 + 8} y={y + TRACK - 4}>
-        {label}
-      </text>
-      {!r.live && (
-        <text className={failed ? "end bad" : "end ok"} x={x1 + 6} y={y + TRACK - 4}>
-          {failed ? "✕ failed" : `${OUTCOME_GLYPH.ok} completed`}
-        </text>
-      )}
+      <StatusText y={y} cls={bad ? (failed ? "bad" : "warn") : r.live ? "calm" : "ok"} text={label} />
     </g>
+  );
+}
+
+// A track's words, in the column on the right.
+function StatusText({ y, cls, text }: { y: number; cls: string; text: string }) {
+  return (
+    <text className={`status ${cls}`} x={W - RIGHT + 14} y={y + TRACK - 1}>
+      <title>{text}</title>
+      {text}
+    </text>
   );
 }
 
@@ -203,6 +206,14 @@ function PaymentsTrack({ r, y, x, now }: { r: NexusRow; y: number; x: (ts: numbe
   const last = atts[atts.length - 1];
   // A later attempt that got the stored result back: it ran after the booking and payments counted a replay.
   const replayed = (a: RefundAttempt) => booked != null && r.ledger.replays > 0 && a.started_at > booked && a.outcome === "ok";
+  const describe = (a: RefundAttempt) => {
+    const secs = Math.round((a.ended_at ?? now) - a.started_at);
+    return a.outcome === "failed"
+      ? `✕ attempt ${a.n} ${timedOut(a) ? "timed out" : `failed after ${secs} s`}`
+      : a.outcome === "ok"
+        ? `${OUTCOME_GLYPH.ok} attempt ${a.n}${replayed(a) ? " · from the ledger" : ""}`
+        : `attempt ${a.n}…`;
+  };
   return (
     <g className="payments-track">
       {atts.slice(1).map((a, i) => {
@@ -212,47 +223,20 @@ function PaymentsTrack({ r, y, x, now }: { r: NexusRow; y: number; x: (ts: numbe
       {last && last.outcome !== "running" && last.outcome !== "ok" && r.live && (
         <line className="gap" x1={x(last.ended_at ?? now)} x2={x(now)} y1={y + TRACK / 2} y2={y + TRACK / 2} />
       )}
-      {atts.map((a) => {
-        const x0 = x(a.started_at);
-        const x1 = x(a.ended_at ?? now);
-        const secs = Math.round((a.ended_at ?? now) - a.started_at);
-        // The failure text can be long (or Temporal's "Failure exceeds size limit."), so the bar says how long the
-        // attempt lasted and the full text is on hover.
-        const text =
-          a.outcome === "failed"
-            ? `✕ attempt ${a.n} ${timedOut(a) ? `timed out` : `failed after ${secs} s`}`
-            : a.outcome === "ok"
-              ? `${OUTCOME_GLYPH.ok} attempt ${a.n}${replayed(a) ? " · from the ledger" : ""}`
-              : `attempt ${a.n}…`;
-        // Keep the label clear of the $ marker when the booking falls inside this attempt.
-        const bx = booked != null ? x(booked) : null;
-        const from = bx != null && bx >= x0 && bx <= x1 ? bx + TRACK / 2 + 6 : x0 + 8;
-        return (
-          <g key={a.n}>
-            <rect className={`seg ${a.outcome}`} x={x0} y={y} width={Math.max(2, x1 - x0)} height={TRACK} rx={4} />
-            <FittedLabel
-              from={from}
-              x0={x0}
-              x1={x1}
-              y={y}
-              text={text}
-              cls={a.outcome}
-              after={a.outcome === "ok"}
-              short={a.outcome === "failed" ? `✕ ${a.n}` : undefined}
-              hover={a.failure ? `attempt ${a.n}: ${a.failure}` : undefined}
-            />
-          </g>
-        );
-      })}
-      {atts.length === 0 && (
-        <text className="seg-text muted" x={x(r.op_scheduled_at) + 4} y={y + TRACK - 4}>
-          not accepted yet
-        </text>
+      {atts.map((a) => (
+        <rect key={a.n} className={`seg ${a.outcome}`} x={x(a.started_at)} y={y} width={Math.max(2, x(a.ended_at ?? now) - x(a.started_at))} height={TRACK} rx={3}>
+          <title>{a.failure ? `${describe(a)} · ${a.failure}` : describe(a)}</title>
+        </rect>
+      ))}
+      {last ? (
+        <StatusText y={y} cls={last.outcome === "ok" ? "ok" : last.outcome === "failed" ? "failed" : "running"} text={describe(last)} />
+      ) : (
+        <StatusText y={y} cls="muted" text="not accepted yet" />
       )}
       {booked != null && (
         <g className="booked">
           <title>The ledger booked this refund (refund-&lt;ticket&gt;)</title>
-          <circle cx={x(booked)} cy={y + TRACK / 2} r={TRACK / 2 + 1} />
+          <circle cx={x(booked)} cy={y + TRACK / 2} r={TRACK / 2 + 3} />
           <text x={x(booked)} y={y + TRACK / 2 + 4} textAnchor="middle">
             $
           </text>
@@ -263,58 +247,3 @@ function PaymentsTrack({ r, y, x, now }: { r: NexusRow; y: number; x: (ts: numbe
 }
 
 const timedOut = (a: RefundAttempt) => /StartToClose|timeout/i.test(a.failure);
-
-// A label inside its bar (from `from`) if it fits, otherwise just after the bar's end. `after` always puts it after.
-// If an "after" label would run off the right edge, it sits before the bar instead, ending where the bar starts.
-// With `short`, a label that doesn't fit stays inside its bar in the short form (a failed attempt is followed by the
-// next attempt, so text after the bar would run under it); the full text is on hover.
-function FittedLabel({
-  from,
-  x0,
-  x1,
-  y,
-  text,
-  cls,
-  after,
-  short,
-  hover,
-}: {
-  from: number;
-  x0: number;
-  x1: number;
-  y: number;
-  text: string;
-  cls: string;
-  after?: boolean;
-  short?: string;
-  hover?: string;
-}) {
-  const room = x1 - from - 4;
-  const fits = !after && room > text.length * CHAR;
-  const tip = <title>{hover ? `${text} · ${hover}` : text}</title>;
-  if (!fits && short !== undefined) {
-    return room > short.length * CHAR ? (
-      <text className={`seg-text ${cls} inside`} x={from} y={y + TRACK - 4}>
-        {tip}
-        {short}
-      </text>
-    ) : (
-      <rect className="hit" x={x0} y={y} width={Math.max(2, x1 - x0)} height={TRACK}>
-        {tip}
-      </rect>
-    );
-  }
-  const width = text.length * CHAR;
-  const offRight = !fits && x1 + 6 + width > W - RIGHT;
-  return (
-    <text
-      className={`seg-text ${cls} ${fits ? "inside" : "outside"}`}
-      x={fits ? from : offRight ? x0 - 6 : x1 + 6}
-      textAnchor={offRight ? "end" : "start"}
-      y={y + TRACK - 4}
-    >
-      {tip}
-      {text}
-    </text>
-  );
-}

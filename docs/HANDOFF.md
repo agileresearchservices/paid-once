@@ -71,6 +71,11 @@ whoever changes the code next.
   ledger (`_stall_window`: first booking to the last held reply). `scripts/smoke.py --check nexus_kill` fails if any
   window hit no refund or never closed. On a real run: 15 calls for 5 refunds, 5 booked and 10 answered from the
   ledger; support saw `STARTED`, 1 start attempt and no error throughout.
+  **The page is "claim, then proof"** (`ui/src/NexusPanel.tsx`, `NexusTimeline.tsx`): a top card says what support's code knows
+  (the Nexus client call, built from `topology`) versus what payments owns, then the run, then three ledger tiles. The old
+  four-beats row and "Without Nexus" line are gone; each ticket is two thin strips with their words in a right-hand status
+  column (`RIGHT` in `NexusTimeline.tsx`; hover has the per-attempt detail). The panel is ~740 px at 1512 wide, which fits
+  the 945 px screen once the run scrolls it to the top. Do not claim the endpoint can be retargeted live: that is under "Not built here".
 - **The show owns Temporal when it starts it.** If nothing listens on `TEMPORAL_ADDRESS`, `procs.ensure_temporal` runs
   `temporal server start-dev --db-filename data/temporal.db` as a managed process, so `/api/faults/kill/temporal`
   works and the server comes back from its database with every workflow where it left off (workers that lose it exit

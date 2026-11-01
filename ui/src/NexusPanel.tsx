@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { NexusTimeline } from "./NexusTimeline";
 import { shortTicket } from "./nexusLinks";
 import { ProcTile } from "./Processes";
-import type { FaultWindow, NexusRow, ProcStatus, SceneRun, Topology } from "./types";
+import type { NexusRow, ProcStatus, SceneRun, Topology } from "./types";
 
 function Ext({ href, children }: { href: string; children: ReactNode }) {
   return (
@@ -12,9 +12,10 @@ function Ext({ href, children }: { href: string; children: ReactNode }) {
   );
 }
 
-// Who owns what, left to right like the architecture diagram: support's code names only the endpoint, and the
-// endpoint maps to the payments namespace. Each team's worker sits in its own box, so the kill shows where it lands.
-function BoundaryStrip({
+// The claim, left to right like the architecture diagram: support's code names one endpoint and one operation, and
+// everything behind it belongs to payments. The snippet and the list are built from the topology the server sends, so they
+// can't drift from support_side.py / the payments side. Each team's worker sits in its own box, so a kill shows where it lands.
+function ClaimCard({
   t,
   ui,
   support,
@@ -31,90 +32,76 @@ function BoundaryStrip({
 }) {
   const isDown = (p?: ProcStatus) => p !== undefined && !p.alive;
   return (
-    <div className="strip">
-      <div className={isDown(support) ? "team down" : "team"}>
-        <div className="team-head">
-          <span className="team-name">Support team</span>
-          {ui && <Ext href={`${ui}/namespaces/${t.support.namespace}/workflows`}>namespace ↗</Ext>}
+    <>
+      <div className="strip">
+        <div className={isDown(support) ? "team down" : "team"}>
+          <div className="team-head">
+            <span className="team-name">Support team</span>
+            {ui && <Ext href={`${ui}/namespaces/${t.support.namespace}/workflows`}>namespace ↗</Ext>}
+          </div>
+          <span className="claim-label">Support's code knows only:</span>
+          <pre className="code">{`nexus = workflow.create_nexus_client(
+    service=${t.service},
+    endpoint="${t.endpoint}")
+await nexus.execute_operation(
+    ${t.service}.${t.operation}, request)`}</pre>
+          {support && <ProcTile p={support} kills={kills.support_worker} />}
         </div>
-        <span>
-          <code>{t.support.namespace}</code> · {t.support.workflow}
+        <span className="strip-arrow" aria-hidden="true">
+          ▶
         </span>
-        {support && <ProcTile p={support} kills={kills.support_worker} />}
-      </div>
-      <span className="strip-arrow" aria-hidden="true">
-        ▶
-      </span>
-      <div className={isDown(temporal) ? "endpoint-card down" : "endpoint-card"}>
-        <span className="headline-label">
-          {isDown(temporal) ? (
-            <>
-              ⚡ Temporal server down
-              <br />
-              {kills.temporal ? "killed during this run" : " "}
-            </>
-          ) : (
-            <>
-              Team boundary
-            </>
-          )}
-        </span>
-        <code>{t.endpoint}</code>
-        <code>
-          {t.service}.{t.operation}
-        </code>
-      </div>
-      <span className="strip-arrow" aria-hidden="true">
-        ▶
-      </span>
-      <div className={isDown(payments) ? "team down" : "team"}>
-        <div className="team-head">
-          <span className="team-name">Payments team</span>
-          {(kills.payments_worker ?? 0) > 0 && (
-            <span className="team-kills" title="kill -9 during this scene">
-              ⚡ killed {kills.payments_worker === 1 ? "once" : `${kills.payments_worker} times`}
-            </span>
-          )}
-          {ui && <Ext href={`${ui}/namespaces/${t.payments.namespace}/workflows`}>namespace ↗</Ext>}
+        <div className={isDown(temporal) ? "endpoint-card down" : "endpoint-card"}>
+          <span className="headline-label">
+            {isDown(temporal) ? (
+              <>
+                ⚡ Temporal server down
+                <br />
+                {kills.temporal ? "killed during this run" : " "}
+              </>
+            ) : (
+              <>Team boundary</>
+            )}
+          </span>
+          <code>{t.endpoint}</code>
+          <code>
+            {t.service}.{t.operation}
+          </code>
         </div>
-        <span>
-          <code>{t.payments.namespace}</code> · {t.payments.workflow} → {t.payments.activity}
+        <span className="strip-arrow" aria-hidden="true">
+          ▶
         </span>
-        {/* The kill count sits in the header, so the tile keeps one line inside the card. */}
-        {payments && <ProcTile p={payments} />}
+        <div className={isDown(payments) ? "team down" : "team"}>
+          <div className="team-head">
+            <span className="team-name">Payments team</span>
+            {(kills.payments_worker ?? 0) > 0 && (
+              <span className="team-kills" title="kill -9 during this scene">
+                ⚡ killed {kills.payments_worker === 1 ? "once" : `${kills.payments_worker} times`}
+              </span>
+            )}
+            {ui && <Ext href={`${ui}/namespaces/${t.payments.namespace}/workflows`}>namespace ↗</Ext>}
+          </div>
+          <span className="claim-label">Payments owns:</span>
+          <ul className="owns">
+            <li>
+              namespace <code>{t.payments.namespace}</code> · task queue <code>{t.payments.task_queue}</code>
+            </li>
+            <li>
+              <code>{t.payments.workflow}</code> → <code>{t.payments.activity}</code>
+            </li>
+            <li>its own retries and timeouts</li>
+            <li>
+              idempotency key <code>refund-&lt;ticket&gt;</code>
+            </li>
+          </ul>
+          {payments && <ProcTile p={payments} />}
+        </div>
       </div>
-    </div>
+      <p className="claim-note">
+        Support names one endpoint and one operation. The endpoint maps to payments' namespace and queue in its own config,
+        not in support's code.
+      </p>
+    </>
   );
-}
-
-type Beat = { text: string };
-
-// The story in four beats, read from the run's fault windows and the rows. Each lights up when it has happened.
-function beatsFor(
-  rows: NexusRow[],
-  faults: FaultWindow[],
-  planned: number,
-  done: boolean,
-  verdict: string,
-): { beats: Beat[]; reached: number } {
-  const n = rows.length;
-  const on = faults.filter((f) => f.start != null);
-  const landed = on.length;
-  const latest = on[on.length - 1];
-  const allBack = landed > 0 && faults.every((f) => f.start != null && f.end != null);
-  const beats = [
-    { text: `Support starts ${n || "the"} refund${n === 1 ? "" : "s"}` },
-    {
-      text:
-        landed === 0
-          ? `⚡ ${planned} failures while in flight`
-          : `⚡ Failure ${landed} of ${planned}: ${latest.effect === "stall" ? "payments goes quiet" : `${latest.label} killed`}`,
-    },
-    { text: "Back up: payments retries, same key" },
-    { text: done ? verdict : "Ledger: was each refund paid once?" },
-  ];
-  const reached = done ? 4 : allBack ? 3 : landed > 0 ? 2 : n > 0 ? 1 : 0;
-  return { beats, reached };
 }
 
 export function NexusPanel({
@@ -153,17 +140,10 @@ export function NexusPanel({
   const errors = rows.filter((r) => r.caller_saw_failure || r.state === "FAILED").length;
   const retries = rows.reduce((n, r) => n + Math.max(0, r.attempts.length - 1, (r.handler.peak_activity_attempt ?? 0) - 1), 0);
   const show = finished && allClosed;
-  const landed = faults.filter((f) => f.start != null);
-  const verdict =
-    paidTwice || missing || errors
-      ? `⚠ ${[paidTwice && `${paidTwice} paid twice`, missing && `${missing} never paid`, errors && `support saw ${errors} error${errors === 1 ? "" : "s"}`].filter(Boolean).join(", ")}`
-      : "Each refund paid once; support saw no errors";
-  const planned = processes.temporal ? 4 : 3; // the Temporal kill needs a server the show started itself
-  const { beats, reached } = beatsFor(rows, faults, planned, show, verdict);
 
   return (
     <section className="nexus" aria-label="Nexus">
-      <BoundaryStrip
+      <ClaimCard
         t={topology}
         ui={temporalUi}
         support={processes.support_worker}
@@ -171,23 +151,6 @@ export function NexusPanel({
         temporal={processes.temporal}
         kills={ran && run ? run.kills : {}}
       />
-      <p className="without">
-        <b>Without Nexus,</b> support would name payments' queue and own its retries.
-      </p>
-
-      {ran ? (
-        <ol className="beats">
-          {beats.map((b, i) => (
-            <li key={i} className={i + 1 < reached ? "done" : i + 1 === reached ? "now" : ""}>
-              <b>{i + 1}</b> {b.text}
-            </li>
-          ))}
-        </ol>
-      ) : (
-        <p className="beats-pre">
-          Press Run. Four failures hit refunds in flight.
-        </p>
-      )}
 
       <div className="timeline-wrap">
         <NexusTimeline rows={rows} t0={t0} now={now} faults={faults} temporalUi={temporalUi} />
@@ -204,16 +167,6 @@ export function NexusPanel({
       </div>
 
       <div className="headline payoff">
-        <div>
-          <span className="headline-label">Failures</span>
-          {show ? (
-            <>
-              <b>{landed.length}</b> <span className="muted">· each hit {Math.min(...landed.map((f) => f.hit))}+ refunds</span>
-            </>
-          ) : (
-            <b className="muted">…</b>
-          )}
-        </div>
         <div>
           <span className="headline-label">Support saw</span>
           {show ? (
