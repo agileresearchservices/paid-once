@@ -24,6 +24,13 @@ def submit(tid="t1", amount=2500):
     audit.record_ticket("lane1", tid, "test", amount)
 
 
+def test_pending_jobs_counts_the_queue_until_it_drains(payments):
+    submit()
+    assert store.pending_jobs() == 1
+    drain(Worker())  # decides the ticket, which then waits for a human: no job is left
+    assert store.pending_jobs() == 0
+
+
 def test_happy_path_refunds_once(payments):
     submit()
     worker = Worker()
