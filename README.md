@@ -118,8 +118,8 @@ Run of show, about ten minutes:
   behind it. Below, the run as two team boxes joined by the endpoint. Four failures hit the refunds in flight, shown as
   chips that go red when they land and read "survived" after: payments books each refund and goes quiet, then the support
   worker, the payments worker and the Temporal server itself are killed, each for 5-6 seconds. The box a failure hits
-  goes red. Support's box holds one ticket per refund (one call each, "no errors"); payments' box holds the same tickets
-  with a retry count (`↻2`) and a `$` when the ledger booked the money; the retry that finally succeeds is answered from
+  goes red. Support's box holds one check per refund (one call each, "no errors"); payments' box turns each refund into
+  a `$` when the ledger books the money, with its retry count (`↻2`) underneath; the retry that finally succeeds is answered from
   the ledger, not paid again. Hover a ticket for its detail; the namespace links open the first refund's history on each
   side in the Temporal Web UI (http://127.0.0.1:8233), including the caller's Nexus Links tab. Three tiles at the bottom
   (errors support saw, retries payments absorbed, refunds paid once) read from the ledger. The Temporal kill

@@ -288,23 +288,20 @@ svg.lg-icon, .diagram svg.lg-icon { display: inline-block; width: 26px; height: 
 .fchip.on .fchip-state { animation: blink 1s ease-in-out infinite; }
 .fchip.survived { border: 1px solid var(--axis); color: var(--ink-2); }
 .fchip.survived .fchip-state { color: var(--good-ink); }
-.teams-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.35fr); align-items: stretch; }
-.tbox { display: grid; grid-template-rows: auto auto 1fr auto; gap: 10px; border: 1.5px solid var(--axis); border-radius: 12px; padding: 12px 18px; background: var(--page); min-height: 236px; transition: background 0.6s, border-color 0.6s; }
+.teams-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: stretch; }
+.tbox { display: grid; grid-template-rows: auto auto 1fr auto; gap: 10px; border: 1.5px solid var(--axis); border-radius: 12px; padding: 12px 18px; background: var(--page); min-height: 200px; transition: background 0.6s, border-color 0.6s; }
 .tbox.down { border-color: var(--critical); background: var(--critical-wash); }
 .tbox-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
 .tbox-name { font-size: 24px; font-weight: 700; }
 .tbox-head a, .tbox-head .muted { font-size: 17px; }
-.tbox-procs { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.tbox-procs .tile { padding: 3px 10px; font-size: 15px; white-space: nowrap; }
-.svc { border: 1px solid var(--axis); border-radius: 8px; padding: 3px 10px; font-size: 15px; color: var(--ink-2); white-space: nowrap; }
-.svc.on { border-color: var(--critical); background: var(--critical); color: #fff; font-weight: 700; }
-.tickets { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; }
+.tbox-worker { font-size: 17px; color: var(--muted); }
+.tbox-worker.bad { color: var(--critical-ink); font-weight: 700; }
+.tickets { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px 20px; }
 .tickets-empty { color: var(--muted); font-size: 19px; }
-.tk { display: inline-grid; grid-template-columns: auto auto; grid-template-rows: auto auto; align-items: center; column-gap: 6px; cursor: default; }
-.tk-glyph { grid-row: 1 / 3; width: 40px; height: 40px; overflow: visible; }
-.tk-id { font-size: 16px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.tk-retry { grid-column: 2; font-size: 18px; font-weight: 800; color: var(--warning); font-variant-numeric: tabular-nums; }
-.tk .key-dollar { grid-column: 3; grid-row: 1 / 3; margin-left: 2px; width: 22px; height: 22px; line-height: 22px; font-size: 15px; }
+.tk { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; cursor: default; }
+.tk-glyph { width: 40px; height: 40px; overflow: visible; }
+.tk-coin { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--good); color: var(--page); font-size: 24px; font-weight: 800; }
+.tk-retry { min-height: 22px; font-size: 18px; font-weight: 800; color: var(--warning); font-variant-numeric: tabular-nums; }
 .tbox-status { font-size: 21px; font-weight: 700; color: var(--ink-2); }
 .tbox-status.calm { color: var(--sky); }
 .tbox-status.ok { color: var(--good-ink); }

@@ -75,12 +75,13 @@ whoever changes the code next.
   "Without Nexus / With Nexus" pair (four arrows into payments' internals vs one call through the endpoint), worded after
   Temporal's own framing (the caller doesn't know the handler's namespace or queue; each team owns its workers and
   retries). `NexusTeams` is the run with no time axis: four failure chips (next / now / survived / skipped), a support box
-  and a payments box joined by the endpoint, one ticket glyph per refund on each side (sorted, so they pair), payments'
-  with a `↻N` retry badge and a `$` once booked, and a Temporal server bar along the bottom. The badges count retries with
+  and a payments box joined by the endpoint, one glyph per refund on each side (sorted, so they pair; no ticket numbers on screen),
+  support's a check once answered, payments' a `$` once booked with a `↻N` retry badge under it, one plain worker line per
+  box (red only while that worker is down or the payments service is quiet), and a Temporal server bar along the bottom. The badges count retries with
   the same `retriesOf` as the "Payments absorbed" tile, so they add up to it (5 × ↻2 = 10). A box goes red when its
   worker is down; the endpoint and the bar go red when the Temporal server is. Per-refund detail and the call counts
   (15 calls: 5 booked, 10 replayed) are hover text only. This replaced a time-axis chart (#32) that showed evidence but
-  not what Nexus is. The panel is ~655 px at 1512 wide. Do not claim the endpoint can be retargeted live: that is
+  not what Nexus is. The panel is ~630 px at 1512 wide. Do not claim the endpoint can be retargeted live: that is
   under "Not built here".
 - **The show owns Temporal when it starts it.** If nothing listens on `TEMPORAL_ADDRESS`, `procs.ensure_temporal` runs
   `temporal server start-dev --db-filename data/temporal.db` as a managed process, so `/api/faults/kill/temporal`

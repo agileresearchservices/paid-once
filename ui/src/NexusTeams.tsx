@@ -1,12 +1,11 @@
 import type { ReactNode } from "react";
 import { OUTCOME_GLYPH } from "./outcomes";
-import { ProcTile } from "./Processes";
 import { TicketGlyph, type TicketKind } from "./TicketIcon";
 import { shortTicket, workflowLink } from "./nexusLinks";
 import type { FaultWindow, NexusRow, ProcStatus, RefundAttempt, Topology } from "./types";
 
-// The run, as two teams and the one door between them. Support's box holds each refund's single Nexus call; payments' box
-// holds the work behind it, with a retry count per refund and a $ when the ledger books it. The four failures are chips
+// The run, as two teams and the one door between them. Support's box holds each refund's single Nexus call (a check once
+// answered); payments' box holds the work behind it (a $ once the ledger books it, with its retry count underneath). The four failures are chips
 // across the top, and each one also turns the box it hits red. No time axis: the point is where the failures land and who
 // absorbs them, not when. Per-refund detail is on hover, and the team names open the histories in the Temporal UI.
 
@@ -106,6 +105,14 @@ function TeamHead({ name, ns, href }: { name: string; ns: string; href: string |
   );
 }
 
+// One plain line per team instead of process pills: red only while something is actually down.
+function WorkerLine({ p, kills = 0, quiet = false }: { p?: ProcStatus; kills?: number; quiet?: boolean }) {
+  if (!p) return <div className="tbox-worker" />;
+  if (!p.alive) return <div className="tbox-worker bad">⚡ worker down</div>;
+  if (quiet) return <div className="tbox-worker bad">⚡ payments service quiet</div>;
+  return <div className="tbox-worker">{kills > 0 ? `worker killed ${kills === 1 ? "once" : `${kills} times`}, back up` : "worker up"}</div>;
+}
+
 function Status({ cls, children }: { cls: string; children: ReactNode }) {
   return <div className={`tbox-status ${cls}`}>{children}</div>;
 }
@@ -157,7 +164,7 @@ export function NexusTeams({
       <div className="teams-row">
         <div className={down(processes.support_worker) ? "tbox down" : "tbox"}>
           <TeamHead name="Support team" ns={t.support.namespace} href={historyLink(ui, sorted[0], "caller", t.support.namespace)} />
-          <div className="tbox-procs">{processes.support_worker && <ProcTile p={processes.support_worker} kills={kills.support_worker} />}</div>
+          <WorkerLine p={processes.support_worker} kills={kills.support_worker} />
           <div className="tickets">
             {sorted.length === 0 ? (
               <span className="tickets-empty">Press Run: five refunds start here.</span>
@@ -165,7 +172,6 @@ export function NexusTeams({
               sorted.map((r) => (
                 <span key={r.ticket} className="tk" title={supportHover(r)}>
                   <Glyph kind={supportKind(r)} />
-                  <span className="tk-id">{shortTicket(r.ticket)}</span>
                 </span>
               ))
             )}
@@ -182,9 +188,8 @@ export function NexusTeams({
 
         <div className="door-col">
           <span className={open ? "dwire busy" : "dwire"} aria-hidden="true" />
-          <div className={temporalDown ? "door down" : "door"}>
+          <div className={temporalDown ? "door down" : "door"} title={`Endpoint ${t.endpoint}: the Temporal server routes ${t.operation} to the ${t.payments.namespace} namespace. Support knows only this name.`}>
             <span className="door-label">Nexus endpoint</span>
-            <code>{t.endpoint}</code>
             <span className="door-op">
               <code>{t.operation}</code>
             </span>
@@ -194,24 +199,18 @@ export function NexusTeams({
 
         <div className={down(processes.payments_worker) ? "tbox down" : "tbox"}>
           <TeamHead name="Payments team" ns={t.payments.namespace} href={historyLink(ui, sorted[0], "handler", t.payments.namespace)} />
-          <div className="tbox-procs">
-            {processes.payments_worker && <ProcTile p={processes.payments_worker} kills={kills.payments_worker} />}
-            <span className={stalling ? "svc on" : "svc"} title="The payments service: books the refund, then (on purpose) goes quiet before replying">
-              {stalling ? "⚡ service quiet" : "payments service"}
-            </span>
-          </div>
+          <WorkerLine p={processes.payments_worker} kills={kills.payments_worker} quiet={stalling} />
           <div className="tickets">
             {sorted.length === 0 ? (
               <span className="tickets-empty">…and each is paid here, once.</span>
             ) : (
               sorted.map((r) => {
                 const n = retriesOf(r);
+                const kind = paymentsKind(r);
                 return (
                   <span key={r.ticket} className="tk" title={paymentsHover(r, t, now)}>
-                    <Glyph kind={paymentsKind(r)} />
-                    <span className="tk-id">{shortTicket(r.ticket)}</span>
-                    {n > 0 && <span className="tk-retry">↻{n}</span>}
-                    {r.ledger.booked_at != null && <i className="key-dollar">$</i>}
+                    {kind === "done" ? <span className="tk-coin">$</span> : <Glyph kind={kind} />}
+                    <span className="tk-retry">{n > 0 ? `↻${n}` : ""}</span>
                   </span>
                 );
               })
