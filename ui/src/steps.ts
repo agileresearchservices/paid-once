@@ -1,4 +1,5 @@
-// The deck: one step per scene, in order, then the scoreboard. `scene` is the show-server scene id.
+// The deck: one step per scene, in order, then the scoreboard, then the Nexus page on its own (the scoreboard doesn't
+// count it). `scene` is the show-server scene id.
 // Talk-track material that doesn't fit on screen lives in drafts/talk-track.md (private).
 
 export interface Step {
@@ -81,6 +82,13 @@ export const STEPS: Step[] = [
     result: "Temporal reuses the ticket's key: answered from the ledger. Queue + LangGraph sends a new key: paid again.",
   },
   {
+    id: "scoreboard",
+    scene: null,
+    short: "Scoreboard",
+    title: "The scoreboard",
+    story: "Scored from the payments ledger, never from either stack's own records.",
+  },
+  {
     id: "nexus_kill",
     scene: "nexus_kill",
     short: "Nexus",
@@ -89,12 +97,5 @@ export const STEPS: Step[] = [
     watch: "Support never sees an error. Payments does the retrying.",
     result: "Support saw no errors. Payments retried with the same key. Each refund paid once.",
     nexus: true,
-  },
-  {
-    id: "scoreboard",
-    scene: null,
-    short: "Scoreboard",
-    title: "The scoreboard",
-    story: "Scored from the payments ledger, never from either stack's own records.",
   },
 ];

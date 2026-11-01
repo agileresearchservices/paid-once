@@ -48,7 +48,7 @@ whoever changes the code next.
   `temperature` are rejected on current models, so the agent does not set any. Strict schemas reject `minimum` on
   integers; the amount floor is applied in code.
 - **For a workflow-run Nexus operation the caller's operation stays `STARTED, attempt 1`** while the payments-side
-  activity retries. Step 6 (`ui/src/NexusTeams.tsx`) needs each attempt (retry badges and hover detail), and history only
+  activity retries. The Nexus step, 7 (`ui/src/NexusTeams.tsx`), needs each attempt (retry badges and hover detail), and history only
   records the last attempt, so `paidonce/show/engine.py` builds `attempts` by polling the refund workflow's pending
   activity (`_merge_attempts`) and closes them from its history (`_finish_attempts`). A StartToClose timeout ends an
   attempt at start + `REFUND_START_TO_CLOSE`. The server's `current_retry_interval` came back unusable (an
@@ -62,7 +62,7 @@ whoever changes the code next.
   are killed, so 3 refunds are in flight and the other 3 tickets (and the human "no") are waiting for a human. After the
   restart the human reviews the rest. Lane 1 pays the in-flight ones twice (new key per attempt) and loses the waiting
   ones (the in-memory graph is gone); Lane 2 replays with the same key and the waiting workflows are untouched.
-- **Step 6 is a gauntlet: four failures on the same refunds.** `scene_nexus_kill` sets `commit_then_stall` on payments
+- **Step 7 (Nexus) is a gauntlet: four failures on the same refunds.** `scene_nexus_kill` sets `commit_then_stall` on payments
   (count 5, 9 s, and 2 s of latency before each commit), then kills the support worker,
   the payments worker (after attempt 2 starts) and the Temporal server (`GAUNTLET_*` in `paidonce/show/engine.py`).
   Each failure is a window in `scene_runs[...]["faults"]`: `{key, label, effect, start, end, hit}`. A kill window opens
@@ -93,7 +93,7 @@ whoever changes the code next.
   that failure (`procs.owns_temporal`). Don't pre-start Temporal for a side-port scenario run; let the show start it.
 - **Ticket IDs carry a scene-run number** (`<reset id>-<scene>-r<n>-<i>-<lane>`), so re-running a scene starts new
   workflows instead of colliding with the last run's IDs. The idempotency key is still `refund-<ticket_id>`.
-- **The page has no Temporal Web UI links.** Step 6's team boxes used to link each namespace to the first refund's
+- **The page has no Temporal Web UI links.** Step 7's team boxes used to link each namespace to the first refund's
   history; they were removed as noise. Open `http://127.0.0.1:8233` directly (namespaces `support`, `payments`). The engine
   still reports `temporal_ui` (`TEMPORAL_UI_URL`, re-checked every 10 seconds) in the snapshot; the UI ignores it.
 - **The UI is a stepper** for a laptop browser, full screen (`#1`..`#7` in the URL, arrow keys, 1-7; scenes
@@ -122,15 +122,15 @@ whoever changes the code next.
   "Not tested yet", not "Holds".
 - **Every scene panel is scoped to the scene on screen.** `lane1_view`, `lane2_view`, `flow` and `payments_calls` count
   only the current scene's tickets, and the UI shows Nexus rows and lane chips only when `snap.current` is the step's
-  scene, so step 6 reads "Not run yet" instead of step 5's rows. `lane1_view_all` (every ticket since reset) feeds the
+  scene, so the Nexus step (7) reads "Not run yet" instead of step 5's rows. `lane1_view_all` (every ticket since reset) feeds the
   scoreboard's "its own job table says N done" line; it is the queue's claim, shown next to the ledger, never scored.
   The scoreboard card's header on steps 2-5 (job table chips, Lane 2 workflow status, payments call line) accumulates
   since the reset like the numbers under it: `lane1_view_all`, `lane2_view_all` (each Lane 2 ticket's last-seen status,
   cleared by reset) and `payments_calls_all`. Before this the header restarted every scene while the headline
   accumulated, so the card never added up. They are the stacks' own claims, never scored.
-  The walkthrough's ticket (`DEMO_SCENES`) is left out of the scoreboard and of those header views (`_is_demo`, by ticket
-  id, so every run of step 1 is covered); `snapshot()['demo_audit']` scores it alone, `make scenario` checks it, and
-  step 1's diagram merges it back so its ledger dot still shows.
+  The walkthrough's and the Nexus scene's tickets (`DEMO_SCENES`) are left out of the scoreboard and of those header views (`_is_demo`, by ticket
+  id, so every run of step 1 is covered); `snapshot()['demo_audit']` scores them alone, `make scenario` adds them back and checks them, and
+  step 1's diagram and the Nexus panel merge it back so their ledger dots still show. The Nexus page is the last step, after the scoreboard, and the scoreboard doesn't count it.
 - **Payments counts its calls** (`CALLS` in `paidonce/payments/service.py`, `GET /admin/calls`, cleared by
   `/admin/reset`): per lane and ticket, calls and how many the ledger answered from an existing key. The engine sums
   them per scene into the snapshot's `payments_calls` (`booked` = calls − replays). It observes only; the ledger and

@@ -67,6 +67,19 @@ def wait_api(proc, timeout=90):
     raise SystemExit("show server did not come up")
 
 
+def scored(snap):
+    """The scoreboard leaves the walkthrough and the Nexus scene out (`demo_audit`). The headless run scores everything,
+    so it adds them back."""
+    for lane in ("lane1", "lane2"):
+        a, d = snap["audit"][lane], snap["demo_audit"][lane]
+        snap["audit"][lane] = {
+            **{k: v + d[k] for k, v in a.items() if isinstance(v, (int, float))},
+            "lane": lane,
+            "tickets": {**a["tickets"], **d["tickets"]},
+        }
+    return snap
+
+
 def line(lane, a, prev):
     d = {k: a[k] - prev.get(k, 0) for k in FIELDS}
     return (
@@ -114,15 +127,15 @@ def main(scenes, check):
                 if not snap["running"]:
                     break
             # The engine holds a scene open until every ticket has landed, so nothing may still be in flight here.
-            snap = httpx.get(f"{BASE}/api/state", timeout=5).json()
+            snap = scored(httpx.get(f"{BASE}/api/state", timeout=5).json())
             print(f"== {scene} ({time.time() - t0:.0f}s incl. settle)")
             for lane in ("lane1", "lane2"):
                 if snap["audit"][lane]["in_flight"]:
                     failures.append(f"{scene}: {lane} still in flight when the scene ended")
             if scene == "walkthrough":
-                # The scoreboard leaves the walkthrough out; its one ticket is scored on its own.
+                # Its one ticket must be refunded exactly once in both lanes (the scoreboard doesn't count it).
                 for lane in ("lane1", "lane2"):
-                    d = snap["demo_audit"][lane]
+                    d = snap["audit"][lane]
                     print(f"  {lane}: walkthrough ticket refunded once: {d['refunded_once']} of {d['approved']}")
                     if d["refunded_once"] != 1 or d["violations"]:
                         failures.append(f"walkthrough: {lane} did not refund its one ticket exactly once")

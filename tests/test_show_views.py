@@ -209,7 +209,7 @@ def test_ticket_ledger_reads_payments_counter_and_booking_time():
     assert _ticket_ledger(calls, {}, "lane2", "t2") == {"calls": 0, "replays": 0, "booked_at": None}
 
 
-# The gauntlet's fault windows (step 7).
+# The gauntlet's fault windows (step 7, the Nexus page).
 
 STALL = {"mode": "commit_then_stall"}
 

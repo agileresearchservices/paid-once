@@ -112,7 +112,9 @@ Run of show, about ten minutes:
   (`✓` paid once, `×2` paid twice, `∅` owed, never paid, `—` denied, nothing owed), and each lane shows what payments saw in the scene: calls, refunds paid, and
   calls answered from an existing key. On step 5 that line is the evidence: Temporal's retry is answered from the
   ledger, the queue's is paid again.
-- **Step 6, Nexus** says what Nexus is and why it matters, then proves it. Two static pictures on top: **Without Nexus**,
+- **Step 6, Scoreboard**: the totals since the reset, and the queue's own job table next to what the ledger says. It counts the
+  scenes on steps 2-5 and leaves out step 1's walkthrough and the Nexus page.
+- **Step 7, Nexus** says what Nexus is and why it matters, then proves it. Two static pictures on top: **Without Nexus**,
   support's code reaches across the team line into payments' namespace, task queue, workflow type and retries; **With
   Nexus**, support makes one call (`issue_refund`) to one endpoint (`payments-endpoint`) and payments owns everything
   behind it. Under them, one strip spells out the contract: support sends `ticket_id` and `amount_cents` to
@@ -127,7 +129,6 @@ Run of show, about ten minutes:
   (errors support saw, retries payments absorbed, refunds paid once) read from the ledger. The Temporal kill
   needs a server the show started itself (`make demo` does, if nothing is listening on 7233); with a server you started,
   the scene skips that kill.
-- **Step 7, Scoreboard**: the totals, and the queue's own job table next to what the ledger says.
 
 The Temporal wordmark and favicon are not in the repo. To show them, put `temporal-wordmark.svg` and `favicon.svg` in
 `ui/public/brand/` (gitignored) before `make ui`; otherwise the header shows text.
