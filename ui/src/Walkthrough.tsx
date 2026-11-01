@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 import { BEATS, WALKTHROUGH_TICKET } from "./steps";
 import { LegendIcon, type TicketKind } from "./TicketIcon";
 import type { FlowDot, LaneId } from "./types";
@@ -46,28 +46,77 @@ function RoleIcon({ role }: { role: "customer" | "agent" }) {
   );
 }
 
-// The customer's photo of the broken mug, sent with their message: a small drawn "snapshot" (no image file), in fixed
-// colours so it reads as a photo on either theme. Two pieces split along one jagged crack, plus a few shards.
+// The customer's photo of the damaged mug, sent with their message: one mug whose handle has snapped off, the handle lying
+// on the table beside it. There is no image file: this is a drawn "photo" that reads as one at this size, with a soft-focus
+// tabletop and wall, a glazed red mug with cylinder shading and specular highlights, pale bare ceramic where the handle
+// broke, soft contact shadows and a vignette. Fixed colours, so it looks the same on either theme. Gradient ids carry a
+// useId() prefix because the photo appears twice on the page (customer and human panes).
 function BrokenMug() {
-  const crack = "L54,34 L60,42 L52,51 L58,60 L54,68"; // the right piece's edge is the same points, reversed
+  const id = useId().replace(/:/g, "");
+  const u = (n: string) => `url(#${id}${n})`;
+  const body = "M36,23 V62 Q36,69 44,69 H68 Q76,69 76,62 V23 Z";
   return (
-    <svg className="mug-photo" viewBox="0 0 120 84" role="img" aria-label="Photo: the mug, broken in two">
-      <rect width="120" height="84" rx="8" className="mug-bg" />
-      <ellipse cx="62" cy="74" rx="44" ry="5" className="mug-shadow" />
-      {/* left piece, with the handle */}
-      <g className="mug">
-        <path d="M30,30 C16,30 16,56 30,56" className="mug-handle" />
-        <path d={`M30,24 H56 ${crack} H34 Q30,68 30,64 Z`} />
-        <path d="M30,24 H56 L55,29 H30 Z" className="mug-rim" />
+    <svg className="mug-photo" viewBox="0 0 120 84" role="img" aria-label="Photo: the mug with its handle broken off">
+      <defs>
+        <linearGradient id={`${id}wall`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#d9d2c6" /><stop offset="1" stopColor="#b7ad9d" />
+        </linearGradient>
+        <linearGradient id={`${id}table`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#a67c55" /><stop offset="0.5" stopColor="#8a6542" /><stop offset="1" stopColor="#5f432b" />
+        </linearGradient>
+        <linearGradient id={`${id}glaze`} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#5e1c12" /><stop offset="0.22" stopColor="#c4402b" /><stop offset="0.45" stopColor="#e2634a" />
+          <stop offset="0.72" stopColor="#b53a27" /><stop offset="1" stopColor="#4d160e" />
+        </linearGradient>
+        <linearGradient id={`${id}core`} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#f6efe2" /><stop offset="1" stopColor="#d3c6b0" />
+        </linearGradient>
+        <radialGradient id={`${id}vig`} cx="0.5" cy="0.55" r="0.75">
+          <stop offset="0.55" stopColor="#000" stopOpacity="0" /><stop offset="1" stopColor="#000" stopOpacity="0.5" />
+        </radialGradient>
+        <filter id={`${id}soft`} x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="2.2" /></filter>
+        <filter id={`${id}blur`}><feGaussianBlur stdDeviation="0.5" /></filter>
+        <clipPath id={`${id}clip`}><path d={body} /></clipPath>
+      </defs>
+      {/* soft-focus room: back wall, tabletop edge, a few wood grain lines */}
+      <rect width="120" height="84" fill={u("wall")} />
+      <rect y="30" width="120" height="54" fill={u("table")} />
+      <rect y="29" width="120" height="2" fill="#6b4c31" opacity="0.6" />
+      <g stroke="#5a3d26" strokeWidth="0.5" opacity="0.35" filter={u("blur")}>
+        <path d="M0,44 H120" /><path d="M0,55 H120" /><path d="M0,67 H120" /><path d="M0,77 H120" />
       </g>
-      {/* right piece, fallen a little away along the crack */}
-      <g className="mug" transform="translate(10 4) rotate(9 70 46)">
-        <path d="M56,24 H82 V64 Q82,68 78,68 H54 L58,60 L52,51 L60,42 L54,34 Z" />
-        <path d="M56,24 H82 V29 H55 Z" className="mug-rim" />
+      {/* contact shadows: the mug, and the handle lying beside it */}
+      <ellipse cx="58" cy="70" rx="26" ry="4.5" fill="#1a0f08" opacity="0.55" filter={u("soft")} />
+      <ellipse cx="99" cy="76" rx="13" ry="3" fill="#1a0f08" opacity="0.5" filter={u("soft")} />
+      {/* the mug: one body, rim, dark inside */}
+      <path d={body} fill={u("glaze")} />
+      <g clipPath={u("clip")}>
+        <path d="M41,27 V63" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" opacity="0.38" filter={u("blur")} />
+        <rect x="34" y="63" width="44" height="8" fill="#000" opacity="0.28" />
       </g>
-      <polygon points="40,76 47,73 45,79" className="mug-shard" />
-      <polygon points="94,74 101,76 96,79" className="mug-shard" />
-      <polygon points="70,77 74,75 75,79" className="mug-shard" />
+      <path d="M36,23 Q56,16.5 76,23 Q56,29.5 36,23 Z" fill="#2c120b" stroke="#f1b9a6" strokeWidth="0.9" />
+      {/* where the handle was: two glazed stubs ending in jagged, pale bare ceramic, and a pale scar between them */}
+      <path d="M76,32 C80,32 82,34 82.5,37" fill="none" stroke="#5e1c12" strokeWidth="5.6" strokeLinecap="butt" />
+      <path d="M76,32 C80,32 82,34 82.5,37" fill="none" stroke={u("glaze")} strokeWidth="4.2" strokeLinecap="butt" />
+      <path d="M76,56 C80,56 82,54 82.5,51" fill="none" stroke="#5e1c12" strokeWidth="5.6" strokeLinecap="butt" />
+      <path d="M76,56 C80,56 82,54 82.5,51" fill="none" stroke={u("glaze")} strokeWidth="4.2" strokeLinecap="butt" />
+      <polygon points="80.2,36.6 83,34.4 85,37.6 82.6,39.8 80.6,38.6" fill={u("core")} />
+      <polygon points="80.2,51.4 83,53.6 85,50.4 82.6,48.2 80.6,49.4" fill={u("core")} />
+      <path d="M75.6,33 L77.2,37 L75.8,41 L77.4,46 L75.8,50 L77,55" fill="none" stroke={u("core")} strokeWidth="1" strokeLinejoin="round" opacity="0.8" />
+      {/* the handle, snapped off and lying on the table: a glazed arc with a pale break at each end */}
+      <g transform="rotate(-6 98 72)">
+        <path d="M88,74 C90,62 108,62 110,74" fill="none" stroke="#5e1c12" strokeWidth="6.6" strokeLinecap="butt" />
+        <path d="M88,74 C90,62 108,62 110,74" fill="none" stroke={u("glaze")} strokeWidth="5" strokeLinecap="butt" />
+        <path d="M91,70 C94,65 100,64 104,65.5" fill="none" stroke="#fff" strokeWidth="0.9" strokeLinecap="round" opacity="0.45" />
+        <polygon points="85.4,74 91,73.6 91.2,76.2 86,76.6" fill={u("core")} />
+        <polygon points="107,73.6 112.6,74 112,76.8 106.8,76.2" fill={u("core")} />
+      </g>
+      {/* a couple of loose chips */}
+      <g strokeLinejoin="round">
+        <polygon points="84,67 88,65.6 87.6,69" fill="#c4402b" stroke="#f6efe2" strokeWidth="0.7" />
+        <polygon points="70,76 74,74.6 74.4,78" fill="#d3c6b0" stroke="#8a7a62" strokeWidth="0.4" />
+      </g>
+      <rect width="120" height="84" fill={u("vig")} />
     </svg>
   );
 }
