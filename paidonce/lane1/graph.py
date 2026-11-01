@@ -15,6 +15,7 @@ from typing import TypedDict
 import httpx
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
+from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import interrupt
 
 from paidonce import agent, config, tls
@@ -22,6 +23,7 @@ from paidonce.lane1 import store
 from paidonce.models import Proposal, Ticket
 
 ATTEMPTS = 3
+BACKOFF_S = 1.0  # attempt n waits n x this before the next try
 
 
 class State(TypedDict, total=False):
@@ -54,12 +56,12 @@ def call_payments(ticket_id: str, amount_cents: int) -> str:
                 verify=tls.client_verify(),
             )
             if resp.status_code < 500:
-                resp.raise_for_status()
+                resp.raise_for_status()  # a 4xx is a refusal, not a blip: it ends the job instead of retrying
                 return resp.json()["refund_id"]
             last = RuntimeError(f"payments returned {resp.status_code}")
         except (httpx.TimeoutException, httpx.TransportError) as exc:
             last = exc
-        time.sleep(1.0 * attempt)  # in-process backoff
+        time.sleep(BACKOFF_S * attempt)  # in-process backoff
     raise RuntimeError(f"payments failed after {ATTEMPTS} attempts: {last}")
 
 
@@ -93,7 +95,7 @@ def _after_approval(state: State) -> str:
     return "execute" if state.get("approved") else END
 
 
-def build_graph():
+def build_graph() -> CompiledStateGraph:
     graph = StateGraph(State)
     graph.add_node("decide", _decide)
     graph.add_node("await_approval", _await_approval)

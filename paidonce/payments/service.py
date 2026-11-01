@@ -9,17 +9,19 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
+from typing import Literal
 
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
+from paidonce.models import LANES
 from paidonce.payments import ledger
 
-LANES = ("lane1", "lane2")
+DEFAULT_STALL_S = 6.0  # how long a stalled response is held after the commit
 
 
 def _clear() -> dict:
-    return {lane: {"mode": "none", "remaining": 0, "delay_s": 6.0, "latency_s": 0.0} for lane in LANES}
+    return {lane: {"mode": "none", "remaining": 0, "delay_s": DEFAULT_STALL_S, "latency_s": 0.0} for lane in LANES}
 
 
 FAULT: dict = _clear()
@@ -44,10 +46,10 @@ class RefundBody(BaseModel):
 
 
 class FaultBody(BaseModel):
-    lane: str = "all"  # lane1 | lane2 | all
-    mode: str = "none"  # none | commit_then_stall
+    lane: Literal["lane1", "lane2", "all"] = "all"
+    mode: Literal["none", "commit_then_stall"] = "none"
     count: int = 0  # how many refunds the stall applies to
-    delay_s: float = 6.0  # how long the response is held after the commit
+    delay_s: float = DEFAULT_STALL_S  # how long the response is held after the commit
     latency_s: float = 0.0  # extra latency before committing
 
 

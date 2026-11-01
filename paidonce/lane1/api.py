@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from paidonce import config, tls
 from paidonce.lane1 import store
+from paidonce.models import DEFAULT_ORDER_AGE_DAYS
 
 
 @asynccontextmanager
@@ -26,7 +27,7 @@ class TicketBody(BaseModel):
     order_id: str
     amount_cents: int
     message: str
-    order_age_days: int = 3
+    order_age_days: int = DEFAULT_ORDER_AGE_DAYS
 
 
 class RedeliverBody(BaseModel):

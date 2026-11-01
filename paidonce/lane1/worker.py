@@ -15,7 +15,8 @@ from paidonce.lane1.graph import build_graph, execute_refund
 from paidonce.models import Ticket
 
 log = logging.getLogger("lane1.worker")
-THREADS = 4
+WORKER_THREADS = 4
+POLL_INTERVAL_S = 0.3  # how long an idle thread waits before it asks the queue again
 
 
 class Worker:
@@ -110,15 +111,15 @@ class Worker:
     def loop(self) -> None:
         while True:
             if not self.run_one():
-                time.sleep(0.3)
+                time.sleep(POLL_INTERVAL_S)
 
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s lane1.worker %(message)s")
     store.init()
     worker = Worker()
-    log.info("lane1 worker started with %d threads", THREADS)
-    threads = [threading.Thread(target=worker.loop, daemon=True) for _ in range(THREADS)]
+    log.info("lane1 worker started with %d threads", WORKER_THREADS)
+    threads = [threading.Thread(target=worker.loop, daemon=True) for _ in range(WORKER_THREADS)]
     for t in threads:
         t.start()
     for t in threads:

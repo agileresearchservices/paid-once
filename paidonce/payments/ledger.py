@@ -11,7 +11,7 @@ import time
 import uuid
 
 from paidonce import config
-from paidonce.db import connect
+from paidonce.db import connect, ensure_schema, transaction
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS refunds (
@@ -27,8 +27,7 @@ CREATE INDEX IF NOT EXISTS refunds_ticket ON refunds (ticket_id);
 
 
 def init() -> None:
-    with connect(config.LEDGER_DB) as conn:
-        conn.executescript(SCHEMA)
+    ensure_schema(config.LEDGER_DB, SCHEMA)
 
 
 def record_refund(ticket_id: str, amount_cents: int, idem_key: str, lane: str) -> dict:
@@ -37,11 +36,9 @@ def record_refund(ticket_id: str, amount_cents: int, idem_key: str, lane: str) -
     Returns the stored row, plus `replayed`: True when the key was already there and nothing new was written.
     """
     init()
-    with connect(config.LEDGER_DB) as conn:
-        conn.execute("BEGIN IMMEDIATE")
+    with transaction(config.LEDGER_DB) as conn:
         row = conn.execute("SELECT * FROM refunds WHERE idem_key = ?", (idem_key,)).fetchone()
         if row is not None:
-            conn.execute("COMMIT")
             return {**dict(row), "replayed": True}
         refund_id = f"re_{uuid.uuid4().hex[:12]}"
         now = time.time()
@@ -50,7 +47,6 @@ def record_refund(ticket_id: str, amount_cents: int, idem_key: str, lane: str) -
             "VALUES (?, ?, ?, ?, ?, ?)",
             (refund_id, ticket_id, amount_cents, idem_key, lane, now),
         )
-        conn.execute("COMMIT")
         return {
             "refund_id": refund_id,
             "ticket_id": ticket_id,
@@ -65,11 +61,8 @@ def record_refund(ticket_id: str, amount_cents: int, idem_key: str, lane: str) -
 def all_refunds(lane: str | None = None) -> list[dict]:
     init()
     with connect(config.LEDGER_DB) as conn:
-        if lane:
-            rows = conn.execute("SELECT * FROM refunds WHERE lane = ? ORDER BY created_at", (lane,))
-        else:
-            rows = conn.execute("SELECT * FROM refunds ORDER BY created_at")
-        return [dict(r) for r in rows.fetchall()]
+        where, args = ("WHERE lane = ?", (lane,)) if lane else ("", ())
+        return [dict(r) for r in conn.execute(f"SELECT * FROM refunds {where} ORDER BY created_at", args)]
 
 
 def reset() -> None:

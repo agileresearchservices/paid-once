@@ -15,7 +15,8 @@ from __future__ import annotations
 import time
 
 from paidonce import config
-from paidonce.db import connect
+from paidonce.db import connect, ensure_schema
+from paidonce.models import LANES
 from paidonce.payments import ledger
 
 SCHEMA = """
@@ -31,15 +32,12 @@ CREATE TABLE IF NOT EXISTS decisions (
 );
 """
 
-LANES = ("lane1", "lane2")
-
 # An approved ticket with no refund yet counts as "in flight" for this long, and as missing after it.
 SETTLE_S = 20.0
 
 
 def init() -> None:
-    with connect(config.AUDIT_DB) as conn:
-        conn.executescript(SCHEMA)
+    ensure_schema(config.AUDIT_DB, SCHEMA)
 
 
 def record_ticket(lane: str, ticket_id: str, scene: str, amount_cents: int, expect: str = "refund") -> None:

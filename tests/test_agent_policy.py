@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from paidonce import agent, config
+from paidonce.lane2.support_side import AGENT_START_TO_CLOSE
 from paidonce.models import Ticket
 
 
@@ -55,5 +56,5 @@ def test_a_refund_is_never_more_than_the_order(monkeypatch):
 
 
 def test_the_model_call_finishes_inside_the_lane2_activity_timeout():
-    # lane2/support_side.py gives run_agent 60 s; the model client must give up well before that.
-    assert (agent.LLM_MAX_RETRIES + 1) * agent.LLM_TIMEOUT_S < 60
+    # The workflow gives run_agent AGENT_START_TO_CLOSE; the model client must give up before that.
+    assert (agent.LLM_MAX_RETRIES + 1) * agent.LLM_TIMEOUT_S < AGENT_START_TO_CLOSE.total_seconds()

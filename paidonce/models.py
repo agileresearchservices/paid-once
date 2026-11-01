@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Literal
+
+LANES = ("lane1", "lane2")  # the two stacks, as they are named in the code, the ledger and ticket IDs
+DEFAULT_ORDER_AGE_DAYS = 3  # a recent order: inside the 30-day return window
 
 
 @dataclass
@@ -12,12 +16,12 @@ class Ticket:
     order_id: str
     amount_cents: int
     message: str
-    order_age_days: int = 3  # from the order system; the agent's return-window rule reads it
+    order_age_days: int = DEFAULT_ORDER_AGE_DAYS  # from the order system; the agent's return-window rule reads it
 
 
 @dataclass
 class Proposal:
-    action: str  # "refund" or "deny"
+    action: Literal["refund", "deny"]
     amount_cents: int
     reason: str
 
@@ -45,7 +49,7 @@ class ApprovalDecision:
 @dataclass
 class TicketOutcome:
     ticket_id: str
-    status: str
+    status: Literal["done", "denied", "rejected"]
     refund_id: str | None = None
     detail: str = ""
     events: list[str] = field(default_factory=list)
