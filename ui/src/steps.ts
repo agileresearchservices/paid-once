@@ -21,7 +21,7 @@ export interface Beat {
   title: string; // the walkthrough's three panes (Walkthrough.tsx) tell the story; this is its headline
 }
 
-// The ticket the walkthrough sends. Mirrors WALKTHROUGH_MESSAGE and WALKTHROUGH_AMOUNT_CENTS in paidonce/show/engine.py.
+// The ticket the walkthrough sends. Mirrors WALKTHROUGH_MESSAGE and WALKTHROUGH_AMOUNT_CENTS in paidonce/show/catalog.py.
 export const WALKTHROUGH_TICKET = { message: "The mug arrived in pieces. Please refund me.", amount: "$42.00" };
 
 export const BEATS: Beat[] = [

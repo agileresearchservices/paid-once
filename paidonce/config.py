@@ -50,7 +50,7 @@ MODEL = os.environ.get("PAIDONCE_MODEL", "claude-sonnet-5-5")
 STUB_LLM = os.environ.get("PAIDONCE_STUB_LLM", "") == "1"
 
 # Off by default. Turns on the one-line Lane 1 fix (derive the idempotency key from the ticket, not the
-# attempt) so the write-up can measure what that fix does and does not close. Lane 1 stays as shipped otherwise.
+# attempt) so `make scenario` can measure what that fix does and does not close. Lane 1 stays as shipped otherwise.
 L1_STABLE_KEY = os.environ.get("PAIDONCE_L1_STABLE_KEY", "") == "1"
 
 # Lane 1 queue: a visibility timeout like SQS or Pub/Sub ack deadlines.

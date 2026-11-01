@@ -1,3 +1,5 @@
+"""Run the payments service on its own: `python -m paidonce.payments`."""
+
 import uvicorn
 
 from paidonce import config, tls

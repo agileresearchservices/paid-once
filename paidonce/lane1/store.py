@@ -197,7 +197,8 @@ def redeliver(n: int) -> int:
     with transaction(config.LANE1_DB) as conn:
         rows = conn.execute(
             "SELECT DISTINCT ticket_id FROM jobs WHERE kind = 'execute' "
-            "UNION SELECT ticket_id FROM (SELECT ticket_id FROM job_log WHERE kind = 'execute' ORDER BY id DESC LIMIT ?)",
+            "UNION SELECT ticket_id FROM "
+            "(SELECT ticket_id FROM job_log WHERE kind = 'execute' ORDER BY id DESC LIMIT ?)",
             (n,),
         ).fetchall()
         picked = [r["ticket_id"] for r in rows][:n]

@@ -68,7 +68,8 @@ class ProcessManager:
         exe = shutil.which("temporal")
         if exe is None:
             raise RuntimeError(
-                f"No Temporal server on {config.TEMPORAL_ADDRESS} and no `temporal` CLI on PATH (brew install temporal)."
+                f"No Temporal server on {config.TEMPORAL_ADDRESS} and no `temporal` CLI on PATH "
+                "(brew install temporal)."
             )
         config.ensure_data_dir()
         # The SQLite file is what lets the server die and come back with every workflow where it was.

@@ -89,7 +89,7 @@ sequenceDiagram
     A->>P: POST /refunds, same key
     P->>L: key already present
     L-->>P: stored refund
-    P-->>A: 200, replayed true
+    P-->>A: 200, the stored refund
     A-->>R: RefundResult
     R-->>H: workflow complete
     H-->>S: operation completes
@@ -121,7 +121,7 @@ Tickets owed nothing (outside the policy, or a human said no) must have no refun
 not read either lane's own state. It only scores tickets the harness recorded, so a refund for an unrecorded
 ticket would not be counted.
 
-## Migration shape (what the case study proposes)
+## A migration path
 
 ```mermaid
 flowchart LR
@@ -134,6 +134,42 @@ flowchart LR
     Gate -->|"violations or stuck tickets"| Rollback["Flip the flag back<br/>no ticket is dual-processed"]
     Gate -->|"clean on the review date"| Expand[Widen the cohort]
 ```
+
+## Lane 1 realism
+
+Lane 1 is meant to be the system a competent team ships today, so its flaws are the common ones, not invented ones.
+Change it only with a reason, and write the reason here. On screen it is "Queue + LangGraph", named the way "Temporal +
+Nexus" is; avoid labels like "traditional" or "hand-rolled", which read as a strawman.
+
+- **Per-attempt idempotency key.** The client sends a fresh key each try. A very common bug; deriving the key from the
+  ticket is a one-line fix that closes the redelivery and payments-quiet duplicates. `PAIDONCE_L1_STABLE_KEY=1` applies
+  that fix so `make scenario` can measure it (duplicates drop to zero, the lost tickets remain). It is off by default.
+- **`MemorySaver`, the LangGraph tutorial default.** The approval interrupt lives in worker memory and is lost when the
+  worker restarts.
+- **At-least-once queue with a visibility timeout,** plus a recovery path that re-drives tickets stuck in `executing`.
+  That path is what turns a crash after the payments commit into a second refund.
+- **A decide job's worker heartbeats its lease** (every third of the visibility timeout), because a model call can
+  outlast the 10 s timeout. Without it a live job was handed to a second worker. Execute jobs keep the plain timeout, so
+  a `kill -9` still makes the job reappear.
+- **A human "no" is handled at the API:** `POST /tickets/{id}/reject` marks the row `rejected` and queues no job, so
+  redelivery and recovery never see it. That is how a team would build it.
+- **A careful dedupe check for finished tickets,** so redelivery after completion is a no-op. Duplicates only arise for
+  work still in flight.
+- **Not built:** a hardened third lane (outbox, sweeper, durable checkpointer). What it would fix is argued, not
+  measured.
+
+## HTTPS between services
+
+Payments (:8101) and the Lane 1 API (:8102) serve HTTPS with their own self-signed certificates (`paidonce/tls.py`),
+generated once under `data/tls/` (gitignored) before anything starts. `<service>.pem` holds the key (mode 0600) and only
+that service reads it; callers read `<service>.crt`.
+
+Callers never turn verification off. Lane 1's `call_payments`, Lane 2's `post_refund` activity and the show engine each
+load the certificate of the one service they call as their only trust anchor (`tls.client_verify`), so a different
+certificate on the port fails the handshake, and the payments certificate does not open the Lane 1 API. The certificates
+name `127.0.0.1`, `::1` and `localhost`, last a year, and are replaced within 30 days of expiry. Both lanes pay the same
+handshake cost. `PAIDONCE_PAYMENTS_TLS=0` and `PAIDONCE_LANE1_TLS=0` serve plain HTTP, which the tests use. The show
+server on :8100 stays plain HTTP on loopback: it is what the browser opens.
 
 ## What is not tested here
 

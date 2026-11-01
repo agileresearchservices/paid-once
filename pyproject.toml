@@ -2,7 +2,7 @@
 name = "paid-once"
 version = "0.1.0"
 description = "Brownfield-to-Temporal demo: a refund agent under chaos, before and after (Temporal + Nexus)"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115",
   "uvicorn>=0.30",
@@ -12,6 +12,7 @@ dependencies = [
   "temporalio>=1.23",
   "nexus-rpc>=1.1",
   "cryptography>=50.0.2",
+  "pydantic>=2.7",
 ]
 
 [build-system]
@@ -36,4 +37,11 @@ include = ["paidonce*"]
 line-length = 120
 
 [tool.ruff.lint]
-ignore = ["ASYNC210", "ASYNC230", "ASYNC251", "BLE001", "S110"]
+select = ["E", "F", "I", "B", "UP", "SIM", "ASYNC"]
+ignore = [
+  "ASYNC109",  # `timeout=` parameters on async helpers are deliberate
+  "ASYNC210",  # short blocking calls (SQLite, httpx) inside async handlers are deliberate and cheap
+  "ASYNC230",
+  "ASYNC251",
+  "SIM105",  # `try: ... except X: pass` reads better than contextlib.suppress where the handler is the point
+]

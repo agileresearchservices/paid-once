@@ -1,137 +1,130 @@
 # Paid Once: refunds over Nexus
 
-A small, runnable test of one migration assumption: **moving an agent's refund-approval process onto Temporal,
-with Nexus to the payments team, keeps every approved refund exactly-once and loses no ticket under worker
-crashes and deploys (including during an approval wait), redelivery, and a payments commit-then-timeout, without changing the
-agent logic or the payments service.**
+A runnable test of one migration claim: moving an agent's refund-approval process onto Temporal, with
+[Nexus](https://docs.temporal.io/nexus) to the payments team, keeps every approved refund **exactly once** and
+**loses no ticket** under worker crashes, redelivery and a payments service that commits and then goes quiet. The agent
+logic and the payments service do not change.
 
 Two copies of the same refund agent run the same tickets under the same chaos:
 
-- **Lane 1** ("Queue + LangGraph" on screen) is the stack a competent team ships today: a job queue with a visibility timeout, a LangGraph agent
-  with the default in-memory checkpointer, and an HTTPS call to payments.
-- **Lane 2** ("Temporal + Nexus" on screen) is the same agent logic on Temporal, with the refund exposed to the payments team as a Nexus operation
-  across two namespaces.
+- **Lane 1** ("Queue + LangGraph" on screen) is the stack a competent team ships today: a job queue with a visibility
+  timeout, a LangGraph agent with the default in-memory checkpointer, and an HTTPS call to payments.
+- **Lane 2** ("Temporal + Nexus" on screen) is the same agent logic on Temporal, with the refund exposed to the payments
+  team as a Nexus operation across two namespaces.
 
-A fault injector kills things. An independent audit then scores both lanes **from the payments ledger**, never
-from a lane's own records.
+A fault injector kills things. An independent audit then scores both lanes **from the payments ledger**, never from a
+lane's own records.
 
-Architecture and diagrams: [`docs/architecture.md`](docs/architecture.md).
-Measured results and how to read them: [`docs/scenario-results.md`](docs/scenario-results.md).
+An agent proposes a refund, a human approves it, and payments moves the money. That is the whole process. The
+design is in [`docs/architecture.md`](docs/architecture.md), the measured results in
+[`docs/scenario-results.md`](docs/scenario-results.md), and how to change the code in
+[`docs/development.md`](docs/development.md).
 
-## Scope
+## Quick start
 
-In scope:
-- One process: refund approval, from "a helpdesk ticket asks for a refund" to "the money moved once". The agent
-  checks two policy rules in code (at most $200, order at most 30 days old) before it asks the model, and a human
-  approves or denies what it proposes.
-- Five chaos scenes: happy path, agent workers killed (a crash or a deploy, with refunds in flight and tickets waiting for a
-  human), message delivered twice, payments commits then goes quiet, and a Nexus gauntlet (Lane 2 only): payments goes quiet, then the support worker,
-  the payments worker and the Temporal server are killed, all while the refunds are in flight.
-- Three ledger invariants: every approved ticket refunded exactly once; no refund without an approval; no ticket
-  lost or stuck. Each scene includes one ticket outside the policy and one a human denies, so the second invariant is
-  tested under the same chaos as the first.
-- Everything on one machine: processes only, SQLite, one local Temporal dev server.
-
-Out of scope, so do not read results as claims about them:
-- Scale, load, latency and cost. Local processes model crash and retry semantics, not distributed-system scale.
-- Temporal Cloud features (the Nexus caller allowlist, the account-wide registry) and self-hosted authorizers. The
-  dev server shows none of them.
-- Nexus cancellation, and retargeting an endpoint while operations are in flight. They are documented capabilities
-  that this repository does not build. Setup only points an existing `payments-endpoint` at the current namespace.
-- The quality of the agent's decisions, and live routing of a real ticket stream between the lanes.
-- A third, hardened Lane 1. What hardening would fix is argued in the write-up and measured for one change only
-  (see "Reproduce" below).
-
-## Setup (macOS or Linux)
-
-You need the [Temporal CLI](https://docs.temporal.io/cli) and [uv](https://docs.astral.sh/uv/):
+You need [uv](https://docs.astral.sh/uv/) and the [Temporal CLI](https://docs.temporal.io/cli). The demo UI also
+needs Node 22 or newer.
 
 ```bash
-brew install temporal uv        # macOS; on Linux install both from their docs
-make install                    # Python 3.12 environment from uv.lock
-make test                       # fast suite, no Temporal server needed
+brew install temporal uv     # macOS; on Linux install both from their docs
+make install                 # Python 3.12 environment from uv.lock
+make test                    # fast suite, no Temporal server needed
+make scenario                # the headless run: no API key, about four minutes
 ```
 
-## Reproduce the scenario (no API key needed)
-
-```bash
-make scenario
-```
-
-This starts everything (including a Temporal dev server if none is listening on `TEMPORAL_ADDRESS`, default
-`127.0.0.1:7233`), runs the walkthrough and the five scenes with a **stub model**, prints a ledger scoreboard for each, and exits
-non-zero if Lane 2 shows any violation. It takes about four minutes. The invariants are decided by the ledger, not by
-the model's wording, so the stub does not change the result.
-
-Two things to know:
-- If a Temporal server is already running on that address, the show **reuses it** and creates two namespaces
-  (`support`, `payments`) and one Nexus endpoint (`payments-endpoint`) on it. To keep it separate, start
-  your own on another port and point at it: `temporal server start-dev --port 7299` and
-  `TEMPORAL_ADDRESS=127.0.0.1:7299 make scenario`. A reused server is not killed, so the Nexus scene then runs three
-  failures instead of four; point `TEMPORAL_ADDRESS` at a free port and the show starts (and kills) its own.
-- It needs port 8100, so stop `make demo` first; it refuses to start if anything is listening there. While it runs,
-  a browser on :8100 shows a "not the demo" banner, and Run and Reset are locked to the test runner.
-- The seed fixes ticket amounts and messages, not the exact timing of the kills. The reproducible claim is the Lane 2
-  outcome (zero violations). Lane 1's failure counts vary a little from run to run, most in `double_delivery`.
-
-To measure the one-line fix to Lane 1 (derive its idempotency key from the ticket instead of from each attempt):
-
-```bash
-PAIDONCE_L1_STABLE_KEY=1 make scenario
-```
-
-Lane 1 is unchanged unless that variable is set.
-
-Integration tests for Lane 2 and Nexus: `make test-temporal`. It starts a throwaway in-memory Temporal dev server on
-port 7299 (`PAIDONCE_TEST_TEMPORAL_PORT` changes it), creates the namespaces and endpoint there, and stops it after,
-so it is safe to run while `make demo` is up.
+`make scenario` starts every service (and a Temporal dev server, if none is listening), runs the walkthrough, the happy
+path, three chaos scenes and the Nexus gauntlet against both lanes with a **stub model**, prints a ledger scoreboard for each, and
+exits non-zero if Lane 2 breaks an invariant. The invariants are decided by the ledger, not by the model's wording, so
+the stub does not change the result.
 
 ## Run the live demo
 
-The demo uses a real Anthropic model (`claude-sonnet-5-5` by default; set `PAIDONCE_MODEL` to change it).
+The demo uses a real Anthropic model (`claude-sonnet-5-5`; `PAIDONCE_MODEL` changes it).
 
 ```bash
 echo 'ANTHROPIC_API_KEY=...' > .env     # gitignored; or export it in your shell
-make ui                                 # builds the Vite UI (needs Node 22+)
+make ui                                 # builds the UI into ui/dist
 make demo                               # http://127.0.0.1:8100
 ```
 
-The page opens with the two architectures. "Walk through one ticket" runs a single approved ticket
-through both stacks and stops at five steps. Under the diagram, three panes show what each role sees as the ticket moves: the customer (their message with a photo of the broken mug, then the agent's replies), the agent (ticket, policy check, human approval, refund) and the human (the proposal with the customer's photo, the agent's policy-check note, and Approve/Deny). This page outlines the flow; it does not compare the stacks yet. The scene plays on its own, a few seconds per step, and the customer pane is a chat that grows an agent reply per step. Then it steps through five scenes. An architecture diagram shows
-where each fault lands and where each stack thinks each ticket is, above both lanes' ledger-based scoreboards; the
-Nexus step shows the operations live. Arrow keys or 1-7 move between steps, R runs the current scene (the page then scrolls so the diagram and both scoreboards are on screen together), and the step is kept in the URL (`#5`), so a refresh stays put. It
-is built for a laptop browser in full screen. The scoreboard resets whenever the show server starts.
+The page is a seven-step stepper for a laptop browser in full screen. Arrow keys or `1`-`7` move between steps, and the
+step is kept in the URL (`#5`). The scoreboard resets whenever the show server starts.
 
-Run of show, about ten minutes:
-- **Step 1, Two architectures**: the same refund flow built twice, and a one-ticket walkthrough of how each stack handles it.
-- **Step 2, Happy path**: seven tickets per lane. The agent's policy check denies one, the human approves five and
-  denies one; both lanes refund the five once and pay nothing on the two denied tickets, which go back to the
-  helpdesk as grey dash badges.
-- **Steps 3-5** (workers die, double delivery, payments goes quiet): the same chaos hits both
-  lanes; watch the ledger-based scoreboards diverge. The payments node's slots mark each ticket in the ledger
-  (`✓` paid once, `×2` paid twice, `∅` owed, never paid, `—` denied, nothing owed), and each lane shows what payments saw in the scene: calls, refunds paid, and
-  calls answered from an existing key. On step 5 that line is the evidence: Temporal's retry is answered from the
-  ledger, the queue's is paid again.
-- **Step 6, Scoreboard**: the totals since the reset, and the queue's own job table next to what the ledger says. It counts the
-  scenes on steps 2-5 and leaves out step 1's walkthrough and the Nexus page.
-- **Step 7, Nexus** says what Nexus is and why it matters, then proves it. Two static pictures on top: **Without Nexus**,
-  support's code reaches across the team line into payments' namespace, task queue, workflow type and retries; **With
-  Nexus**, support makes one call (`issue_refund`) to one endpoint (`payments-endpoint`) and payments owns everything
-  behind it. Under them, one strip spells out the contract: support sends `ticket_id` and `amount_cents` to
-  `issue_refund`, payments answers `refund_id`, `ticket_id` and `amount_cents`, and nothing else crosses (the field names
-  are read from the dataclasses). Below, the run as two team boxes joined by the endpoint. Four failures hit the refunds in flight, shown as
-  chips that go red when they land and read "survived" after: payments books each refund and goes quiet, then the support
-  worker, the payments worker and the Temporal server itself are killed, each for 5-6 seconds. The box a failure hits
-  goes red. Support's box holds one check per refund (one call each, "no errors"); payments' box turns each refund into
-  a `$` when the ledger books the money, with its retry count (`↻2`) underneath; the retry that finally succeeds is answered from
-  the ledger, not paid again. Hover a ticket for its detail; both sides' histories are in the Temporal Web UI
-  (http://127.0.0.1:8233, namespaces `support` and `payments`), including the caller's Nexus Links tab. Three tiles at the bottom
-  (errors support saw, retries payments absorbed, refunds paid once) read from the ledger. The Temporal kill
-  needs a server the show started itself (`make demo` does, if nothing is listening on 7233); with a server you started,
-  the scene skips that kill.
+| Step | What it shows |
+|---|---|
+| 1 Architectures | The two stacks side by side, and a one-ticket walkthrough of the flow |
+| 2 Happy path | Seven tickets per lane, no faults. Both lanes refund the five approved once |
+| 3 Crash | The agent workers are killed with refunds in flight and approvals waiting for a human |
+| 4 Redelivery | The queue delivers the same message twice |
+| 5 Payments quiet | Payments commits a refund, then the reply never arrives |
+| 6 Scoreboard | Totals since the reset for steps 2-5, from the ledger |
+| 7 Nexus | What Nexus is, then a gauntlet of four failures on the same in-flight refunds (Lane 2 only) |
 
-The Temporal wordmark and favicon are not in the repo. To show them, put `temporal-wordmark.svg` and `favicon.svg` in
-`ui/public/brand/` (gitignored) before `make ui`; otherwise the header shows text.
+Steps 2-5 run the same chaos against both lanes; the scoreboards diverge. The payments node in the diagram marks each
+ticket in the ledger: `✓` paid once, `×2` paid twice, `∅` owed and never paid, `—` denied and nothing owed.
+
+The Temporal wordmark and favicon are trademarks, so they are not in the repo. Put `temporal-wordmark.svg` and
+`favicon.svg` in `ui/public/brand/` (gitignored) before `make ui` to show them; otherwise the header shows text.
+
+## Make targets
+
+| Target | What it does |
+|---|---|
+| `make install` | Create the Python environment from `uv.lock` |
+| `make test` | The fast suite: payments, ledger, audit, agent policy, Lane 1, the show server (stub model) |
+| `make test-temporal` | Lane 2 and Nexus integration tests on their own throwaway Temporal server (port 7299) |
+| `make setup` | Create the two namespaces and the Nexus endpoint on the server at `TEMPORAL_ADDRESS` (safe to repeat) |
+| `make scenario` | The headless run described above. Needs port 8100 free |
+| `make ui` | Build the UI into `ui/dist`; the show server serves it |
+| `make demo` | Start everything and serve the show on :8100 |
+| `make lint` / `make fmt` | `ruff check` and `ruff format --check` / apply the formatter |
+
+## Configuration
+
+Everything has a default; set a variable in your shell or in a gitignored `.env`.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | none | The live demo needs it. `make scenario` and `make test` do not |
+| `PAIDONCE_MODEL` | `claude-sonnet-5-5` | The model the agent calls |
+| `PAIDONCE_STUB_LLM` | unset | `1` replaces the model with a deterministic stub |
+| `TEMPORAL_ADDRESS` | `127.0.0.1:7233` | The Temporal frontend. If nothing listens there the show starts a dev server |
+| `PAIDONCE_SUPPORT_NS`, `PAIDONCE_PAYMENTS_NS` | `support`, `payments` | The two namespaces |
+| `PAIDONCE_SHOW_PORT`, `PAIDONCE_PAYMENTS_PORT`, `PAIDONCE_LANE1_PORT` | 8100, 8101, 8102 | Where the services listen |
+| `PAIDONCE_DATA` | `./data` | SQLite files, TLS certificates and the dev server's database |
+| `PAIDONCE_PAYMENTS_TLS`, `PAIDONCE_LANE1_TLS` | `1` | `0` serves that service over plain HTTP (the tests do) |
+| `PAIDONCE_VISIBILITY_S` | `10` | Lane 1's queue visibility timeout |
+| `PAIDONCE_PAYMENTS_TIMEOUT_S` | `3` | Lane 1's client timeout against payments |
+| `PAIDONCE_L1_STABLE_KEY` | unset | `1` makes Lane 1 derive its idempotency key from the ticket. Off by default; see below |
+| `PAIDONCE_TEST_TEMPORAL_PORT` | `7299` | The throwaway server `make test-temporal` starts |
+
+`PAIDONCE_L1_STABLE_KEY=1 make scenario` measures the one-line fix to Lane 1: duplicates drop to zero and the lost
+tickets remain (see [`docs/scenario-results.md`](docs/scenario-results.md)).
+
+## Scope
+
+In scope: one process (refund approval, from "a ticket asks for a refund" to "the money moved once"), the agent's two
+policy rules (at most $200, order at most 30 days old), a human approve or deny, and three ledger invariants: every
+approved ticket refunded exactly once, no refund without an approval, no ticket lost or stuck. Everything runs on one
+machine: local processes, SQLite and one Temporal dev server.
+
+Out of scope, so do not read the results as claims about them: scale, load and cost; Temporal Cloud features (the Nexus
+caller allowlist, the account-wide registry); Nexus cancellation and retargeting an endpoint while operations are in
+flight; workflow versioning; approval waits longer than seconds; and the quality of the agent's decisions.
+
+## Troubleshooting
+
+- **Port 8100 is busy.** Another `make demo` or `make scenario` is running. The show server refuses to start a second
+  instance. Stop the first one.
+- **A Temporal server is already running on `TEMPORAL_ADDRESS`.** The show reuses it and creates its two namespaces and
+  the Nexus endpoint there. It cannot kill a server it did not start, so the Nexus scene skips that failure. To keep
+  the demo separate, run `temporal server start-dev --port 7299` and `TEMPORAL_ADDRESS=127.0.0.1:7299 make demo`, or
+  free the port and let the show start its own.
+- **Odd database errors after pulling a newer version.** Delete the old databases once: `rm data/*.db`.
+- **A browser left open on :8100 during `make scenario`** shows a "not the demo" banner; its Run and Reset buttons are
+  locked to the test runner.
+- **Lane 1's counts differ from `docs/scenario-results.md`.** They vary a little run to run because kills land at
+  wall-clock times. Lane 2's result (zero violations) does not.
 
 ## Layout
 
@@ -140,10 +133,14 @@ The Temporal wordmark and favicon are not in the repo. To show them, put `tempor
 | `paidonce/payments/` | The payments service and its SQLite ledger, with fault injection (commit-then-stall, latency) |
 | `paidonce/lane1/` | Lane 1: API, threaded worker, jobs table with a visibility timeout, LangGraph graph |
 | `paidonce/lane2/` | Lane 2: the Nexus contract, the support and payments workflows, activities, workers, setup |
+| `paidonce/agent.py` | The policy check and the model call, shared by both lanes |
 | `paidonce/audit.py` | The three invariants, computed from the ledger |
-| `paidonce/show/` | The process manager, the scenes and the fault injector, the server that streams state to the UI |
-| `scripts/smoke.py` | The headless scene runner behind `make scenario` |
+| `paidonce/show/` | The process manager, the scenes and the fault injector, and the server that streams state to the UI |
+| `paidonce/db.py`, `models.py`, `config.py`, `tls.py` | SQLite helpers, shared types, settings, self-signed certificates |
+| `scripts/` | `smoke.py` (the headless runner behind `make scenario`) and `test-temporal.sh` |
+| `tests/` | The pytest suites. `-m temporal` tests need `make test-temporal` |
 | `ui/` | The Vite + React + TypeScript demo UI |
+| `docs/` | `architecture.md`, `development.md`, `scenario-results.md` |
 
 ## License
 

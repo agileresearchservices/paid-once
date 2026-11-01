@@ -27,7 +27,8 @@ AGENT_WORKERS = ["lane1_worker", "support_worker"]
 WORKER_CRASH_COHORT = 6
 WORKER_CRASH_IN_FLIGHT = 3
 
-# Scored on their own and left out of the scoreboard totals: the walkthrough is a demonstration, and Nexus is its own step.
+# Scored on their own and left out of the scoreboard totals: the walkthrough is a demonstration, and Nexus is
+# its own step.
 DEMO_SCENES = ("walkthrough", "nexus_kill")
 
 # The Nexus gauntlet (step 7): four failures, each landing on refunds still in flight.
