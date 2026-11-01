@@ -51,7 +51,6 @@ function Invariant({ text, verdict, detail }: { text: string; verdict: Verdict; 
 // believedDone: what the lane's own records claim, set only where the ledger's answer sits next to it (the scoreboard
 // step). The verdicts never read it.
 export function Scoreboard({ audit, name, believedDone, note }: { audit: LaneAudit; name: string; believedDone?: number; note?: string }) {
-  const a = audit;
   const ps = parts(audit);
   const total = ps.reduce((n, p) => n + p.value, 0);
   const untested = total === 0;
@@ -89,21 +88,11 @@ export function Scoreboard({ audit, name, believedDone, note }: { audit: LaneAud
               tabIndex={0}
               data-tip={`${p.label}: ${p.value} of ${total}`}
             >
-              {p.value / total > 0.07 && <span>{p.value}{p.value / total > 0.15 && ` ${p.short}`}</span>}
+              {p.value / total > 0.04 && <span>{p.value}{p.value / total > 0.09 && ` ${p.short}`}</span>}
             </div>
           ))}
         </div>
       )}
-
-      <ul className="legend">
-        {ps.filter((p) => p.value > 0 || p.key === "ok").map((p) => (
-          <li key={p.key}>
-            <i className={`swatch ${p.className}`} aria-hidden="true" />
-            {p.icon} {p.label} <b>{p.value}</b>
-            {p.key === "none" && ` (${a.declined} policy, ${a.rejected} human)`}
-          </li>
-        ))}
-      </ul>
 
       <ul className="invariants">
         <Invariant

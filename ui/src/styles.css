@@ -139,8 +139,6 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .diagram .bolt { font-size: 38px; animation: bolt 0.9s ease-out 2; transform-box: fill-box; transform-origin: center; }
 @keyframes bolt { from { transform: scale(0.3); opacity: 1; } to { transform: scale(1.5); opacity: 0; } }
 .diagram .staged { fill: var(--warning); font-size: 13.5px; font-weight: 600; }
-.diagram .stall { fill: var(--warning); font-size: 13.5px; }
-.diagram .stall.now { fill: var(--critical-ink); animation: blink 0.6s step-end 4; }
 @keyframes blink { 50% { opacity: 0.2; } }
 .diagram .packet rect { fill: var(--critical-wash); stroke: var(--critical); }
 .diagram .packet text { fill: var(--critical-ink); font-size: 13px; font-weight: 700; }
@@ -170,11 +168,13 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
   .diagram * { animation: none !important; transition: none !important; }
 }
 
-.chip { display: inline-block; background: var(--surface); border: 1px solid var(--axis); border-radius: 999px; padding: 2px 10px; font-size: 14px; color: var(--ink-2); margin: 0 6px 4px 0; }
+.chip { display: inline-block; background: var(--surface); border: 1px solid var(--axis); border-radius: 999px; padding: 3px 12px; font-size: 19px; color: var(--ink-2); margin: 0 6px 4px 0; }
 .chip.warn { border-color: var(--warning); color: var(--ink); }
 
 .lanes { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 @media (max-width: 960px) { .lanes, .story, .nexus { grid-template-columns: 1fr; } }
+.lane h2 { font-size: 30px; }
+.lane > .muted { font-size: 21px; }
 .lane { background: var(--surface); border: 1px solid var(--grid); border-radius: 12px; padding: 16px 20px; }
 /* Lane 2 and the Nexus panel carry the brand gradient as a border; Lane 1 stays neutral. */
 .lane.lane2, .nexus, .endpoint-card {
@@ -189,20 +189,20 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .tile-state { font-weight: 700; font-size: 14px; letter-spacing: 0.05em; }
 .tile.down .tile-state { color: var(--critical-ink); }
 .tile-kills { color: var(--muted); font-size: 14px; }
-.believes { font-size: 15px; margin-bottom: 8px; }
+.believes { font-size: 20px; margin-bottom: 8px; }
 .calls { margin-top: 4px; }
 .calls b { font-variant-numeric: tabular-nums; }
 
 .scoreboard { border-top: 1px solid var(--grid); padding-top: 12px; margin-top: 8px; }
 .hero { display: flex; align-items: baseline; gap: 12px; }
-.hero-num { font-size: 52px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
-.hero-of { color: var(--ink-2); }
-.loss { color: var(--critical-ink); font-weight: 600; margin: 4px 0 0; min-height: 1.45em; }
+.hero-num { font-size: 76px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.hero-of { color: var(--ink-2); font-size: 26px; }
+.loss { color: var(--critical-ink); font-weight: 600; font-size: 26px; margin: 4px 0 0; min-height: 1.45em; }
 .loss.none { color: var(--good-ink); font-weight: 400; }
 .hero-note { color: var(--muted); font-size: 14px; margin: 2px 0 0; }
-.believed { color: var(--ink-2); font-size: 15px; margin: 4px 0 0; }
+.believed { color: var(--ink-2); font-size: 22px; margin: 4px 0 0; }
 
-.bar { display: flex; gap: 2px; height: 40px; margin: 12px 0 8px; }
+.bar { display: flex; gap: 2px; height: 56px; margin: 14px 0 16px; font-size: 20px; }
 .bar.empty { align-items: center; padding: 0 12px; color: var(--muted); background: var(--page); border-radius: 6px; }
 .seg {
   position: relative; display: flex; align-items: center; justify-content: center; min-width: 8px;
@@ -226,11 +226,11 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .legend { list-style: none; display: flex; gap: 14px; flex-wrap: wrap; padding: 0; margin: 0 0 12px; font-size: 15px; color: var(--ink-2); }
 .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; }
 
-.invariants { list-style: none; padding: 0; margin: 0 0 8px; display: grid; gap: 4px; }
-.invariant { display: grid; grid-template-columns: 22px 1fr auto; column-gap: 8px; font-size: 16px; }
+.invariants { list-style: none; padding: 0; margin: 0 0 8px; display: grid; gap: 10px; }
+.invariant { display: grid; grid-template-columns: 30px 1fr auto; column-gap: 10px; font-size: 24px; }
 .inv-icon { font-weight: 700; text-align: center; }
-.inv-verdict { font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: 0.04em; }
-.inv-detail { grid-column: 2 / 4; color: var(--muted); font-size: 14px; }
+.inv-verdict { font-weight: 700; font-size: 20px; text-transform: uppercase; letter-spacing: 0.04em; }
+.inv-detail { grid-column: 2 / 4; color: var(--muted); font-size: 19px; }
 .invariant.holds .inv-icon, .invariant.holds .inv-verdict { color: var(--good-ink); }
 .invariant.violated .inv-icon, .invariant.violated .inv-verdict { color: var(--critical-ink); }
 .invariant.settling .inv-icon, .invariant.settling .inv-verdict { color: var(--warning); }

@@ -99,7 +99,7 @@ function FaultRow({
   const x0 = live ? x(f.start!) : 0;
   const x1 = live ? x(f.end != null ? Math.min(f.end, now) : now) : 0;
   const secs = live ? Math.max(0, Math.round((f.end != null ? Math.min(f.end, now) : now) - f.start!)) : 0;
-  const what = f?.effect === "stall" ? `replies held · ${f.hit} booked` : `down${f?.end != null ? ` ${secs} s` : ""} · ${f?.hit ?? 0} in flight`;
+  const what = f?.effect === "stall" ? `quiet · ${f.hit} booked` : `down${f?.end != null ? ` ${secs} s` : ""} · ${f?.hit ?? 0} in flight`;
   return (
     <g className={live ? "fault on" : "fault"}>
       <text className="fault-label" x={8} y={y + FAULT_ROW - 5}>
@@ -172,7 +172,7 @@ function SupportTrack({ r, y, x, now }: { r: NexusRow; y: number; x: (ts: number
     ? `FAILED · ${r.last_failure || "the operation failed"}`
     : r.caller_saw_failure
       ? `${r.state} · ${startAttempts} · saw: ${r.last_failure}`
-      : `STARTED · ${startAttempts} · no error`;
+      : "STARTED · no error";
   const x0 = x(r.op_scheduled_at);
   const x1 = x(end);
   return (
@@ -220,9 +220,9 @@ function PaymentsTrack({ r, y, x, now }: { r: NexusRow; y: number; x: (ts: numbe
         // attempt lasted and the full text is on hover.
         const text =
           a.outcome === "failed"
-            ? `✕ attempt ${a.n} ${timedOut(a) ? `timed out (${secs} s)` : `failed after ${secs} s`}`
+            ? `✕ attempt ${a.n} ${timedOut(a) ? `timed out` : `failed after ${secs} s`}`
             : a.outcome === "ok"
-              ? `${OUTCOME_GLYPH.ok} attempt ${a.n}${replayed(a) ? " · answered from the ledger" : ""}`
+              ? `${OUTCOME_GLYPH.ok} attempt ${a.n}${replayed(a) ? " · from the ledger" : ""}`
               : `attempt ${a.n}…`;
         // Keep the label clear of the $ marker when the booking falls inside this attempt.
         const bx = booked != null ? x(booked) : null;

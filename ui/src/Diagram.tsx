@@ -73,7 +73,7 @@ function dotClass(d: FlowDot): string {
   return "tdot active";
 }
 
-const EFFECT_MARK: Record<string, string> = { duplicate: "⚡ fed twice", stall: "⚡ reply held" };
+const EFFECT_MARK: Record<string, string> = { duplicate: "⚡ delivered twice", stall: "⚡ goes quiet" };
 
 function Dots({ lane, dots }: { lane: LaneId; dots: FlowDot[] }) {
   const slot: Record<string, number> = {};
@@ -156,7 +156,6 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
     }
 
   const latency = (lane: LaneId) => snap.faults?.[lane]?.latency_s ?? 0;
-  const stall = snap.faults?.lane1?.mode === "commit_then_stall" ? snap.faults.lane1 : snap.faults?.lane2?.mode === "commit_then_stall" ? snap.faults.lane2 : undefined;
   const audit = (lane: LaneId) => snap.audit[lane]?.tickets ?? {};
 
   return (
@@ -287,11 +286,6 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
           );
         })}
 
-        {stall && stall.remaining > 0 && (
-          <text className={hitNow.has("payments") ? "stall now" : "stall"} x={NODES.payments.x + 16} y={(mid("lane1") + mid("lane2")) / 2 + 14}>
-            ⏸ commits, then holds the reply {stall.delay_s}s ({stall.remaining} left)
-          </text>
-        )}
         {scene != null && (
           <>
             <Ledger lane="lane1" label="Queue" dots={flow.lane1} tickets={audit("lane1")} />
