@@ -7,8 +7,8 @@ export interface Step {
   title: string;
   short: string; // label on the step button
   story: string; // what happens: one or two short sentences (this is read from a projector)
-  watch: string; // what to look at, without giving the outcome away
-  result?: string; // what it showed; appears once this step's scene has finished
+  watch?: string; // what to look at, without giving the outcome away (the scoreboard page has none)
+  result?: string; // what the scene shows and why; on screen from the start, beside "watch"
   nexus?: boolean; // show the Nexus panel
   arch?: boolean; // the architecture page: the diagram and the walkthrough, no lane scoreboards
   runLabel?: string; // the run button, when "Run this scene" doesn't say what it does
@@ -96,6 +96,5 @@ export const STEPS: Step[] = [
     short: "Scoreboard",
     title: "The scoreboard",
     story: "Scored from the payments ledger, never from either stack's own records.",
-    watch: "Refunded once. Nothing unapproved. Nothing lost.",
   },
 ];
