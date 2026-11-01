@@ -167,9 +167,9 @@ export function App() {
           <h2>{step.title}</h2>
           <p>{step.story}</p>
           <p className="watch"><b>Watch:</b> {step.watch}</p>
-          {/* Laid out before the scene finishes, so the page doesn't jump when the result appears */}
+          {/* Shown from the start, next to "Watch", so the viewer knows the outcome while the scene plays and why it happens */}
           {step.result && (
-            <p className={finished ? "result" : "result pending"} aria-hidden={!finished}>
+            <p className="result">
               <b>Result:</b> {step.result}
             </p>
           )}
