@@ -93,9 +93,9 @@ whoever changes the code next.
 - **The show links into the Temporal Web UI** (`TEMPORAL_UI_URL`, default `http://127.0.0.1:8233`; the engine re-checks
   it every 10 seconds and hides the links while it doesn't answer). On step 6 the namespace links in the team boxes open the first refund's caller history in `support` and
   its handler history in `payments`.
-- **The UI is a stepper** for a laptop browser, full screen (`#1`..`#7` in the URL, arrow keys, 1-7, R runs the
-  scene). Nothing is built for tablet or phone. Step 1 is the architecture diagram plus the walkthrough
-  (below). The side-by-side table that used to sit under the diagram was removed; the walkthrough is a general outline
+- **The UI is a stepper** for a laptop browser, full screen (`#1`..`#7` in the URL, arrow keys, 1-7; scenes
+  run from the button only, no R shortcut). Nothing is built for tablet or phone. Step 1 is the walkthrough (three role
+  panes: customer, agent, human in the loop, shown empty before the run) above the architecture diagram. The side-by-side table that used to sit under the diagram was removed; the walkthrough is a general outline
   (a support chat, no stack comparison); the per-stack notes it used to carry are in the private talk track.
 - **Running a scene scrolls the page** (`App.tsx`, on the scene starting): it scrolls down until the diagram (or the Nexus panel) is at the top, so the
   explanation above can scroll away and everything that updates stays on screen. Scene steps use a compact lane layout (`.lane.compact`:

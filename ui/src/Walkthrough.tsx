@@ -3,9 +3,9 @@ import { BEATS, WALKTHROUGH_TICKET } from "./steps";
 import { LegendIcon, type TicketKind } from "./TicketIcon";
 import type { FlowDot, LaneId } from "./types";
 
-// The walkthrough's panel, under the diagram on step 1: the refund as three role panes that fill in as the scene plays on its
-// own. Each step stays up for a few seconds (the engine's WALKTHROUGH_DWELL_S), so the diagram above shows what the panes
-// say. Before the scene runs the panel keeps its place with a hint, so the page doesn't jump. This page outlines the flow
+// The walkthrough's panel, above the diagram on step 1: the refund as three role panes that fill in as the scene plays on its
+// own. Each step stays up for a few seconds (the engine's WALKTHROUGH_DWELL_S), so the diagram below shows what the panes
+// say. Before the scene runs the three panes are already there, empty, so the roles are on screen and nothing jumps. This page outlines the flow
 // in general; it does not compare the two stacks.
 
 function Typing() {
@@ -78,25 +78,17 @@ export function Walkthrough({ beat, flow }: { beat: string | null; flow?: Record
   const b = BEATS[i];
   const shown = at >= 0; // a step is up
 
-  // When a step opens, bring the diagram and all three panes into view together. The header above may scroll away; the
-  // diagram must not be cut off (the scroll stops at the diagram's top).
+  // When a step opens, bring all three panes into view. The header above may scroll away; the panel's own top must not
+  // (the scroll stops there). The diagram sits below the panel.
   useEffect(() => {
     if (!shown) return;
     const panel = document.querySelector(".beat");
-    const diagram = document.querySelector(".diagram");
-    if (!panel || !diagram) return;
-    const hidden = panel.getBoundingClientRect().bottom - window.innerHeight + 12;
-    const room = diagram.getBoundingClientRect().top - 8;
-    if (hidden > 0) window.scrollBy({ top: Math.min(hidden, Math.max(room, 0)), behavior: "smooth" });
+    if (!panel) return;
+    const r = panel.getBoundingClientRect();
+    const hidden = r.bottom - window.innerHeight + 12;
+    if (hidden > 0) window.scrollBy({ top: Math.min(hidden, Math.max(r.top - 8, 0)), behavior: "smooth" });
   }, [shown, at]);
 
-  if (!b) {
-    return (
-      <section className="beat idle" aria-label="Walkthrough">
-        <p>Press R to walk one ticket through. It plays on its own.</p>
-      </section>
-    );
-  }
   const { message, amount } = WALKTHROUGH_TICKET;
   const agentDone = i >= 2 || decided(flow);
   const done = i >= 4 && refunded(flow);
@@ -107,23 +99,24 @@ export function Walkthrough({ beat, flow }: { beat: string | null; flow?: Record
     "I'm checking with a teammate.",
     "Good news, it's approved!",
     done ? `Your ${amount} refund is on its way.` : "Sending your refund now…",
-  ].slice(0, i);
+  ].slice(0, Math.max(i, 0)); // none before the run (i is -1)
   return (
-    <section className="beat" aria-label={`Step ${i + 1} of ${BEATS.length}: ${b.title}`}>
+    <section className="beat" aria-label={b ? `Step ${i + 1} of ${BEATS.length}: ${b.title}` : "Walkthrough"}>
       <div className="beat-head">
-        <span className="beat-n">Step {i + 1} of {BEATS.length}</span>
-        <h3>{b.title}</h3>
+        {/* Before the run the headline row stays (blank) so the panes don't move when step 1 starts. */}
+        <span className="beat-n">{b ? `Step ${i + 1} of ${BEATS.length}` : "\u00a0"}</span>
+        <h3>{b ? b.title : "\u00a0"}</h3>
       </div>
       <div className="panes">
         {/* The customer talks only to the agent: a short answer per step, never the policy check or the approval. */}
         <Pane who="Customer view" avatar={<RoleIcon role="customer" />} chat>
-          <div className="msg customer"><p>{message}</p></div>
+          {b && <div className="msg customer"><p>{message}</p></div>}
           {replies.map((r, n) => (
             <div className="msg support" key={n}><p>{r}</p></div>
           ))}
         </Pane>
         <Pane who="Agent view" avatar={<RoleIcon role="agent" />}>
-          <Row kind={i >= 1 ? "done" : "active"}>{`New ticket · ${amount}`}</Row>
+          {b ? <Row kind={i >= 1 ? "done" : "active"}>{`New ticket · ${amount}`}</Row> : <p className="pane-empty">No ticket yet</p>}
           {i >= 1 && (agentDone ? <Row kind="done">Policy check passed</Row> : <div className="pane-row"><Typing /></div>)}
           {/* One row for the human: proposed, then approved, in place */}
           {i >= 2 && (i >= 3 ? <Row kind="done">Human approved</Row> : <Row kind="waiting">Proposed it to a human</Row>)}

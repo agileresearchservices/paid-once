@@ -336,16 +336,14 @@ svg.lg-icon, .diagram svg.lg-icon { display: inline-block; width: 26px; height: 
 
 /* The walkthrough's explanation panel: in the page under the diagram, so the diagram stays in view. */
 .beat { min-height: 264px; padding: 10px 22px 12px; background: var(--surface); border: 2px solid var(--accent); border-radius: 14px; }
-.beat.idle { display: grid; place-items: center; border-color: var(--grid); }
-.beat.idle p { margin: 0; max-width: 90ch; color: var(--muted); font-size: 26px; text-align: center; }
 /* The walkthrough: three panes, one per role, each showing only what that role sees. */
 .panes { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
-/* Step 1 fills the window: the bottom panel takes whatever height is left, and the text grows with it (--wf), never below the
+/* Step 1 fills the window: the walkthrough panel (above the diagram) takes whatever height is left, and the text grows with it (--wf), never below the
    sizes that fit the smallest screen. 830 px is about what the rest of the page uses plus the panel's own chrome. */
 main.fill { display: flex; flex-direction: column; min-height: 100vh; }
 .beat { --wf: clamp(20px, calc((100vh - 753px) / 9), 34px); }
-main.fill > .beat:not(.idle) { flex: 1 1 auto; display: flex; flex-direction: column; }
-main.fill > .beat:not(.idle) .panes { flex: 1 1 auto; grid-template-rows: minmax(0, 1fr); }
+main.fill > .beat { flex: 1 1 auto; display: flex; flex-direction: column; }
+main.fill > .beat .panes { flex: 1 1 auto; grid-template-rows: minmax(0, 1fr); }
 main.fill .pane { height: auto; min-height: 186px; }
 .pane { height: 186px; display: flex; flex-direction: column; border: 1px solid var(--axis); border-radius: 14px; background: var(--page); overflow: hidden; }
 .pane-bar { display: flex; align-items: center; gap: 10px; padding: 5px 14px; border-bottom: 1px solid var(--grid); font-size: calc(var(--wf) * 0.9); font-weight: 600; color: var(--ink); }
