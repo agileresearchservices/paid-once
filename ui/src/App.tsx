@@ -85,6 +85,22 @@ export function App() {
     if (beat) void act(`/api/beat/continue?beat=${beat}`);
   }, [beat, act]);
 
+  // Pressing Run on a scene step: scroll down so the diagram and the scoreboards below it are on screen together, and
+  // stop at the diagram's top (the explanation above may scroll away). The first step does its own scrolling (Walkthrough).
+  const sceneRunning = !!snap && snap.running && step.scene != null && snap.current === step.scene;
+  const wasRunning = useRef(false);
+  useEffect(() => {
+    if (sceneRunning && !wasRunning.current && !step.arch) {
+      const first = document.querySelector<HTMLElement>(".diagram, .nexus");
+      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+      if (first) {
+        const target = Math.min(maxScroll, window.scrollY + first.getBoundingClientRect().top - 8);
+        if (target > window.scrollY) window.scrollTo({ top: target, behavior: "smooth" });
+      }
+    }
+    wasRunning.current = sceneRunning;
+  }, [sceneRunning, step.arch]);
+
   // Arrows step, 1-8 jump, R runs this step's scene.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -197,21 +213,30 @@ export function App() {
       {(step.arch || (step.scene && !step.nexus)) && <Diagram snap={snap} scene={step.scene} />}
 
       {step.arch ? (
-        <Walkthrough beat={beat} running={thisRunning} onContinue={onContinue} />
+        <Walkthrough beat={beat} flow={onScreen ? snap.flow : undefined} onContinue={onContinue} />
       ) : step.nexus ? null : (
         <div className="lanes">
           {LANES.map((l) => (
-            <article key={l.id} className={`lane ${l.id}`}>
-              <h2>{l.name}</h2>
-              <p className="muted">{l.subtitle}</p>
-              {step.scene && (
-                <div className="believes">
-                  <span className="muted">{l.id === "lane1" ? "Job table:" : "Workflow status:"}</span>{" "}
-                  <Chips counts={onScreen ? (l.id === "lane1" ? snap.lane1_view : snap.lane2_view) : {}} empty="nothing yet" />
-                  <PaymentsCalls c={onScreen ? snap.payments_calls?.[l.id] : undefined} />
+            <article key={l.id} className={step.scene ? `lane ${l.id} compact` : `lane ${l.id}`}>
+              {step.scene ? (
+                // A scene step is read from across a room while it runs: name and what the stack believes on one line,
+                // so the diagram and both scoreboards fit one screen.
+                <div className="lane-head">
+                  <h2>{l.name}</h2>
+                  <div className="believes">
+                    <span className="muted">{l.id === "lane1" ? "Job table:" : "Workflow status:"}</span>{" "}
+                    <Chips counts={onScreen ? (l.id === "lane1" ? snap.lane1_view : snap.lane2_view) : {}} empty="nothing yet" />
+                    <PaymentsCalls c={onScreen ? snap.payments_calls?.[l.id] : undefined} />
+                  </div>
                 </div>
+              ) : (
+                <>
+                  <h2>{l.name}</h2>
+                  <p className="muted">{l.subtitle}</p>
+                </>
               )}
               <Scoreboard
+                compact={!!step.scene}
                 audit={snap.audit[l.id]}
                 name={l.name}
                 believedDone={!step.scene && l.id === "lane1" ? (snap.lane1_view_all?.done ?? 0) : undefined}

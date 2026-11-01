@@ -83,8 +83,12 @@ whoever changes the code next.
   handler's in `payments`.
 - **The UI is a stepper** for a laptop browser, full screen (`#1`..`#7` in the URL, arrow keys, 1-7, R runs the
   scene). Nothing is built for tablet or phone. Step 1 is the architecture diagram plus the walkthrough
-  (below). The side-by-side table that used to sit under the diagram was removed; the walkthrough boxes say what each
-  stack does at each step, so keep `BEATS` in `ui/src/steps.ts` in step with `paidonce/lane1/` and `paidonce/lane2/`.
+  (below). The side-by-side table that used to sit under the diagram was removed; the walkthrough is a general outline
+  (a support chat, no stack comparison); the per-stack notes it used to carry are in the private talk track.
+- **Running a scene scrolls the page** (`App.tsx`, on the scene starting): it scrolls down until the diagram (or the Nexus panel) is at the top, so the
+  explanation above can scroll away and everything that updates stays on screen. Scene steps use a compact lane layout (`.lane.compact`:
+  name and the stack's own view on one line, the amount refunded twice beside the number, no table view), so the diagram plus both
+  scoreboards measure about 840 px after a run, under the 945 px screen. Step 1 does its own scrolling (`Walkthrough.tsx`).
 - **Faults are drawn where they land.** One architecture diagram (`ui/src/Diagram.tsx`) on step 1 and the scene steps
   replaces the old toast, payments strip and process tiles. Fault events carry `target` (diagram node ids: process
   names or `temporal`) and `effect` (`kill`, `duplicate`, `stall`), set in `Engine.fault()`, so the UI never parses
@@ -138,10 +142,15 @@ whoever changes the code next.
 - Fairness: both lanes pay the same handshake cost, and TLS does not change Lane 1's per-attempt key or its 3 s timeout.
 
 ## The walkthrough (step 1)
-- `Engine.scene_walkthrough` sends one $42.00 ticket to both lanes and stops at six steps with `Engine.await_beat`. The
+- `Engine.scene_walkthrough` sends one $42.00 ticket to both lanes and stops at the first four steps with `Engine.await_beat`; step 5, the refund, has no gate (the engine just sets `beat`), and the scene ends when the ledger has it. The
   snapshot's `beat` names the step; the UI shows its panel under the diagram, in the space the old comparison table used (`ui/src/Walkthrough.tsx`, copy in `BEATS` in `steps.ts`) and
   `POST /api/beat/continue?beat=<id>` releases the gate. The id must match the step on screen, so a double click cannot
   skip the next one. `make scenario` releases the gates itself.
+- The panel is three panes, Customer, Agent and Human view, each showing only what that role sees (the customer never sees the
+  policy check, proposal or approval). It outlines the flow and deliberately does not compare the stacks: that
+  starts with the scenes. The agent's reply is typing dots until both stacks show the ticket waiting for a human (`decided()` in
+  `Walkthrough.tsx`, read from the snapshot's `flow`), so the step opens right after the ticket is submitted and the audience
+  sees it travel to the agent and the decision arrive. `WALKTHROUGH_TICKET` in `steps.ts` mirrors the engine's `WALKTHROUGH_*`.
 - Payments latency is 2.5 s for the scene so the refund is visible in flight. It must stay under Lane 1's 3 s client
   timeout: a longer hold makes its retry (new key) book the refund twice on the happy path. The refund box is shown
   0.6 s after the approval is delivered, inside that window; the money lands while you talk.

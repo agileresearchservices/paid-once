@@ -18,55 +18,18 @@ export interface Step {
 // (Engine.scene_walkthrough). Every line says what this repo's code does (paidonce/lane1/, paidonce/lane2/).
 export interface Beat {
   id: string;
-  title: string;
-  intro: string;
-  queue: string;
-  temporal: string;
+  title: string; // the walkthrough's three panes (Walkthrough.tsx) tell the story; this is its headline
 }
 
+// The ticket the walkthrough sends. Mirrors WALKTHROUGH_MESSAGE and WALKTHROUGH_AMOUNT_CENTS in paidonce/show/engine.py.
+export const WALKTHROUGH_TICKET = { message: "The mug arrived in pieces. Please refund me.", amount: "$42.00" };
+
 export const BEATS: Beat[] = [
-  {
-    id: "ticket",
-    title: "A customer asks for a refund",
-    intro: "One ticket: a $42.00 refund request.",
-    queue: "A row in the jobs table, and a queued job.",
-    temporal: "A workflow starts. Its history is the record.",
-  },
-  {
-    id: "agent",
-    title: "The agent decides",
-    intro: "Policy rules first, then Claude proposes.",
-    queue: "A worker runs a LangGraph graph. State lives in worker memory.",
-    temporal: "An activity runs the agent. The result goes into history.",
-  },
-  {
-    id: "waiting",
-    title: "Waiting for a human",
-    intro: "The agent only proposes. A human decides.",
-    queue: "The pause is held in worker memory. A restart loses it.",
-    temporal: "The workflow waits durably. A new worker replays to here.",
-  },
-  {
-    id: "approve",
-    title: "The human approves",
-    intro: "The $42.00 refund is approved.",
-    queue: "The API marks the row approved and queues a job.",
-    temporal: "A signal wakes the workflow. Repeats are ignored.",
-  },
-  {
-    id: "refund",
-    title: "Asking payments for the money",
-    intro: "Slowed 2.5 s so you can see it in flight.",
-    queue: "HTTPS call to payments. A new idempotency key every try.",
-    temporal: "One Nexus operation. Payments retries with key refund-<ticket>.",
-  },
-  {
-    id: "ledger",
-    title: "The ledger decides",
-    intro: "The scoreboard reads payments' ledger, not either stack.",
-    queue: "The row says done.",
-    temporal: "The workflow completed with the refund ID.",
-  },
+  { id: "ticket", title: "A customer asks for a refund" },
+  { id: "agent", title: "The agent decides" },
+  { id: "waiting", title: "Handed to a human" },
+  { id: "approve", title: "The human approves" },
+  { id: "refund", title: "Payments moves the money" },
 ];
 
 export const STEPS: Step[] = [

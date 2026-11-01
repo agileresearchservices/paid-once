@@ -142,7 +142,7 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .ti-line { fill: none; stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; }
 .ti-light { stroke: #fff; }
 .ti-dark { stroke: var(--page); }
-.diagram svg.lg-icon { display: inline-block; width: 26px; height: 26px; flex: none; overflow: visible; }
+svg.lg-icon, .diagram svg.lg-icon { display: inline-block; width: 26px; height: 26px; flex: none; overflow: visible; }
 .diagram .human .badge { fill: var(--page); stroke: var(--ink-2); stroke-width: 1.5; transition: stroke 0.3s; }
 .diagram .human .glyph { fill: var(--ink); }
 .diagram .human.now .badge { stroke: var(--sky); stroke-width: 2.5; }
@@ -189,6 +189,20 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .tile.down .tile-state { color: var(--critical-ink); }
 .tile-kills { color: var(--muted); font-size: 14px; }
 .believes { font-size: 20px; margin-bottom: 8px; }
+/* A scene step: one header line, a smaller number, the amount refunded twice beside it, tighter rows. Diagram plus both
+   scoreboards must fit one screen so the whole run can be watched after pressing Run. */
+.lane.compact { padding: 12px 18px 14px; }
+.lane-head { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4px 14px; }
+.lane-head h2 { margin: 0; }
+.lane.compact .believes { margin: 0; font-size: 19px; }
+.lane.compact .scoreboard { padding-top: 8px; margin-top: 8px; }
+.lane.compact .hero { align-items: baseline; }
+.lane.compact .hero-num { font-size: 56px; }
+.lane.compact .hero-of { font-size: 22px; }
+.lane.compact .hero .loss { margin: 0 0 0 auto; min-height: 0; font-size: 24px; }
+.lane.compact .bar { height: 46px; margin: 8px 0 10px; }
+.lane.compact .invariants { gap: 6px; margin: 0; }
+.lane.compact .invariant { font-size: 22px; }
 .calls { margin-top: 4px; }
 .calls b { font-variant-numeric: tabular-nums; }
 
@@ -317,16 +331,36 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 
 
 /* The walkthrough's explanation panel: in the page under the diagram, so the diagram stays in view. */
-.beat { min-height: 230px; padding: 16px 22px 18px; background: var(--surface); border: 2px solid var(--accent); border-radius: 14px; }
+.beat { min-height: 264px; padding: 10px 22px 12px; background: var(--surface); border: 2px solid var(--accent); border-radius: 14px; }
 .beat.idle { display: grid; place-items: center; border-color: var(--grid); }
 .beat.idle p { margin: 0; max-width: 90ch; color: var(--muted); font-size: 26px; text-align: center; }
+/* The walkthrough: three panes, one per role, each showing only what that role sees. */
+.panes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.pane { height: 186px; display: flex; flex-direction: column; border: 1px solid var(--axis); border-radius: 14px; background: var(--page); overflow: hidden; }
+.pane-bar { display: flex; align-items: center; gap: 10px; padding: 5px 14px; border-bottom: 1px solid var(--grid); font-size: 18px; font-weight: 600; color: var(--ink); }
+.pane-body { flex: 1; display: flex; flex-direction: column; justify-content: flex-start; gap: 5px; padding: 8px 14px; overflow: hidden; }
+.pane-row { display: flex; align-items: center; gap: 10px; font-size: 20px; line-height: 1.2; color: var(--ink); min-height: 27px; }
+.pane-empty { margin: auto; font-size: 20px; color: var(--muted); }
+.msg { display: flex; }
+.msg p { margin: 0; padding: 4px 14px; border-radius: 16px; font-size: 21px; line-height: 1.25; color: var(--ink); background: var(--surface); }
+.msg.customer { justify-content: flex-end; }
+.msg.customer p { background: var(--accent-wash); }
+.review { display: flex; flex-direction: column; gap: 8px; }
+.review-ask { font-size: 24px; font-weight: 700; color: var(--ink); }
+.review-quote { font-size: 17px; color: var(--ink-2); line-height: 1.25; }
+.review-actions { display: flex; gap: 10px; margin-top: 2px; }
+.act { padding: 5px 16px; border: 1px solid var(--axis); border-radius: 8px; font-size: 19px; font-weight: 600; color: var(--ink-2); }
+.act.approve.on { background: #0b3a22; border-color: var(--good); color: var(--good-ink); }
+.avatar { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--grid); color: var(--ink-2); font-size: 14px; font-weight: 700; }
+.pane:nth-child(2) .avatar { background: var(--sky); color: var(--page); }
+.avatar .lg-icon { width: 24px; height: 24px; }
+.pane-row .lg-icon { width: 24px; height: 24px; }
+.typing { display: inline-flex; gap: 6px; align-items: center; height: 26px; }
+.typing i { width: 9px; height: 9px; border-radius: 50%; background: var(--ink-2); animation: typing 1.2s ease-in-out infinite; }
+.typing i:nth-child(2) { animation-delay: 0.2s; }
+.typing i:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typing { 0%, 60%, 100% { opacity: 0.25; } 30% { opacity: 1; } }
 .beat-head { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
-.beat-head h3 { flex: 1; margin: 0; font-size: 34px; color: var(--ink); text-transform: none; letter-spacing: 0; }
+.beat-head h3 { flex: 1; margin: 0; font-size: 32px; color: var(--ink); text-transform: none; letter-spacing: 0; }
 .beat-n { color: var(--accent-ink); font-size: 14px; font-weight: 600; white-space: nowrap; }
 .beat kbd { font: 12px var(--mono); margin-left: 6px; padding: 1px 6px; border: 1px solid rgba(255, 255, 255, 0.5); border-radius: 4px; }
-.beat-intro { font-size: 28px; color: var(--ink); margin-bottom: 12px; }
-.beat-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.beat-cols > div { padding: 10px 14px; border-radius: 10px; background: var(--page); font-size: 26px; color: var(--ink-2); }
-.beat-cols > div.t { background: var(--accent-wash); }
-.beat-cols b { display: block; margin-bottom: 6px; font-size: 20px; color: var(--ink); }
-.beat-cols p { margin: 0; }
