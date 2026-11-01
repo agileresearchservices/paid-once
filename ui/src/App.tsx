@@ -166,7 +166,7 @@ export function App() {
         <div className="story-text">
           <h2>{step.title}</h2>
           <p>{step.story}</p>
-          <p className="watch"><b>Watch:</b> {step.watch}</p>
+          {step.watch && <p className="watch"><b>Watch:</b> {step.watch}</p>}
           {/* Shown from the start, next to "Watch", so the viewer knows the outcome while the scene plays and why it happens */}
           {step.result && (
             <p className="result">
