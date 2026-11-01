@@ -17,7 +17,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
-from paidonce import agent, config
+from paidonce import agent, config, tls
 from paidonce.lane1 import store
 from paidonce.models import Proposal, Ticket
 
@@ -52,6 +52,7 @@ def call_payments(ticket_id: str, amount_cents: int) -> str:
                 json={"ticket_id": ticket_id, "amount_cents": amount_cents},
                 headers={"Idempotency-Key": key, "X-Lane": "lane1"},
                 timeout=config.PAYMENTS_CLIENT_TIMEOUT_S,
+                verify=tls.client_verify(),
             )
             if resp.status_code < 500:
                 resp.raise_for_status()

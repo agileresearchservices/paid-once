@@ -148,9 +148,9 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .diagram .tdot.done { fill: var(--good); }
 .diagram .tdot.failed { fill: var(--critical); }
 .diagram .tdot.closed { fill: var(--muted); }
-.diagram .human rect { fill: var(--page); stroke: var(--ink-2); stroke-width: 1.5; transition: stroke 0.3s; }
-.diagram .human text { fill: var(--ink); font-size: 13px; font-weight: 600; }
-.diagram .human.now rect { stroke: var(--sky); stroke-width: 2.5; }
+.diagram .human .badge { fill: var(--page); stroke: var(--ink-2); stroke-width: 1.5; transition: stroke 0.3s; }
+.diagram .human .glyph { fill: var(--ink); }
+.diagram .human.now .badge { stroke: var(--sky); stroke-width: 2.5; }
 .diagram .slot rect { fill: none; stroke: var(--axis); stroke-dasharray: 3 3; }
 .diagram .slot text { font-size: 12px; font-weight: 700; }
 .diagram .slot.ok rect { fill: #0b3a22; stroke: var(--good); stroke-dasharray: none; }

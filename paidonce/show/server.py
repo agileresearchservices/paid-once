@@ -12,7 +12,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from paidonce import agent, audit, config
+from paidonce import agent, audit, config, tls
 from paidonce.lane2.client import ensure_setup
 from paidonce.show.engine import SCENES, Engine
 from paidonce.show.procs import ProcessManager, port_open
@@ -43,6 +43,8 @@ async def lifespan(_: FastAPI):
     setup_notes = await asyncio.to_thread(ensure_setup)
     engine = Engine(procs)
     state.update(procs=procs, engine=engine)
+    if config.PAYMENTS_TLS or config.LANE1_TLS:
+        await asyncio.to_thread(tls.ensure_certs)  # before any process starts, so every caller finds the certificate
     procs.start_all()
     ready = await asyncio.to_thread(procs.wait_ready)
     await asyncio.sleep(2.0)  # let the workers register their pollers

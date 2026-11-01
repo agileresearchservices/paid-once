@@ -7,9 +7,9 @@ import type { FlowDot, LaneId, ShowEvent, Snapshot } from "./types";
 // audit, never from a stack.
 
 const W = 1464;
-const H = 270;
-const ROW: Record<LaneId, number> = { lane1: 30, lane2: 170 }; // node top per row; the gap holds the human
-const NODE_H = 76;
+const H = 298;
+const ROW: Record<LaneId, number> = { lane1: 30, lane2: 184 }; // node top per row; the gap holds the human
+const NODE_H = 90; // three text lines (title, what it is, what the agent does) with the ticket dots below them
 
 interface Box {
   x: number;
@@ -18,15 +18,16 @@ interface Box {
   h: number;
   title: string;
   sub: string;
+  note?: string; // a third line, hidden while the node is down (the DOWN badge takes that spot)
   proc?: string; // process name in snap.processes, if a process backs this node
 }
 
 const NODES: Record<string, Box> = {
   helpdesk: { x: 2, y: ROW.lane1, w: 116, h: ROW.lane2 + NODE_H - ROW.lane1, title: "Helpdesk", sub: "support tickets" },
   lane1_api: { x: 158, y: ROW.lane1, w: 180, h: NODE_H, title: "Queue API", sub: "jobs table (SQLite)", proc: "lane1_api" },
-  lane1_worker: { x: 378, y: ROW.lane1, w: 236, h: NODE_H, title: "Queue worker", sub: "agent · state in memory", proc: "lane1_worker" },
+  lane1_worker: { x: 378, y: ROW.lane1, w: 236, h: NODE_H, title: "Queue worker", sub: "agent · state in memory", note: "policy rules, then Claude", proc: "lane1_worker" },
   temporal: { x: 158, y: ROW.lane2, w: 180, h: NODE_H, title: "Temporal server", sub: "durable history" },
-  support_worker: { x: 378, y: ROW.lane2, w: 236, h: NODE_H, title: "Support worker", sub: "agent · SupportTicketWorkflow", proc: "support_worker" },
+  support_worker: { x: 378, y: ROW.lane2, w: 236, h: NODE_H, title: "Support worker", sub: "agent · SupportTicketWorkflow", note: "policy rules, then Claude", proc: "support_worker" },
   endpoint: { x: 650, y: ROW.lane2, w: 150, h: NODE_H, title: "Nexus endpoint", sub: "payments-endpoint" },
   payments_worker: { x: 860, y: ROW.lane2, w: 210, h: NODE_H, title: "Payments worker", sub: "RefundWorkflow", proc: "payments_worker" },
   payments: { x: 1170, y: ROW.lane1, w: 294, h: ROW.lane2 + NODE_H - ROW.lane1, title: "Payments service + ledger", sub: "the audit reads this ledger", proc: "payments" },
@@ -35,14 +36,14 @@ const NODES: Record<string, Box> = {
 const mid = (lane: LaneId) => ROW[lane] + NODE_H / 2;
 
 // The human reviews proposals where approvals actually land: the Queue API and the Temporal server.
-const HUMAN = { x: 163, y: 126, w: 170, h: 24 };
+const HUMAN = { x: 234, y: 138, w: 28, h: 28 }; // a round badge with a person in it
 const HUMAN_X = HUMAN.x + HUMAN.w / 2;
 
 // Wires: [from x, to x, row, id]. A wire is "busy" while a ticket is on it or in the node it feeds.
 const WIRES: { id: string; x1: number; x2: number; lane: LaneId; label?: string }[] = [
   { id: "helpdesk>lane1_api", x1: 118, x2: 158, lane: "lane1" },
   { id: "lane1_api>lane1_worker", x1: 338, x2: 378, lane: "lane1" },
-  { id: "lane1_worker>payments", x1: 614, x2: 1170, lane: "lane1", label: "plain HTTP" },
+  { id: "lane1_worker>payments", x1: 614, x2: 1170, lane: "lane1", label: "HTTPS" },
   { id: "helpdesk>temporal", x1: 118, x2: 158, lane: "lane2" },
   { id: "temporal>support_worker", x1: 338, x2: 378, lane: "lane2" },
   { id: "support_worker>endpoint", x1: 614, x2: 650, lane: "lane2" },
@@ -203,15 +204,21 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
         <rect className="team" x={822} y={4} width={W - 824} height={H - 8} rx={14} />
         <text className="row-label" x={838} y={20}>PAYMENTS TEAM</text>
         <text className="row-label" x={158} y={20}>QUEUE + LANGGRAPH</text>
-        <text className="row-label" x={HUMAN.x + HUMAN.w + 18} y={ROW.lane2 - 9}>TEMPORAL + NEXUS · SUPPORT TEAM</text>
+        {/* Under its row, lined up with the Queue label above its own: the human's bubble sits between the rows */}
+        <text className="row-label" x={158} y={ROW.lane2 + NODE_H + 18}>TEMPORAL + NEXUS</text>
 
-        <g className={humanNow ? "human now" : "human"}>
+        <g className={humanNow ? "human now" : "human"} role="img" aria-label="A human approves or denies">
           <line className="wire" x1={HUMAN_X} x2={HUMAN_X} y1={HUMAN.y} y2={ROW.lane1 + NODE_H + 3} markerEnd="url(#arrow)" />
           <line className="wire" x1={HUMAN_X} x2={HUMAN_X} y1={HUMAN.y + HUMAN.h} y2={ROW.lane2 - 3} markerEnd="url(#arrow)" />
-          <rect x={HUMAN.x} y={HUMAN.y} width={HUMAN.w} height={HUMAN.h} rx={12} />
-          <text x={HUMAN_X} y={HUMAN.y + 16.5} textAnchor="middle">Human: approve / deny</text>
+          <circle className="badge" cx={HUMAN_X} cy={HUMAN.y + HUMAN.h / 2} r={HUMAN.w / 2} />
+          {/* A person: head and shoulders */}
+          <circle className="glyph" cx={HUMAN_X} cy={HUMAN.y + 10} r={4.2} />
+          <path
+            className="glyph"
+            d={`M${HUMAN_X - 7.5},${HUMAN.y + 22} Q${HUMAN_X - 7.5},${HUMAN.y + 15} ${HUMAN_X},${HUMAN.y + 15} Q${HUMAN_X + 7.5},${HUMAN.y + 15} ${HUMAN_X + 7.5},${HUMAN.y + 22} Z`}
+          />
+          <title>Human: approve / deny</title>
         </g>
-        <text className="n-sub" x={NODES.lane1_worker.x + 14} y={HUMAN.y + 17}>both agents: policy rules, then Claude</text>
 
         {WIRES.map((w) => (
           <g key={w.id}>
@@ -246,8 +253,8 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
             </g>
             {/* Temporal's duplicate is the human's decision signal, replayed: it comes down from the review */}
             <g className="packet" style={{ ["--dx" as string]: "0px", ["--dy" as string]: "24px" }}>
-              <rect x={HUMAN_X + 8} y={HUMAN.y + 2} width={30} height={22} rx={5} />
-              <text x={HUMAN_X + 23} y={HUMAN.y + 18} textAnchor="middle">×2</text>
+              <rect x={HUMAN_X + 20} y={HUMAN.y + 3} width={30} height={22} rx={5} />
+              <text x={HUMAN_X + 35} y={HUMAN.y + 19} textAnchor="middle">×2</text>
             </g>
           </>
         )}
@@ -263,6 +270,7 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
               <rect x={b.x} y={b.y} width={b.w} height={b.h} rx={10} />
               <text className="n-title" x={b.x + 14} y={b.y + 22}>{b.title}</text>
               <text className="n-sub" x={b.x + 14} y={b.y + 40}>{b.sub}</text>
+              {b.note && !down && <text className="n-sub" x={b.x + 14} y={b.y + 60}>{b.note}</text>}
               {p && !down && (
                 <text className="n-state" x={b.x + b.w - 12} y={b.y + 22} textAnchor="end">UP</text>
               )}

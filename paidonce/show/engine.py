@@ -18,7 +18,7 @@ import httpx
 from temporalio.api.enums.v1 import PendingActivityState
 from temporalio.client import Client, WorkflowExecutionStatus
 
-from paidonce import audit, config
+from paidonce import audit, config, tls
 from paidonce.lane2.client import connect
 from paidonce.lane2.contract import NEXUS_ENDPOINT, PaymentsService
 from paidonce.lane2.payments_side import REFUND_RETRY, REFUND_START_TO_CLOSE, RefundWorkflow, refund_workflow_id
@@ -175,7 +175,7 @@ class Engine:
     @property
     def http(self) -> httpx.AsyncClient:
         if self._http is None:
-            self._http = httpx.AsyncClient(timeout=5.0)
+            self._http = httpx.AsyncClient(timeout=5.0, verify=tls.client_verify("payments", "lane1_api"))
         return self._http
 
     async def temporal(self) -> Client:

@@ -93,7 +93,7 @@ class Worker:
         done = threading.Event()
         if job["kind"] == "decide":
             # A decide job waits on an LLM call that can outlast the visibility timeout, and the queue would hand
-            # the same job to a second worker. Execute jobs are short HTTP calls and keep the plain timeout.
+            # the same job to a second worker. Execute jobs are short HTTPS calls and keep the plain timeout.
             threading.Thread(target=self._heartbeat, args=(job, done), daemon=True).start()
         try:
             if job["kind"] == "decide":

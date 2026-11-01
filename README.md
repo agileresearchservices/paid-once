@@ -8,7 +8,7 @@ agent logic or the payments service.**
 Two copies of the same refund agent run the same tickets under the same chaos:
 
 - **Lane 1** ("Queue + LangGraph" on screen) is the stack a competent team ships today: a job queue with a visibility timeout, a LangGraph agent
-  with the default in-memory checkpointer, and a plain HTTP call to payments.
+  with the default in-memory checkpointer, and an HTTPS call to payments.
 - **Lane 2** ("Temporal + Nexus" on screen) is the same agent logic on Temporal, with the refund exposed to the payments team as a Nexus operation
   across two namespaces.
 

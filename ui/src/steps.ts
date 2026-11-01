@@ -60,7 +60,7 @@ export const BEATS: Beat[] = [
     title: "Asking payments for the money",
     intro: "Payments is the payments team's service with its own ledger. The call is slowed 2.5 s on purpose so you can see it in flight.",
     queue:
-      "The worker POSTs to payments over plain HTTP: a 3 s timeout, 3 tries, and a new Idempotency-Key each try (l1-<ticket>-<random>). Support owns that client.",
+      "The worker POSTs to payments over HTTPS (it verifies payments' self-signed certificate): a 3 s timeout, 3 tries, and a new Idempotency-Key each try (l1-<ticket>-<random>). Support owns that client.",
     temporal:
       "Support starts one Nexus operation, issue_refund, on payments-endpoint. Payments' handler starts RefundWorkflow, ID refund-<ticket_id>, and its activity sends the same key (refund-<ticket_id>) on every retry. Payments owns the retries.",
   },
