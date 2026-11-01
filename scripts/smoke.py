@@ -29,6 +29,7 @@ from paidonce.show.procs import port_open
 PORT = config.SHOW_PORT
 BASE = f"http://127.0.0.1:{PORT}"
 MUST_HAVE = [
+    "walkthrough",
     "intro",
     "tip_over",
     "double_delivery",
@@ -50,7 +51,8 @@ FIELDS = (
 )
 # Each cohort carries one ticket outside the refund policy and one the human denies (Engine.submit_cohort).
 NO_PER_COHORT = 2
-COHORTS = {"free_roam": 4}
+# The walkthrough is one approved ticket: no denials.
+COHORTS = {"free_roam": 4, "walkthrough": 0}
 
 
 def wait_api(proc, timeout=90):
@@ -108,6 +110,10 @@ def main(scenes, check):
             while True:
                 time.sleep(1)
                 snap = httpx.get(f"{BASE}/api/state", timeout=5).json()
+                if snap.get("beat"):  # the walkthrough stops at each step for a presenter; nobody is here to click
+                    httpx.post(
+                        f"{BASE}/api/beat/continue", params={"beat": snap["beat"]["id"]}, headers=headers, timeout=5
+                    )
                 h, c = handler_attempts(snap)
                 peak_handler, peak_caller = max(peak_handler, h), max(peak_caller, c)
                 if not snap["running"]:

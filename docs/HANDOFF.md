@@ -11,7 +11,7 @@ whoever changes the code next.
   gives one refund; an approval sent while no worker is running survives; a human "no" ends `rejected` with no ledger
   row; a policy denial ends `denied` with no Nexus operation in its history). It runs on its own throwaway Temporal
   server (`scripts/test-temporal.sh`, port 7299), and passed with `make demo` running.
-- `make scenario`: runs six scenes headless against both lanes and exits non-zero if Lane 2 breaks an invariant.
+- `make scenario`: runs the walkthrough and six scenes headless against both lanes and exits non-zero if Lane 2 breaks an invariant.
   Results, SHAs and caveats: `docs/scenario-results.md`. It also passed from a fresh clone with no `.env`.
 - Two guards on the show server, after a browser left open on :8100 wrecked two scenario runs. `make scenario` locks
   the controls (`PAIDONCE_SCENARIO_TOKEN`: reset, run and kill answer 423 without it, and the UI shows a "not the demo"
@@ -116,9 +116,22 @@ whoever changes the code next.
 - The show reuses any Temporal server already listening on `TEMPORAL_ADDRESS` and will create its two namespaces
   and the Nexus endpoint there. Point `TEMPORAL_ADDRESS` somewhere else if that server belongs to something else.
 
+## The walkthrough (step 1)
+- `Engine.scene_walkthrough` sends one $42.00 ticket to both lanes and stops at six steps with `Engine.await_beat`. The
+  snapshot's `beat` names the step; the UI shows its box (`ui/src/Walkthrough.tsx`, copy in `BEATS` in `steps.ts`) and
+  `POST /api/beat/continue?beat=<id>` releases the gate. The id must match the step on screen, so a double click cannot
+  skip the next one. `make scenario` releases the gates itself.
+- Payments latency is 2.5 s for the scene so the refund is visible in flight. It must stay under Lane 1's 3 s client
+  timeout: a longer hold makes its retry (new key) book the refund twice on the happy path. The refund box is shown
+  0.6 s after the approval is delivered, inside that window; the money lands while you talk.
+
 ## Lane 1 realism (keep it fair; these are the deliberate choices)
 - Per-attempt idempotency key in the client (fresh uuid each try). Very common bug; fixing it (derive the key from the ticket) is a one-line change that fixes the double-delivery and timeout scenes. The write-up measures this.
 - LangGraph `MemorySaver` (the tutorial default). Approval interrupt state is lost when the worker restarts.
+- Decide jobs heartbeat their lease (`Worker._heartbeat`, every third of the visibility timeout) because a Claude call
+  can outlast the 10 s timeout. Without it the queue handed a live decide job to a second worker, whose late finish
+  overwrote a refunded ticket's status with `awaiting_approval` (seen on the happy path). Execute jobs keep the plain
+  timeout, so the redelivery and crash scenes behave as before; a `kill -9` stops the heartbeat, so the job still reappears.
 - At-least-once queue with a visibility timeout. A recovery path re-drives "executing" tickets from the DB after a crash, which is what turns a crash-after-commit into a second refund.
 - A human "no" is handled at the API: `POST /tickets/{id}/reject` marks the row `rejected` and queues no job, so
   redelivery and the recovery path (both of which touch only execute jobs) never see it. That is how a team would

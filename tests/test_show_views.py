@@ -1,6 +1,7 @@
 """The diagram's view of a Lane 2 ticket, the per-scene payments call totals, when a scene has settled, and the
 Nexus timeline's attempts and ledger fields."""
 
+import asyncio
 from types import SimpleNamespace
 
 from paidonce.models import TicketOutcome
@@ -239,7 +240,9 @@ def test_stall_window_after_the_fault_was_cleared_counts_the_bookings():
 
 def _engine_with_window(key: str) -> SimpleNamespace:
     run = {"kills": {}, "faults": [{"key": key, "effect": "kill", "start": 1.0, "end": None, "hit": 5}]}
-    return SimpleNamespace(scene_runs={"nexus_kill": run}, running=True, current="nexus_kill", emit=lambda *a, **k: None)
+    return SimpleNamespace(
+        scene_runs={"nexus_kill": run}, running=True, current="nexus_kill", emit=lambda *a, **k: None
+    )
 
 
 def test_restart_closes_the_killed_process_window():
@@ -261,3 +264,72 @@ def test_a_second_restart_does_not_move_a_closed_window():
     end = eng.scene_runs["nexus_kill"]["faults"][0]["end"]
     Engine.emit_from_procs(eng, "restart", "back again", proc="payments_worker")
     assert eng.scene_runs["nexus_kill"]["faults"][0]["end"] == end
+
+
+def _stepper() -> SimpleNamespace:
+    return SimpleNamespace(beat=None, _beat_gate=None)
+
+
+def test_walkthrough_waits_on_a_step_until_its_box_is_dismissed():
+    async def go() -> list[str]:
+        eng = _stepper()
+        log: list[str] = []
+
+        async def scene() -> None:
+            await Engine.await_beat(eng, "walkthrough", "ticket")
+            log.append("after ticket")
+            await Engine.await_beat(eng, "walkthrough", "agent")
+            log.append("after agent")
+
+        task = asyncio.create_task(scene())
+        await asyncio.sleep(0.05)
+        assert eng.beat["id"] == "ticket" and log == []
+        assert Engine.continue_beat(eng, "ticket") is True
+        await asyncio.sleep(0.05)
+        assert eng.beat["id"] == "agent" and log == ["after ticket"]
+        assert Engine.continue_beat(eng, "agent") is True
+        await task
+        assert eng.beat is None
+        return log
+
+    assert asyncio.run(go()) == ["after ticket", "after agent"]
+
+
+def test_a_late_click_for_an_earlier_step_does_not_skip_the_next_one():
+    async def go() -> None:
+        eng = _stepper()
+
+        async def scene() -> None:
+            await Engine.await_beat(eng, "walkthrough", "ticket")
+            await Engine.await_beat(eng, "walkthrough", "agent")
+
+        task = asyncio.create_task(scene())
+        await asyncio.sleep(0.05)
+        assert Engine.continue_beat(eng, "ticket") is True
+        await asyncio.sleep(0.05)
+        assert Engine.continue_beat(eng, "ticket") is False  # a double-click lands on the next step's box
+        assert eng.beat["id"] == "agent"
+        assert not task.done()
+        Engine.continue_beat(eng, "agent")
+        await task
+
+    asyncio.run(go())
+
+
+def test_continue_with_no_step_waiting_does_nothing():
+    assert Engine.continue_beat(_stepper(), "ticket") is False
+
+
+def test_cancelling_the_scene_clears_the_step():
+    async def go() -> None:
+        eng = _stepper()
+        task = asyncio.create_task(Engine.await_beat(eng, "walkthrough", "ticket"))
+        await asyncio.sleep(0.05)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        assert eng.beat is None and eng._beat_gate is None
+
+    asyncio.run(go())

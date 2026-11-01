@@ -320,3 +320,22 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .headline b.n-bad { color: var(--critical-ink); }
 .headline-label { display: block; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
 
+
+/* The walkthrough's thinking box: docked at the bottom, so the diagram above it stays visible. */
+.beat {
+  position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 10;
+  width: min(1180px, calc(100vw - 48px)); padding: 16px 22px 18px;
+  background: var(--surface); border: 2px solid var(--accent); border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6); animation: beat-in 0.25s ease-out;
+}
+@keyframes beat-in { from { opacity: 0; transform: translate(-50%, 12px); } }
+.beat-head { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+.beat-head h3 { flex: 1; margin: 0; font-size: 22px; color: var(--ink); text-transform: none; letter-spacing: 0; }
+.beat-n { color: var(--accent-ink); font-size: 14px; font-weight: 600; white-space: nowrap; }
+.beat kbd { font: 12px var(--mono); margin-left: 6px; padding: 1px 6px; border: 1px solid rgba(255, 255, 255, 0.5); border-radius: 4px; }
+.beat-intro { font-size: 18px; color: var(--ink); margin-bottom: 12px; }
+.beat-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.beat-cols > div { padding: 10px 14px; border-radius: 10px; background: var(--page); font-size: 16px; color: var(--ink-2); }
+.beat-cols > div.t { background: var(--accent-wash); }
+.beat-cols b { display: block; margin-bottom: 4px; color: var(--ink); }
+.beat-cols p { margin: 0; }

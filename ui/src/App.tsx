@@ -5,6 +5,7 @@ import { NexusPanel } from "./NexusPanel";
 import { Scoreboard } from "./Scoreboard";
 import { STEPS } from "./steps";
 import { post, useSnapshot } from "./useSnapshot";
+import { Walkthrough } from "./Walkthrough";
 
 const LANES = [
   { id: "lane1" as const, name: "Queue + LangGraph", subtitle: "What most teams run today: queue, polling worker, in-memory agent state, HTTP to payments" },
@@ -80,6 +81,11 @@ export function App() {
       setError(String(e));
     }
   }, []);
+
+  const beat = snap?.beat && snap.beat.scene === step.scene ? snap.beat.id : null;
+  const onContinue = useCallback(() => {
+    if (beat) void act(`/api/beat/continue?beat=${beat}`);
+  }, [beat, act]);
 
   // Arrows step, 1-8 jump, R runs this step's scene.
   useEffect(() => {
@@ -160,7 +166,7 @@ export function App() {
         <div className="controls">
           {step.scene && (
             <button className="primary" disabled={running || !!locked} onClick={() => void act(`/api/scenes/${step.scene}/run`)}>
-              {locked ? "Locked by the test run" : thisRunning ? `Running ${elapsed}s…` : running ? "Another scene is running" : finished ? "Run again (R)" : "Run this scene (R)"}
+              {locked ? "Locked by the test run" : thisRunning ? `Running ${elapsed}s…` : running ? "Another scene is running" : finished ? "Run again (R)" : `${step.runLabel ?? "Run this scene"} (R)`}
             </button>
           )}
           {status && <p className={`scene-status ${status.cls}`} role="status">{status.text}</p>}
@@ -217,6 +223,8 @@ export function App() {
           ))}
         </div>
       )}
+
+      {beat && <Walkthrough beat={beat} onContinue={onContinue} />}
 
       {/* Scene steps show faults on the diagram, so the event log only appears on the scoreboard. */}
     </main>

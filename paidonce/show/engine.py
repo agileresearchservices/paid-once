@@ -41,6 +41,12 @@ GAUNTLET_STALL_S = 9.0  # payments holds its reply this long after booking: past
 GAUNTLET_LATENCY_S = 2.0  # every payments call takes this long, so a kill lands mid-call
 GAUNTLET_DOWN_S = {"support_worker": 5.0, "payments_worker": 6.0, "temporal": 5.0}
 
+# The walkthrough (step 1): one ticket, with the refund slowed a little so it is visible in flight. Stays under Lane 1's
+# 3 s payments client timeout, or its retry would book the refund twice on the happy path.
+WALKTHROUGH_LATENCY_S = 2.5
+WALKTHROUGH_AMOUNT_CENTS = 4200
+WALKTHROUGH_MESSAGE = "The mug arrived in pieces. Please refund me."
+
 MESSAGES = [
     "The mug arrived in pieces. Please refund me.",
     "I was charged twice for the same order, please refund the duplicate.",
@@ -58,6 +64,7 @@ class SceneInfo:
 
 
 SCENES = [
+    SceneInfo("walkthrough", "Walkthrough: one ticket"),
     SceneInfo("intro", "Happy path"),
     SceneInfo("tip_over", "The agent workers crash"),
     SceneInfo("double_delivery", "Double-delivered mail"),
@@ -124,6 +131,9 @@ class Engine:
         self.booked_at: dict[str, float] = {}
         # Where each stack thinks each of this scene's tickets is, for the architecture diagram.
         self.flow: dict[str, list[dict]] = {"lane1": [], "lane2": []}
+        # The walkthrough stops at each step until the presenter dismisses its box: {scene, id, at}, or None.
+        self.beat: dict | None = None
+        self._beat_gate: asyncio.Event | None = None
         self._task: asyncio.Task | None = None
         self.procs.emit = self.emit_from_procs
 
@@ -311,6 +321,38 @@ class Engine:
             await asyncio.sleep(0.5)
         self.emit("note", "timed out waiting for every proposal", scene=scene)
 
+    # -- walkthrough steps -----------------------------------------------------------
+    async def await_beat(self, scene: str, beat: str) -> None:
+        """Stop the scene on a step until the presenter dismisses its box (continue_beat)."""
+        gate = asyncio.Event()
+        self._beat_gate = gate
+        self.beat = {"scene": scene, "id": beat, "at": time.time()}
+        try:
+            await gate.wait()
+        finally:
+            if self._beat_gate is gate:
+                self.beat = None
+                self._beat_gate = None
+
+    def continue_beat(self, beat: str) -> bool:
+        """Dismiss the box on screen. A late or repeated click for an earlier step is ignored."""
+        if self._beat_gate is None or self.beat is None or self.beat["id"] != beat:
+            return False
+        self._beat_gate.set()
+        return True
+
+    async def wait_for_stage(self, scene: str, lane1: set[str], lane2: set[str], timeout: float = 20.0) -> None:
+        """Until each lane's ticket in `scene` is at one of the given diagram spots (see LANE1_STAGES, _lane2_stage)."""
+        want = {"lane1": lane1, "lane2": lane2}
+        pairs = self.scene_tickets.get(scene, [])
+        end = time.time() + timeout
+        while time.time() < end:
+            at = {(lane, d["ticket"]): d["at"] for lane in self.flow for d in self.flow[lane]}
+            if pairs and all(at.get((lane, tid)) in want[lane] for lane, tid in pairs):
+                return
+            await asyncio.sleep(0.25)
+        self.emit("note", f"timed out waiting for the tickets to reach {sorted(lane1 | lane2)}", scene=scene)
+
     # -- chaos primitives ----------------------------------------------------------
     async def set_fault(
         self,
@@ -355,6 +397,35 @@ class Engine:
                     pass
 
     # -- scenes ---------------------------------------------------------------------
+    async def scene_walkthrough(self) -> None:
+        """One approved ticket through both stacks, stopping at each step for the presenter to explain it."""
+        scene = "walkthrough"
+        self.emit("scene", "Walkthrough: one ticket, approved, through both stacks", scene=scene)
+        await self.set_fault("all", "none", latency_s=WALKTHROUGH_LATENCY_S)
+        try:
+            await self.await_beat(scene, "ticket")
+            lanes = ("lane1", "lane2")
+            tickets = {
+                lane: self._make_ticket(scene, 0, lane, WALKTHROUGH_AMOUNT_CENTS, WALKTHROUGH_MESSAGE) for lane in lanes
+            }
+            await asyncio.gather(*(self.submit_ticket(lane, scene, tickets[lane]) for lane in lanes))
+            self.emit("submit", "1 support ticket asking for a refund submitted to both stacks", scene=scene)
+            await self.await_beat(scene, "agent")
+            await self.wait_for_proposals(scene)
+            await self.wait_for_stage(scene, {"lane1_api"}, {"temporal"})  # both drawn waiting for a human
+            await self.await_beat(scene, "waiting")
+            await self.await_beat(scene, "approve")
+            self.emit("human", "A human reviews the proposal and approves it in both stacks", scene=scene)
+            await asyncio.gather(*(self.decide_ticket(lane, tickets[lane].ticket_id, True) for lane in lanes))
+            # Both calls start within a moment and stay in flight for the 2.5 s of latency: show the box now, not after
+            # the diagram has caught up, or the refund may already be booked by the time it appears.
+            await asyncio.sleep(0.6)
+            await self.await_beat(scene, "refund")
+            await self.wait_for_stage(scene, {"done"}, {"done"}, timeout=30.0)
+            await self.await_beat(scene, "ledger")
+        finally:
+            await self.clear_faults()
+
     async def scene_intro(self) -> None:
         self.emit(
             "scene",
@@ -610,6 +681,7 @@ class Engine:
         self.booked_at = {}
         self.nexus_seen = {}
         self.flow = {"lane1": [], "lane2": []}
+        self.beat = None
         self.scene_runs = {}  # a cancelled scene's finally block then updates a run nobody shows
         self.events.clear()
         self.current = None
@@ -811,6 +883,7 @@ class Engine:
             "faults": self.faults,
             "payments_calls": self.payments_calls,
             "flow": self.flow,
+            "beat": self.beat,
             "temporal_ui": self.temporal_ui,
             "topology": TOPOLOGY,
         }

@@ -94,6 +94,13 @@ async def run_scene(scene_id: str, request: Request) -> dict:
     return {"started": scene_id}
 
 
+@app.post("/api/beat/continue")
+async def continue_beat(beat: str, request: Request) -> dict:
+    """Dismiss the walkthrough's box for step `beat`, so the scene goes on to the next step."""
+    guard(request)
+    return {"continued": state["engine"].continue_beat(beat)}
+
+
 @app.post("/api/reset")
 async def reset(request: Request) -> dict:
     guard(request)
