@@ -127,7 +127,7 @@ export function Walkthrough({ beat, flow }: { beat: string | null; flow?: Record
           {i >= 1 && (agentDone ? <Row kind="done">Policy check passed</Row> : <div className="pane-row"><Typing /></div>)}
           {/* One row for the human: proposed, then approved, in place */}
           {i >= 2 && (i >= 3 ? <Row kind="done">Human approved</Row> : <Row kind="waiting">Proposed it to a human</Row>)}
-          {i >= 4 && (done ? <Row kind="done">Refunded. Customer told.</Row> : <Row kind="paying">Asking payments…</Row>)}
+          {i >= 4 && (done ? <Row kind="done">Refunded, customer notified.</Row> : <Row kind="paying">Asking payments…</Row>)}
         </Pane>
         {/* The human sees the proposal and decides; nothing about payments. */}
         <Pane who="Human in the loop" avatar={<LegendIcon kind="waiting" />}>
