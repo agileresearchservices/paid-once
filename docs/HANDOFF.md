@@ -74,14 +74,17 @@ whoever changes the code next.
   **Page 6 explains, then proves** (`ui/src/NexusPanel.tsx`, `NexusWhy.tsx`, `NexusTeams.tsx`). `NexusWhy` is a static
   "Without Nexus / With Nexus" pair (four arrows into payments' internals vs one call through the endpoint), worded after
   Temporal's own framing (the caller doesn't know the handler's namespace or queue; each team owns its workers and
-  retries). `NexusTeams` is the run with no time axis: four failure chips (next / now / survived / skipped), a support box
+  retries). `NexusContract` is one strip under it: what support sends and what payments answers, field by field, read from
+  the `RefundRequest` / `RefundResult` dataclasses through the topology (`sends`, `returns`), plus one plain-English line.
+  `RefundResult` no longer carries `replayed`: whether the ledger answered from an existing key is payments-internal.
+  The ~80 px strip puts the panel at ~710 px at 1512 wide. `NexusTeams` is the run with no time axis: four failure chips (next / now / survived / skipped), a support box
   and a payments box joined by the endpoint, one glyph per refund on each side (sorted, so they pair; no ticket numbers on screen),
   support's a check once answered, payments' a `$` once paid (ledger `booked_at` set) with a `↻N` retry badge under it, one plain worker line per
   box (red only while that worker is down or the payments service is quiet), and a Temporal server bar along the bottom. The badges count retries with
   the same `retriesOf` as the "Payments absorbed" tile, so they add up to it (5 × ↻2 = 10). A box goes red when its
   worker is down; the endpoint and the bar go red when the Temporal server is. Per-refund detail and the call counts
-  (15 calls: 5 booked, 10 replayed) are hover text only. This replaced a time-axis chart (#32) that showed evidence but
-  not what Nexus is. The panel is ~630 px at 1512 wide. Do not claim the endpoint can be retargeted live: that is
+  (15 calls: 5 paid, 10 answered from the ledger) are hover text only. This replaced a time-axis chart (#32) that showed evidence but
+  not what Nexus is. Do not claim the endpoint can be retargeted live: that is
   under "Not built here".
 - **The show owns Temporal when it starts it.** If nothing listens on `TEMPORAL_ADDRESS`, `procs.ensure_temporal` runs
   `temporal server start-dev --db-filename data/temporal.db` as a managed process, so `/api/faults/kill/temporal`

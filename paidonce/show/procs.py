@@ -77,7 +77,7 @@ class ProcessManager:
         cmd = [
             exe,
             "server",
-            "start-dev",  # with its Web UI: the demo links both namespaces from the Nexus panel
+            "start-dev",  # with its Web UI (:8233), for opening both namespaces by hand during Q&A
             "--port",
             port,
             "--db-filename",

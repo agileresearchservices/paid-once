@@ -12,7 +12,7 @@ import random
 import time
 import uuid
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 
 import httpx
 from temporalio.api.enums.v1 import PendingActivityState
@@ -23,7 +23,7 @@ from paidonce.lane2.client import connect
 from paidonce.lane2.contract import NEXUS_ENDPOINT, PaymentsService
 from paidonce.lane2.payments_side import REFUND_RETRY, REFUND_START_TO_CLOSE, RefundWorkflow, refund_workflow_id
 from paidonce.lane2.support_side import SupportTicketWorkflow, ticket_workflow_id
-from paidonce.models import ApprovalDecision, Ticket, TicketOutcome
+from paidonce.models import ApprovalDecision, RefundRequest, RefundResult, Ticket, TicketOutcome
 from paidonce.show.procs import ProcessManager
 
 SETTLE_S = 20.0
@@ -93,6 +93,9 @@ TOPOLOGY = {
     "endpoint": NEXUS_ENDPOINT,
     "service": PaymentsService.__name__,
     "operation": "issue_refund",
+    # The contract's two messages, field by field, read off the dataclasses so page 6 can't drift from the code.
+    "sends": [f.name for f in fields(RefundRequest)],
+    "returns": [f.name for f in fields(RefundResult)],
     "payments": {
         "namespace": config.PAYMENTS_NAMESPACE,
         "task_queue": config.PAYMENTS_TASK_QUEUE,

@@ -279,6 +279,17 @@ svg.lg-icon, .diagram svg.lg-icon { display: inline-block; width: 26px; height: 
 .why-op { fill: var(--good-ink); font-size: 16px; }
 .why-caption { fill: var(--ink-2); font-size: 18px; }
 
+/* The contract strip (NexusContract.tsx): what crosses the endpoint, and nothing else. */
+.contract { display: grid; gap: 4px; border: 1.5px dashed var(--violet); border-radius: 12px; padding: 10px 20px; background: var(--page); }
+.ct-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 18px; }
+.ct-label { font-size: 20px; font-weight: 700; margin-right: 8px; }
+.ct-side { color: var(--ink-2); }
+.ct-fields { display: inline-flex; gap: 6px; }
+.ct-field { padding: 2px 8px; border-radius: 6px; background: var(--surface); border: 1px solid var(--axis); font-size: 16px; cursor: help; }
+.ct-op { color: var(--good-ink); font-weight: 700; font-size: 17px; }
+.ct-arrow { color: var(--good); font-weight: 700; }
+.ct-plain { color: var(--ink-2); font-size: 17px; }
+
 /* The run as two teams and one door (NexusTeams.tsx). */
 .teams { display: grid; gap: 10px; }
 .fchips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }

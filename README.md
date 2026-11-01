@@ -115,7 +115,9 @@ Run of show, about ten minutes:
 - **Step 6, Nexus** says what Nexus is and why it matters, then proves it. Two static pictures on top: **Without Nexus**,
   support's code reaches across the team line into payments' namespace, task queue, workflow type and retries; **With
   Nexus**, support makes one call (`issue_refund`) to one endpoint (`payments-endpoint`) and payments owns everything
-  behind it. Below, the run as two team boxes joined by the endpoint. Four failures hit the refunds in flight, shown as
+  behind it. Under them, one strip spells out the contract: support sends `ticket_id` and `amount_cents` to
+  `issue_refund`, payments answers `refund_id`, `ticket_id` and `amount_cents`, and nothing else crosses (the field names
+  are read from the dataclasses). Below, the run as two team boxes joined by the endpoint. Four failures hit the refunds in flight, shown as
   chips that go red when they land and read "survived" after: payments books each refund and goes quiet, then the support
   worker, the payments worker and the Temporal server itself are killed, each for 5-6 seconds. The box a failure hits
   goes red. Support's box holds one check per refund (one call each, "no errors"); payments' box turns each refund into

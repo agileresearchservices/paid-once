@@ -1,8 +1,9 @@
+import { NexusContract } from "./NexusContract";
 import { NexusTeams, retriesOf } from "./NexusTeams";
 import { NexusWhy } from "./NexusWhy";
 import type { NexusRow, ProcStatus, SceneRun, Topology } from "./types";
 
-// Page 6: why Nexus (two static pictures), then the run as two teams and the one door between them, then the receipts
+// Page 6: why Nexus (two static pictures), the contract in one strip, then the run as two teams and the one door between them, then the receipts
 // from the ledger. The receipts read the audit, never the lane's own state.
 
 export function NexusPanel({
@@ -41,6 +42,8 @@ export function NexusPanel({
   return (
     <section className="nexus" aria-label="Nexus">
       <NexusWhy t={topology} />
+
+      <NexusContract t={topology} />
 
       <NexusTeams
         rows={rows}
