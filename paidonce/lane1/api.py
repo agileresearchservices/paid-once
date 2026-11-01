@@ -72,6 +72,11 @@ def reject(ticket_id: str) -> dict:
     return {"result": result}
 
 
+@app.get("/admin/queue")
+def queue() -> dict:
+    return {"jobs": store.pending_jobs()}
+
+
 @app.post("/admin/redeliver")
 def redeliver(body: RedeliverBody) -> dict:
     return {"redelivered": store.redeliver(body.n)}

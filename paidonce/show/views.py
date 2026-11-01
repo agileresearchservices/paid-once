@@ -59,6 +59,7 @@ class ViewsMixin:
                     flow1.append({"ticket": t["ticket_id"], "at": at, "state": state})
             self.lane1_view_all = counts_all
             self.flow["lane1"] = flow1
+            self.lane1_jobs = (await self.http.get(f"{config.LANE1_URL}/admin/queue")).json()["jobs"]
         except Exception:
             pass
 

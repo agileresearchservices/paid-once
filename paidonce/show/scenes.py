@@ -186,8 +186,6 @@ class SceneMixin:
         )
         await self.redeliver_lane1(5)
         await self.replay_approvals_lane2("double_delivery", 3)
-        await asyncio.sleep(14)
-        await self.clear_faults()
 
     async def scene_payments_timeout(self) -> None:
         self.emit(
@@ -200,8 +198,6 @@ class SceneMixin:
         await self.wait_for_proposals("payments_timeout")
         await self.approve_scene("payments_timeout")
         self.fault("payments_timeout", "Fault: payments goes quiet after booking", ["payments"], "stall")
-        await asyncio.sleep(20)
-        await self.clear_faults()
 
     async def scene_nexus_kill(self) -> None:
         """The Nexus gauntlet: while the refunds are in flight, payments goes quiet after booking, then the support
