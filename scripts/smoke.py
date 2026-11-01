@@ -109,10 +109,6 @@ def main(scenes, check):
             while True:
                 time.sleep(1)
                 snap = httpx.get(f"{BASE}/api/state", timeout=5).json()
-                if snap.get("beat"):  # the walkthrough stops at each step for a presenter; nobody is here to click
-                    httpx.post(
-                        f"{BASE}/api/beat/continue", params={"beat": snap["beat"]["id"]}, headers=headers, timeout=5
-                    )
                 h, c = handler_attempts(snap)
                 peak_handler, peak_caller = max(peak_handler, h), max(peak_caller, c)
                 if not snap["running"]:

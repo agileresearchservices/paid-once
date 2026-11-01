@@ -49,6 +49,10 @@ GAUNTLET_DOWN_S = {"support_worker": 5.0, "payments_worker": 6.0, "temporal": 5.
 # The walkthrough (step 1): one ticket, with the refund slowed a little so it is visible in flight. Stays under Lane 1's
 # 3 s payments client timeout, or its retry would book the refund twice on the happy path.
 WALKTHROUGH_LATENCY_S = 2.5
+# How long each walkthrough step stays on screen before the scene moves on, so a viewer can follow it unprompted. The
+# "agent" step is also held until the agent has decided; this is its minimum.
+WALKTHROUGH_END_HOLD_S = 2.5
+WALKTHROUGH_DWELL_S = {"ticket": 3.5, "agent": 4.0, "waiting": 4.5, "approve": 4.0}
 WALKTHROUGH_AMOUNT_CENTS = 4200
 WALKTHROUGH_MESSAGE = "The mug arrived in pieces. Please refund me."
 
@@ -137,7 +141,6 @@ class Engine:
         self.flow: dict[str, list[dict]] = {"lane1": [], "lane2": []}
         # The walkthrough stops at each step until the presenter dismisses its box: {scene, id, at}, or None.
         self.beat: dict | None = None
-        self._beat_gate: asyncio.Event | None = None
         self._task: asyncio.Task | None = None
         self.procs.emit = self.emit_from_procs
 
@@ -336,24 +339,14 @@ class Engine:
         self.emit("note", "timed out waiting for every proposal", scene=scene)
 
     # -- walkthrough steps -----------------------------------------------------------
-    async def await_beat(self, scene: str, beat: str) -> None:
-        """Stop the scene on a step until the presenter dismisses its box (continue_beat)."""
-        gate = asyncio.Event()
-        self._beat_gate = gate
+    def start_beat(self, scene: str, beat: str) -> float:
+        """Put a walkthrough step on screen (the snapshot's `beat`); returns when it started."""
         self.beat = {"scene": scene, "id": beat, "at": time.time()}
-        try:
-            await gate.wait()
-        finally:
-            if self._beat_gate is gate:
-                self.beat = None
-                self._beat_gate = None
+        return self.beat["at"]
 
-    def continue_beat(self, beat: str) -> bool:
-        """Dismiss the box on screen. A late or repeated click for an earlier step is ignored."""
-        if self._beat_gate is None or self.beat is None or self.beat["id"] != beat:
-            return False
-        self._beat_gate.set()
-        return True
+    async def hold_beat(self, started: float, beat: str) -> None:
+        """Keep the step on screen for its dwell time, counted from when it started."""
+        await asyncio.sleep(max(0.0, started + WALKTHROUGH_DWELL_S[beat] - time.time()))
 
     async def wait_for_stage(self, scene: str, lane1: set[str], lane2: set[str], timeout: float = 20.0) -> None:
         """Until each lane's ticket in `scene` is at one of the given diagram spots (see LANE1_STAGES, _lane2_stage)."""
@@ -412,33 +405,35 @@ class Engine:
 
     # -- scenes ---------------------------------------------------------------------
     async def scene_walkthrough(self) -> None:
-        """One approved ticket through both stacks, stopping at each step for the presenter to explain it."""
+        """One approved ticket through both stacks, a step at a time: each stays on screen long enough to follow."""
         scene = "walkthrough"
         self.emit("scene", "Walkthrough: one ticket, approved, through both stacks", scene=scene)
         await self.set_fault("all", "none", latency_s=WALKTHROUGH_LATENCY_S)
         try:
-            await self.await_beat(scene, "ticket")
+            await self.hold_beat(self.start_beat(scene, "ticket"), "ticket")
             lanes = ("lane1", "lane2")
             tickets = {
                 lane: self._make_ticket(scene, 0, lane, WALKTHROUGH_AMOUNT_CENTS, WALKTHROUGH_MESSAGE) for lane in lanes
             }
             await asyncio.gather(*(self.submit_ticket(lane, scene, tickets[lane]) for lane in lanes))
             self.emit("submit", "1 support ticket asking for a refund submitted to both stacks", scene=scene)
-            await self.await_beat(scene, "agent")
+            started = self.start_beat(scene, "agent")
             await self.wait_for_proposals(scene)
             await self.wait_for_stage(scene, {"lane1_api"}, {"temporal"})  # both drawn waiting for a human
-            await self.await_beat(scene, "waiting")
-            await self.await_beat(scene, "approve")
+            await self.hold_beat(started, "agent")
+            await self.hold_beat(self.start_beat(scene, "waiting"), "waiting")
+            await self.hold_beat(self.start_beat(scene, "approve"), "approve")
             self.emit("human", "A human reviews the proposal and approves it in both stacks", scene=scene)
             await asyncio.gather(*(self.decide_ticket(lane, tickets[lane].ticket_id, True) for lane in lanes))
             # Both calls start within a moment and stay in flight for the 2.5 s of latency: show the box now, not after
             # the diagram has caught up, or the refund may already be booked by the time it appears.
             await asyncio.sleep(0.6)
-            # The last step has no gate: it shows while the refund lands, and the scene ends when the ledger has it.
-            self.beat = {"scene": scene, "id": "refund", "at": time.time()}
+            # The last step has no dwell: it shows while the refund lands, and the scene ends when the ledger has it.
+            self.start_beat(scene, "refund")
             await self.wait_for_stage(scene, {"done"}, {"done"}, timeout=30.0)
-            self.beat = None
+            await asyncio.sleep(WALKTHROUGH_END_HOLD_S)  # let the finished chat sit before the scene is marked done
         finally:
+            self.beat = None
             await self.clear_faults()
 
     async def scene_intro(self) -> None:

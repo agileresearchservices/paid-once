@@ -3,10 +3,10 @@ import { BEATS, WALKTHROUGH_TICKET } from "./steps";
 import { LegendIcon, type TicketKind } from "./TicketIcon";
 import type { FlowDot, LaneId } from "./types";
 
-// The walkthrough's panel, under the diagram on step 1: the refund as a support chat that grows one line per step, with the
-// step's one-line explanation beside it. The scene is stopped on a step until it is dismissed, so the diagram above shows
-// exactly what the chat says. Between steps (and before the first) the panel keeps its place with a hint, so the page
-// doesn't jump. This page outlines the flow in general; it does not compare the two stacks.
+// The walkthrough's panel, under the diagram on step 1: the refund as three role panes that fill in as the scene plays on its
+// own. Each step stays up for a few seconds (the engine's WALKTHROUGH_DWELL_S), so the diagram above shows what the panes
+// say. Before the scene runs the panel keeps its place with a hint, so the page doesn't jump. This page outlines the flow
+// in general; it does not compare the two stacks.
 
 function Typing() {
   return (
@@ -47,16 +47,8 @@ function refunded(flow: Record<LaneId, FlowDot[]> | undefined): boolean {
   return dots.length >= 2 && dots.every((d) => d.state === "refunded");
 }
 
-export function Walkthrough({
-  beat,
-  flow,
-  onContinue,
-}: {
-  beat: string | null;
-  flow?: Record<LaneId, FlowDot[]>;
-  onContinue: () => void;
-}) {
-  // Between steps the chat stays as it was, without a button, so the panel never flashes a message or jumps.
+export function Walkthrough({ beat, flow }: { beat: string | null; flow?: Record<LaneId, FlowDot[]> }) {
+  // Once the scene has finished the chat stays as it was, so the panel never flashes a message or jumps.
   const last = useRef(-1);
   const at = BEATS.findIndex((b) => b.id === beat);
   if (at >= 0) last.current = at;
@@ -64,14 +56,11 @@ export function Walkthrough({
   const i = last.current;
   const b = BEATS[i];
   const shown = at >= 0; // a step is up
-  const gated = shown && at < BEATS.length - 1; // all but the last wait for a click; the refund ends the scene on its own
 
   // When a step opens, bring the diagram and all three panes into view together. The header above may scroll away; the
-  // diagram must not be cut off (so the focus below does not scroll by itself, and the scroll stops at the diagram's top).
-  const button = useRef<HTMLButtonElement>(null);
+  // diagram must not be cut off (the scroll stops at the diagram's top).
   useEffect(() => {
     if (!shown) return;
-    button.current?.focus({ preventScroll: true });
     const panel = document.querySelector(".beat");
     const diagram = document.querySelector(".diagram");
     if (!panel || !diagram) return;
@@ -80,24 +69,10 @@ export function Walkthrough({
     if (hidden > 0) window.scrollBy({ top: Math.min(hidden, Math.max(room, 0)), behavior: "smooth" });
   }, [shown, at]);
 
-  useEffect(() => {
-    if (!gated) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
-      if (e.key === " " || e.key === "Enter" || e.key === "ArrowRight") {
-        e.preventDefault();
-        e.stopPropagation(); // ArrowRight must not also change the page behind the panel
-        onContinue();
-      }
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [gated, onContinue]);
-
   if (!b) {
     return (
       <section className="beat idle" aria-label="Walkthrough">
-        <p>Press R to walk one ticket through. Space or → moves to the next step.</p>
+        <p>Press R to walk one ticket through. It plays on its own.</p>
       </section>
     );
   }
@@ -117,11 +92,6 @@ export function Walkthrough({
       <div className="beat-head">
         <span className="beat-n">Step {i + 1} of {BEATS.length}</span>
         <h3>{b.title}</h3>
-        {gated && (
-          <button ref={button} className="primary" onClick={onContinue}>
-            Continue → <kbd>space</kbd>
-          </button>
-        )}
       </div>
       <div className="panes">
         {/* The customer talks only to the agent: a short answer per step, never the policy check or the approval. */}

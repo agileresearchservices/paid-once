@@ -142,10 +142,14 @@ whoever changes the code next.
 - Fairness: both lanes pay the same handshake cost, and TLS does not change Lane 1's per-attempt key or its 3 s timeout.
 
 ## The walkthrough (step 1)
-- `Engine.scene_walkthrough` sends one $42.00 ticket to both lanes and stops at the first four steps with `Engine.await_beat`; step 5, the refund, has no gate (the engine just sets `beat`), and the scene ends when the ledger has it. The
-  snapshot's `beat` names the step; the UI shows its panel under the diagram, in the space the old comparison table used (`ui/src/Walkthrough.tsx`, copy in `BEATS` in `steps.ts`) and
-  `POST /api/beat/continue?beat=<id>` releases the gate. The id must match the step on screen, so a double click cannot
-  skip the next one. `make scenario` releases the gates itself.
+- `Engine.scene_walkthrough` sends one $42.00 ticket to both lanes and plays the five steps on its own: `start_beat` puts a step on
+  screen (the snapshot's `beat`) and `hold_beat` keeps it up for its dwell time (`WALKTHROUGH_DWELL_S`: ticket 3.5 s, agent 4 s
+  minimum and not before the agent has decided, waiting 4.5 s, approve 4 s). The refund step has no dwell: it shows while the
+  money lands and the scene ends when the ledger has it, plus a 2.5 s hold. The UI shows the panel under the diagram, in the space
+  the old comparison table used (`ui/src/Walkthrough.tsx`, copy in `BEATS` in `steps.ts`). There is no Continue button or gate any more
+  (an earlier version stopped at each step; `make scenario` no longer has to release anything). The "approve" step shows the human's
+  card approved a few seconds before the decision is actually delivered; the refund must start within Lane 1's 3 s timeout, so the
+  decision cannot be held back to match.
 - The panel is three panes, Customer, Agent and Human view, each showing only what that role sees (the customer never sees the
   policy check, proposal or approval). It outlines the flow and deliberately does not compare the stacks: that
   starts with the scenes. The customer pane is a chat that grows one agent reply per step (2-5), newest at the bottom; on a window shorter than ~945 px the
