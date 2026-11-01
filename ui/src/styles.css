@@ -79,7 +79,7 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 /* The architecture diagram: faults land on the node they hit, dots are tickets. */
 .diagram { background: var(--surface); border: 1px solid var(--grid); border-radius: 12px; padding: 8px 12px 4px; }
 .diagram svg { display: block; width: 100%; height: auto; }
-.diagram-head { min-height: 82px; display: flex; align-items: center; font-size: 15px; }
+.diagram-head { min-height: 52px; display: flex; align-items: center; font-size: 15px; }
 .legend { display: flex; gap: 22px; color: var(--ink-2); flex-wrap: wrap; }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .lg { display: inline-block; width: 11px; height: 11px; border-radius: 50%; }
@@ -92,23 +92,13 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .legend .lg-group { gap: 14px; }
 .lg-group b { color: var(--ink); font-weight: 600; }
 .lg-group + .lg-group { padding-left: 22px; border-left: 1px solid var(--axis); }
-/* Ledger keys: the same box, colours and glyph as the ledger slots in the diagram. */
-.lg-slot {
-  display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 18px; padding: 0 3px;
-  border: 1px solid var(--muted); border-radius: 4px; font-style: normal; font-size: 12px; font-weight: 700; box-sizing: border-box;
-}
-.lg-slot.ok { background: #0b3a22; border-color: var(--good); color: var(--good-ink); }
-.lg-slot.missing { background: #4a2306; border-color: var(--serious); color: var(--serious); }
-.lg-slot.bad { background: var(--critical-wash); border-color: var(--critical); color: var(--critical-ink); }
-.lg-slot.none { color: var(--ink-2); }
-/* The key to the dots and boxes: two rows, big enough to read from the back of a room. */
+/* The key to the ticket dots: one row, big enough to read from the back of a room. */
 .diagram .legend { display: grid; gap: 12px; width: 100%; font-size: 22px; }
 .diagram .legend .lg-group { display: flex; align-items: center; gap: 34px; padding: 0; border: 0; }
 .diagram .legend .lg-group span { gap: 10px; }
 .diagram .legend .lg-group b { width: 86px; font-size: 22px; }
 .diagram .legend .lg { width: 18px; height: 18px; }
 .diagram .legend .lg.waiting { border-width: 3px; }
-.diagram .legend .lg-slot { min-width: 34px; height: 28px; font-size: 17px; border-radius: 5px; }
 .diagram .legend .lg-stage { margin-left: auto; font-size: 18px; }
 .locked-banner {
   margin: 0 0 12px; padding: 10px 16px; border-radius: 10px; font-size: 16px;
@@ -156,6 +146,13 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .diagram .human.now .badge { stroke: var(--sky); stroke-width: 2.5; }
 .diagram .slot rect { fill: none; stroke: var(--axis); stroke-dasharray: 3 3; }
 .diagram .slot text { font-size: 12px; font-weight: 700; }
+.diagram .ledger .slot text { font-size: 15px; }
+.diagram .ledger-name { fill: var(--ink-2); font-size: 15px; font-weight: 600; }
+.diagram .tally { font-size: 17px; font-weight: 700; }
+.diagram .tally-sep { fill: var(--muted); font-weight: 400; }
+.diagram .tally-ok { fill: var(--good-ink); }
+.diagram .tally-bad { fill: var(--critical-ink); }
+.diagram .tally-missing { fill: var(--serious); }
 .diagram .slot.ok rect { fill: #0b3a22; stroke: var(--good); stroke-dasharray: none; }
 .diagram .slot.ok text { fill: var(--good-ink); }
 .diagram .slot.missing rect { fill: #4a2306; stroke: var(--serious); stroke-dasharray: none; }

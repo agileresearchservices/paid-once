@@ -36,7 +36,12 @@ LANE_NAMES = {"lane1": "Queue + LangGraph", "lane2": "Temporal + Nexus"}
 
 AGENT_WORKERS = ["lane1_worker", "support_worker"]
 
-# The Nexus gauntlet (step 7): four failures, each landing on refunds still in flight.
+# The worker-crash scene (step 3): the first few approved refunds are in flight at payments when the workers die;
+# the rest of the cohort is still waiting for a human.
+WORKER_CRASH_APPROVED = 6
+WORKER_CRASH_IN_FLIGHT = 3
+
+# The Nexus gauntlet (step 6): four failures, each landing on refunds still in flight.
 GAUNTLET_STALL_S = 9.0  # payments holds its reply this long after booking: past the activity's 8 s timeout
 GAUNTLET_LATENCY_S = 2.0  # every payments call takes this long, so a kill lands mid-call
 GAUNTLET_DOWN_S = {"support_worker": 5.0, "payments_worker": 6.0, "temporal": 5.0}
@@ -66,9 +71,8 @@ class SceneInfo:
 SCENES = [
     SceneInfo("walkthrough", "Walkthrough: one ticket"),
     SceneInfo("intro", "Happy path"),
-    SceneInfo("tip_over", "The agent workers crash"),
+    SceneInfo("worker_crash", "The agent workers go down (crash or deploy)"),
     SceneInfo("double_delivery", "Double-delivered mail"),
-    SceneInfo("deploy_wait", "Deploy during the approval wait"),
     SceneInfo("payments_timeout", "Payments commits, then goes quiet"),
     SceneInfo("nexus_kill", "Nexus: four failures mid-refund"),
     SceneInfo("free_roam", "Free roam"),
@@ -271,20 +275,30 @@ class Engine:
                 except Exception:
                     await asyncio.sleep(0.5)
 
-    async def approve_scene(self, scene: str, who: str = "A human", then: str = "", stagger: float = 0.05) -> None:
+    async def approve_scene(
+        self,
+        scene: str,
+        who: str = "A human",
+        then: str = "",
+        stagger: float = 0.05,
+        only=None,
+        policy_note: bool = True,
+    ) -> None:
         """The human reviews the agent's proposals: approves the refunds, denies one. Policy tickets never reach
-        the human; the agent's policy check already closed them."""
-        pairs = [(lane, tid) for lane, tid in self.scene_tickets.get(scene, []) if self.plan[tid] != "policy"]
-        one_lane = [tid for lane, tid in self.scene_tickets.get(scene, []) if lane == pairs[0][0]] if pairs else []
+        the human; the agent's policy check already closed them. `only` (a ticket id -> bool) limits the review to
+        part of the cohort, for a scene where the human gets to some tickets before a fault and the rest after."""
+        pairs = [
+            (lane, tid)
+            for lane, tid in self.scene_tickets.get(scene, [])
+            if self.plan[tid] != "policy" and (only is None or only(tid))
+        ]
+        one_lane = [tid for lane, tid in pairs if lane == pairs[0][0]] if pairs else []  # what this review covers
         yes = sum(self.plan[tid] == "refund" for tid in one_lane)
         no = sum(self.plan[tid] == "human_no" for tid in one_lane)
-        closed = sum(self.plan[tid] == "policy" for tid in one_lane)
-        self.emit(
-            "human",
-            f"{who} reviews {yes + no} proposals: approves {yes}, denies {no}{then}. "
-            f"The agent's policy check closed {closed} before review.",
-            scene=scene,
-        )
+        lane_tickets = [tid for lane, tid in self.scene_tickets.get(scene, []) if lane == pairs[0][0]] if pairs else []
+        closed = sum(self.plan[tid] == "policy" for tid in lane_tickets)
+        tail = f" The agent's policy check closed {closed} before review." if policy_note else ""
+        self.emit("human", f"{who} reviews {yes + no} proposals: approves {yes}, denies {no}{then}.{tail}", scene=scene)
         tasks = []
         for lane, tid in pairs:
             tasks.append(asyncio.create_task(self.decide_ticket(lane, tid, self.plan[tid] == "refund")))
@@ -436,21 +450,30 @@ class Engine:
         await self.wait_for_proposals("intro")
         await self.approve_scene("intro", then=" in both stacks")
 
-    async def scene_tip_over(self) -> None:
-        self.emit(
-            "scene",
-            "The agent workers will be killed right after payments commits",
-            scene="tip_over",
-        )
-        await self.set_fault("all", "commit_then_stall", count=6, delay_s=9.0)
-        await self.submit_cohort("tip_over", 6)
-        await self.wait_for_proposals("tip_over")
-        await self.approve_scene("tip_over")
+    async def scene_worker_crash(self) -> None:
+        """One kill, two kinds of ticket. Some refunds are already in flight at payments (it booked them and went
+        quiet) and the rest still wait for a human. The agent workers die, as in a crash or a deploy, and come back;
+        only then does the human review the waiting tickets."""
+        scene = "worker_crash"
+        self.emit("scene", "Some refunds are in flight, others wait for a human. The agent workers die.", scene=scene)
+        await self.set_fault("all", "commit_then_stall", count=WORKER_CRASH_IN_FLIGHT, delay_s=9.0)
+        await self.submit_cohort(scene, WORKER_CRASH_APPROVED)
+        await self.wait_for_proposals(scene)
+        # The human reaches the first few tickets before the fault: their refunds are the ones in flight.
+        await self.approve_scene(scene, who="A human", only=lambda tid: _ticket_index(tid) < WORKER_CRASH_IN_FLIGHT)
         await asyncio.sleep(1.6)
-        self.fault("tip_over", "Fault: kill -9 on both agent workers", AGENT_WORKERS, "kill")
+        self.fault(scene, "Fault: kill -9 on both agent workers", AGENT_WORKERS, "kill")
         self.procs.kill("lane1_worker", restart_after=3.0)
         self.procs.kill("support_worker", restart_after=3.0)
-        await asyncio.sleep(25)
+        await asyncio.sleep(6)
+        # The rest of the cohort waited through the restart. Now the human gets to them.
+        await self.approve_scene(
+            scene,
+            who="After the restart, the human",
+            only=lambda tid: _ticket_index(tid) >= WORKER_CRASH_IN_FLIGHT,
+            policy_note=False,
+        )
+        await asyncio.sleep(20)
         await self.clear_faults()
 
     async def scene_double_delivery(self) -> None:
@@ -470,21 +493,6 @@ class Engine:
         await self.replay_approvals_lane2("double_delivery", 3)
         await asyncio.sleep(14)
         await self.clear_faults()
-
-    async def scene_deploy_wait(self) -> None:
-        self.emit(
-            "scene",
-            "Tickets are waiting for a human. A deploy restarts the workers.",
-            scene="deploy_wait",
-        )
-        await self.submit_cohort("deploy_wait", 5)
-        await self.wait_for_proposals("deploy_wait")
-        self.fault("deploy_wait", "Fault: a deploy restarts both workers", AGENT_WORKERS, "kill")
-        self.procs.kill("lane1_worker", restart_after=3.0)
-        self.procs.kill("support_worker", restart_after=3.0)
-        await asyncio.sleep(6)
-        await self.approve_scene("deploy_wait", who="After the deploy, the human")
-        await asyncio.sleep(10)
 
     async def scene_payments_timeout(self) -> None:
         self.emit(
@@ -1037,6 +1045,11 @@ def _unsettled(
         if not (decided and stopped):
             out.append(tid)
     return out
+
+
+def _ticket_index(ticket_id: str) -> int:
+    """The ticket's position in its cohort: ids end in `...-<index>-<lane>` (see Engine._make_ticket)."""
+    return int(ticket_id.rsplit("-", 2)[1])
 
 
 def _scene_calls(calls: dict, pairs: list[tuple[str, str]]) -> dict[str, dict[str, int]]:

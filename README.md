@@ -2,7 +2,7 @@
 
 A small, runnable test of one migration assumption: **moving an agent's refund-approval process onto Temporal,
 with Nexus to the payments team, keeps every approved refund exactly-once and loses no ticket under worker
-crashes, redelivery, deploys during an approval wait, and a payments commit-then-timeout, without changing the
+crashes and deploys (including during an approval wait), redelivery, and a payments commit-then-timeout, without changing the
 agent logic or the payments service.**
 
 Two copies of the same refund agent run the same tickets under the same chaos:
@@ -24,8 +24,8 @@ In scope:
 - One process: refund approval, from "a helpdesk ticket asks for a refund" to "the money moved once". The agent
   checks two policy rules in code (at most $200, order at most 30 days old) before it asks the model, and a human
   approves or denies what it proposes.
-- Six chaos scenes: happy path, agent process killed, message delivered twice, deploy during the approval wait,
-  payments commits then goes quiet, and a Nexus gauntlet (Lane 2 only): payments goes quiet, then the support worker,
+- Five chaos scenes: happy path, agent workers killed (a crash or a deploy, with refunds in flight and tickets waiting for a
+  human), message delivered twice, payments commits then goes quiet, and a Nexus gauntlet (Lane 2 only): payments goes quiet, then the support worker,
   the payments worker and the Temporal server are killed, all while the refunds are in flight.
 - Three ledger invariants: every approved ticket refunded exactly once; no refund without an approval; no ticket
   lost or stuck. Each scene includes one ticket outside the policy and one a human denies, so the second invariant is
@@ -59,7 +59,7 @@ make scenario
 ```
 
 This starts everything (including a Temporal dev server if none is listening on `TEMPORAL_ADDRESS`, default
-`127.0.0.1:7233`), runs the six scenes with a **stub model**, prints a ledger scoreboard for each, and exits
+`127.0.0.1:7233`), runs the walkthrough and the five scenes with a **stub model**, prints a ledger scoreboard for each, and exits
 non-zero if Lane 2 shows any violation. It takes about four minutes. The invariants are decided by the ledger, not by
 the model's wording, so the stub does not change the result.
 
@@ -98,9 +98,9 @@ make demo                               # http://127.0.0.1:8100
 
 The page opens with the two architectures. "Walk through one ticket" runs a single approved ticket
 through both stacks and stops at six steps: each shows an explanation under the diagram (what each stack stores, calls and
-waits on), and the scene does not move until you dismiss it (button, Space or →). Then it steps through six scenes. An architecture diagram shows
+waits on), and the scene does not move until you dismiss it (button, Space or →). Then it steps through five scenes. An architecture diagram shows
 where each fault lands and where each stack thinks each ticket is, above both lanes' ledger-based scoreboards; the
-Nexus step shows the operations live. Arrow keys or 1-8 move between steps, R runs the current scene, and the step is kept in the URL (`#6`), so a refresh stays put. It
+Nexus step shows the operations live. Arrow keys or 1-7 move between steps, R runs the current scene, and the step is kept in the URL (`#5`), so a refresh stays put. It
 is built for a laptop browser in full screen. The scoreboard resets whenever the show server starts.
 
 Run of show, about ten minutes:
@@ -108,12 +108,12 @@ Run of show, about ten minutes:
 - **Step 2, Happy path**: seven tickets per lane. The agent's policy check denies one, the human approves five and
   denies one; both lanes refund the five once and pay nothing on the two denied tickets, which go back to the
   helpdesk as grey dots.
-- **Steps 3-6** (agent crash, double delivery, deploy mid-wait, payments goes quiet): the same chaos hits both
+- **Steps 3-5** (workers die, double delivery, payments goes quiet): the same chaos hits both
   lanes; watch the ledger-based scoreboards diverge. The payments node's slots mark each ticket in the ledger
   (`✓` paid once, `×2` paid twice, `∅` owed, never paid, `—` denied, nothing owed), and each lane shows what payments saw in the scene: calls, refunds booked, and
-  calls answered from an existing key. On step 6 that line is the evidence: Temporal's retry is answered from the
+  calls answered from an existing key. On step 5 that line is the evidence: Temporal's retry is answered from the
   ledger, the queue's is booked again.
-- **Step 7, Nexus**: four failures while the refunds are in flight. Payments books each refund and goes quiet, then
+- **Step 6, Nexus**: four failures while the refunds are in flight. Payments books each refund and goes quiet, then
   the support worker, the payments worker and the Temporal server itself are killed, each for 5-6 seconds. A red row
   per failure shows when it was down and how many refunds it hit. Under them, each approved refund has two tracks:
   what support's code sees (one `STARTED` bar, no error) and what payments does (failed attempts, then one that
@@ -122,7 +122,7 @@ Run of show, about ten minutes:
   the ledger. The `support sees ↗` and `payments does ↗` labels open each side's history in the Temporal Web UI
   (http://127.0.0.1:8233), including the caller's Nexus Links tab. The Temporal kill needs a server the show started
   itself (`make demo` does, if nothing is listening on 7233); with a server you started, the scene skips that kill.
-- **Step 8, Scoreboard**: the totals, and the queue's own job table next to what the ledger says.
+- **Step 7, Scoreboard**: the totals, and the queue's own job table next to what the ledger says.
 
 The Temporal wordmark and favicon are not in the repo. To show them, put `temporal-wordmark.svg` and `favicon.svg` in
 `ui/public/brand/` (gitignored) before `make ui`; otherwise the header shows text.

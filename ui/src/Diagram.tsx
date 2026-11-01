@@ -99,32 +99,78 @@ function Dots({ lane, dots }: { lane: LaneId; dots: FlowDot[] }) {
   );
 }
 
-// This scene's refunds as the ledger has them: one slot per ticket, filled when the audit sees the refund.
-function Ledger({ lane, label, dots, tickets }: { lane: LaneId; label: string; dots: FlowDot[]; tickets: Record<string, string> }) {
+// Where each lane's ledger sits inside the Payments box: its name, the row of boxes, then one line with the result.
+const LEDGER_Y: Record<LaneId, { label: number; slots: number; tally: number }> = {
+  lane1: { label: 98, slots: 106, tally: 150 },
+  lane2: { label: 200, slots: 208, tally: 252 },
+};
+const SLOT_W = 24;
+const SLOT_PITCH = 28;
+
+// The result in words, so the outcome reads without decoding the boxes. Each part takes its box's colour (the slot classes
+// in styles.css). Problems come first; with none, "all N paid once".
+interface TallyPart {
+  text: string;
+  cls: "ok" | "bad" | "missing";
+}
+
+function tallyParts(statuses: string[]): TallyPart[] {
+  const n = (st: string) => statuses.filter((x) => x === st).length;
+  const problems: TallyPart[] = [];
+  if (n("duplicate")) problems.push({ text: `${n("duplicate")} paid twice`, cls: "bad" });
+  if (n("missing")) problems.push({ text: `${n("missing")} owed`, cls: "missing" });
+  if (n("unapproved")) problems.push({ text: `${n("unapproved")} unapproved`, cls: "bad" });
+  if (problems.length) return problems;
+  const open = statuses.filter((x) => x === "waiting" || x === "settling").length;
+  return n("ok") > 0 && open === 0 ? [{ text: `all ${n("ok")} paid once`, cls: "ok" }] : [];
+}
+
+// This scene's refunds as the ledger has them: one box per ticket, filled when the audit sees the refund.
+function Ledger({
+  lane,
+  label,
+  dots,
+  tickets,
+}: {
+  lane: LaneId;
+  label: string;
+  dots: FlowDot[];
+  tickets: Record<string, string>;
+}) {
   const ids = dots.map((d) => d.ticket).sort();
   const x0 = NODES.payments.x + 16;
-  const y = mid(lane) + 8;
+  const at = LEDGER_Y[lane];
+  const statuses = ids.map((id) => tickets[id] ?? "waiting");
+  const tally = tallyParts(statuses);
   return (
     <g className="ledger">
-      <text x={x0} y={y + 13} className="n-sub">{label}</text>
-      {ids.length === 0 && <text x={x0 + 82} y={y + 13} className="n-sub">no tickets this scene</text>}
+      <text x={x0} y={at.label} className="ledger-name">{label}</text>
+      {ids.length === 0 && <text x={x0} y={at.slots + 16} className="n-sub">no tickets this scene</text>}
       {ids.map((id, i) => {
-        const st = tickets[id] ?? "waiting";
-        const x = x0 + 82 + i * 24;
+        const st = statuses[i];
+        const x = x0 + i * SLOT_PITCH;
         // Same colours as the scoreboard: twice and unapproved are critical (red), never refunded is serious (orange).
         // Owed nothing and paid nothing (a denial, or a ticket outside the policy) is neutral.
         const owedNothing = st === "rejected" || st === "declined";
         const cls = st === "ok" ? "slot ok" : st === "duplicate" || st === "unapproved" ? "slot bad" : st === "missing" ? "slot missing" : owedNothing ? "slot none" : "slot";
         const glyph = owedNothing ? OUTCOME_GLYPH.denied : st === "ok" || st === "duplicate" || st === "missing" || st === "unapproved" ? OUTCOME_GLYPH[st] : "";
-        const what = st === "ok" ? "refunded once" : st === "duplicate" ? "refunded more than once" : owedNothing ? "denied, nothing owed" : st;
         return (
           <g key={id} className={cls}>
-            <rect x={x} y={y} width={22} height={18} rx={4} />
-            <text x={x + 11} y={y + 13.5} textAnchor="middle">{glyph}</text>
-            <title>{`${id}: ${what}`}</title>
+            <rect x={x} y={at.slots} width={SLOT_W} height={22} rx={4} />
+            <text x={x + SLOT_W / 2} y={at.slots + 16.5} textAnchor="middle">{glyph}</text>
           </g>
         );
       })}
+      {tally.length > 0 && (
+        <text x={x0} y={at.tally} className="tally">
+          {tally.map((t, i) => (
+            <tspan key={t.cls}>
+              {i > 0 && <tspan className="tally-sep"> · </tspan>}
+              <tspan className={`tally-${t.cls}`}>{t.text}</tspan>
+            </tspan>
+          ))}
+        </text>
+      )}
     </g>
   );
 }
@@ -167,8 +213,7 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
           </span>
         ) : (
           <span className="legend">
-            {/* Two keys, two sources: the dots are where each stack thinks a ticket is; the boxes are what the payments
-                ledger actually paid. Each ledger key is a small copy of the real slot, so it reads as the same mark. */}
+            {/* The dots are where each stack thinks a ticket is. The ledger boxes are explained by the result line under each lane. */}
             <span className="lg-group">
               <b>Ticket</b>
               <span><i className="lg active" /> in progress</span>
@@ -176,13 +221,6 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
               <span><i className="lg paying" /> refund in flight</span>
               <span><i className="lg failed" /> job failed</span>
               <span><i className="lg closed" /> denied</span>
-            </span>
-            <span className="lg-group">
-              <b>Ledger</b>
-              <span><i className="lg-slot ok">{OUTCOME_GLYPH.ok}</i> paid once</span>
-              <span><i className="lg-slot bad">{OUTCOME_GLYPH.duplicate}</i> paid twice</span>
-              <span><i className="lg-slot missing">{OUTCOME_GLYPH.missing}</i> owed, never paid</span>
-              <span><i className="lg-slot none">{OUTCOME_GLYPH.denied}</i> denied, nothing owed</span>
               <span className="lg-stage">⏱ slowed on purpose</span>
             </span>
           </span>
@@ -257,8 +295,8 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
           const p = b.proc ? snap.processes[b.proc] : undefined;
           const down = p ? !p.alive : false;
           const cls = ["node", down && "down", hitNow.has(id) && "hit", id === "endpoint" && "door"].filter(Boolean).join(" ");
-          // Payments' bottom strip holds the Temporal ledger row, so its badge sits under the Queue + LangGraph row instead.
-          const badgeY = id === "payments" ? b.y + 72 : b.y + b.h - 27;
+          // Payments' bottom strip holds the Temporal ledger, so its badge sits in the gap between the two ledgers instead.
+          const badgeY = id === "payments" ? b.y + 128 : b.y + b.h - 27;
           return (
             <g key={id} className={cls}>
               <rect x={b.x} y={b.y} width={b.w} height={b.h} rx={10} />

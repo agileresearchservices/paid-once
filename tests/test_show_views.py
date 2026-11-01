@@ -14,6 +14,7 @@ from paidonce.show.engine import (
     _merge_attempts,
     _scene_calls,
     _stall_window,
+    _ticket_index,
     _ticket_ledger,
     _unsettled,
 )
@@ -331,5 +332,58 @@ def test_cancelling_the_scene_clears_the_step():
         except asyncio.CancelledError:
             pass
         assert eng.beat is None and eng._beat_gate is None
+
+    asyncio.run(go())
+
+
+# The worker-crash scene reviews part of a cohort before the fault and the rest after the restart.
+def _reviewer() -> SimpleNamespace:
+    eng = SimpleNamespace(events=[], decided=[])
+    eng.emit = lambda kind, msg, **extra: eng.events.append((kind, msg))
+    eng.scene_tickets = {"s": []}
+    eng.plan = {}
+    plans = ["refund", "refund", "refund", "refund", "policy", "human_no"]
+    for lane in ("lane1", "lane2"):
+        for i, plan in enumerate(plans):
+            tid = f"run-s-r1-{i:02d}-{lane}"
+            eng.scene_tickets["s"].append((lane, tid))
+            eng.plan[tid] = plan
+
+    async def decide(lane: str, tid: str, approved: bool) -> None:
+        eng.decided.append((lane, tid, approved))
+
+    eng.decide_ticket = decide
+    return eng
+
+
+def test_ticket_index_is_the_position_in_the_cohort():
+    assert _ticket_index("20261101-run-worker_crash-r2-03-lane1") == 3
+    assert _ticket_index("a-b-c-r1-11-lane2") == 11
+
+
+def test_review_can_cover_only_part_of_the_cohort():
+    async def go() -> None:
+        eng = _reviewer()
+        await Engine.approve_scene(eng, "s", only=lambda tid: _ticket_index(tid) < 2, stagger=0)
+        assert sorted(i for _, i, _ in eng.decided) == [
+            f"run-s-r1-{n:02d}-{lane}" for n in (0, 1) for lane in ("lane1", "lane2")
+        ]
+        assert all(approved for _, _, approved in eng.decided)
+        assert "approves 2, denies 0" in eng.events[0][1] and "policy check closed 1" in eng.events[0][1]
+
+    asyncio.run(go())
+
+
+def test_the_second_review_gets_the_rest_and_never_the_policy_ticket():
+    async def go() -> None:
+        eng = _reviewer()
+        await Engine.approve_scene(eng, "s", only=lambda tid: _ticket_index(tid) >= 2, stagger=0, policy_note=False)
+        decided = {(lane, tid.split("-")[-2]): approved for lane, tid, approved in eng.decided}
+        assert decided == {
+            (lane, n): approved
+            for lane in ("lane1", "lane2")
+            for n, approved in (("02", True), ("03", True), ("05", False))
+        }  # index 04 is the policy ticket: the agent closed it, the human never sees it
+        assert "approves 2, denies 1" in eng.events[0][1] and "policy" not in eng.events[0][1]
 
     asyncio.run(go())
