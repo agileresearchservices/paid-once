@@ -48,7 +48,7 @@ whoever changes the code next.
   `temperature` are rejected on current models, so the agent does not set any. Strict schemas reject `minimum` on
   integers; the amount floor is applied in code.
 - **For a workflow-run Nexus operation the caller's operation stays `STARTED, attempt 1`** while the payments-side
-  activity retries. The step 6 timeline (`ui/src/NexusTimeline.tsx`) needs each attempt's times, and history only
+  activity retries. Step 6 (`ui/src/NexusTeams.tsx`) needs each attempt (retry badges and hover detail), and history only
   records the last attempt, so `paidonce/show/engine.py` builds `attempts` by polling the refund workflow's pending
   activity (`_merge_attempts`) and closes them from its history (`_finish_attempts`). A StartToClose timeout ends an
   attempt at start + `REFUND_START_TO_CLOSE`. The server's `current_retry_interval` came back unusable (an
@@ -71,12 +71,18 @@ whoever changes the code next.
   ledger (`_stall_window`: first booking to the last held reply). `scripts/smoke.py --check nexus_kill` fails if any
   window hit no refund or never closed. On a real run: 15 calls for 5 refunds, 5 booked and 10 answered from the
   ledger; support saw `STARTED`, 1 start attempt and no error throughout.
-  **The page is deliberately sparse** (`ui/src/NexusPanel.tsx`, `NexusTimeline.tsx`): a claim card (support: one call;
-  the endpoint; payments: owns what is behind it), the four failure bars, two blocks of five thin bars ("Support sees" calm,
-  "Payments does" busy, one status word each on the right), and three ledger tiles. Per-refund detail and the call counts
-  (15 calls: 5 booked, 10 replayed) are hover text only; the block names link to the first refund's histories. It
-  replaced a busier version (code snippet, owns list, per-ticket status text, four-beats row) that Kevin found wordy.
-  The panel is ~610 px at 1512 wide. Do not claim the endpoint can be retargeted live: that is under "Not built here".
+  **Page 6 explains, then proves** (`ui/src/NexusPanel.tsx`, `NexusWhy.tsx`, `NexusTeams.tsx`). `NexusWhy` is a static
+  "Without Nexus / With Nexus" pair (four arrows into payments' internals vs one call through the endpoint), worded after
+  Temporal's own framing (the caller doesn't know the handler's namespace or queue; each team owns its workers and
+  retries). `NexusTeams` is the run with no time axis: four failure chips (next / now / survived / skipped), a support box
+  and a payments box joined by the endpoint, one glyph per refund on each side (sorted, so they pair; no ticket numbers on screen),
+  support's a check once answered, payments' a `$` once booked with a `↻N` retry badge under it, one plain worker line per
+  box (red only while that worker is down or the payments service is quiet), and a Temporal server bar along the bottom. The badges count retries with
+  the same `retriesOf` as the "Payments absorbed" tile, so they add up to it (5 × ↻2 = 10). A box goes red when its
+  worker is down; the endpoint and the bar go red when the Temporal server is. Per-refund detail and the call counts
+  (15 calls: 5 booked, 10 replayed) are hover text only. This replaced a time-axis chart (#32) that showed evidence but
+  not what Nexus is. The panel is ~630 px at 1512 wide. Do not claim the endpoint can be retargeted live: that is
+  under "Not built here".
 - **The show owns Temporal when it starts it.** If nothing listens on `TEMPORAL_ADDRESS`, `procs.ensure_temporal` runs
   `temporal server start-dev --db-filename data/temporal.db` as a managed process, so `/api/faults/kill/temporal`
   works and the server comes back from its database with every workflow where it left off (workers that lose it exit
@@ -85,8 +91,8 @@ whoever changes the code next.
 - **Ticket IDs carry a scene-run number** (`<reset id>-<scene>-r<n>-<i>-<lane>`), so re-running a scene starts new
   workflows instead of colliding with the last run's IDs. The idempotency key is still `refund-<ticket_id>`.
 - **The show links into the Temporal Web UI** (`TEMPORAL_UI_URL`, default `http://127.0.0.1:8233`; the engine re-checks
-  it every 10 seconds and hides the links while it doesn't answer). Each timeline row links the caller's workflow history in `support` and the
-  handler's in `payments`.
+  it every 10 seconds and hides the links while it doesn't answer). On step 6 the namespace links in the team boxes open the first refund's caller history in `support` and
+  its handler history in `payments`.
 - **The UI is a stepper** for a laptop browser, full screen (`#1`..`#7` in the URL, arrow keys, 1-7, R runs the
   scene). Nothing is built for tablet or phone. Step 1 is the architecture diagram plus the walkthrough
   (below). The side-by-side table that used to sit under the diagram was removed; the walkthrough is a general outline
