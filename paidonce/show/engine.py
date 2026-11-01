@@ -51,6 +51,7 @@ class Engine(HarnessMixin, SceneMixin, ViewsMixin):
         self._http: httpx.AsyncClient | None = None
         # Every Nexus operation seen in the current scene, kept after it completes so the evidence stays on screen.
         self.nexus_seen: dict[str, dict] = {}
+        self.lane1_jobs: int | None = None  # jobs left in Lane 1's queue (None until read): a scene waits for zero
         self.lane1_view_all: dict[str, int] = {}  # every ticket since reset: the scoreboard compares it with the ledger
         # Every Lane 2 ticket's last-seen workflow status since reset, so the card header accumulates like the scoreboard.
         self.lane2_status: dict[str, str] = {}
@@ -133,15 +134,16 @@ class Engine(HarnessMixin, SceneMixin, ViewsMixin):
         return [pair for key in self._scene_keys(scene_id) for pair in self.scene_tickets[key]]
 
     async def settle(self, scene_id: str) -> None:
-        """Hold the scene open until each ticket has landed: the ledger has decided it and its stack has stopped
-        moving it. Settled must hold for SCENE_QUIET_S, so a redelivered job still in the queue gets its chance."""
+        """Hold the scene open until each ticket has landed: the ledger has decided it, its stack has stopped moving
+        it, and Lane 1's queue is empty (a redelivered job still waiting for a worker would otherwise be missed).
+        That must hold for SCENE_QUIET_S, so the scene ends as soon as nothing is moving, not after a fixed wait."""
         pairs = self.scene_pairs(scene_id)
         end = time.time() + SCENE_SETTLE_MAX_S
         quiet_since: float | None = None
         while time.time() < end:
             board = await asyncio.to_thread(audit.compute_all)
             ledger = {lane: board[lane]["tickets"] for lane in board}
-            if unsettled(pairs, ledger, self.flow):
+            if unsettled(pairs, ledger, self.flow) or self.lane1_jobs:
                 quiet_since = None
             elif quiet_since is None:
                 quiet_since = time.time()
@@ -173,6 +175,7 @@ class Engine(HarnessMixin, SceneMixin, ViewsMixin):
             try:
                 await fn()
                 await self.settle(scene_id)
+                await self.clear_faults()  # held until now, so a retry in the scene still meets the fault
             except Exception as exc:
                 ok = False
                 error = f"{exc!r}"[:120]  # shown on the scene's status line
@@ -211,6 +214,7 @@ class Engine(HarnessMixin, SceneMixin, ViewsMixin):
         self.payments_calls_by_ticket = {}
         self.lane2_status.clear()
         self.lane1_view_all = {}
+        self.lane1_jobs = None
         self.lane2_view_all = {}
         self.booked_at = {}
         self.nexus_seen = {}

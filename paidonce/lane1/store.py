@@ -190,6 +190,13 @@ def complete_job(job: dict) -> None:
         )
 
 
+def pending_jobs() -> int:
+    """Jobs still in the queue: waiting, or claimed and not yet finished. The show waits for this to reach zero."""
+    init()
+    with connect(config.LANE1_DB) as conn:
+        return conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
+
+
 def redeliver(n: int) -> int:
     """Chaos: the broker delivers some recent execute jobs a second time (at-least-once)."""
     init()

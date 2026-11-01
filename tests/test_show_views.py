@@ -1,6 +1,7 @@
 """The diagram's view of a Lane 2 ticket, the per-scene payments call totals, when a scene has settled, the Nexus
 page's attempts and ledger fields, and the engine's scene bookkeeping."""
 
+import asyncio
 import re
 import time
 from pathlib import Path
@@ -359,3 +360,27 @@ def test_the_snapshot_has_exactly_the_keys_the_page_reads():
     body = re.search(r"export interface Snapshot \{(.*?)\n\}", types_ts, re.DOTALL).group(1)
     page_keys = set(re.findall(r"^  (\w+)\??:", body, re.MULTILINE))
     assert set(Engine(ProcessManager()).snapshot()) | {"locked"} == page_keys
+
+
+async def test_a_scene_waits_for_lane_1s_queue_to_empty(monkeypatch):
+    """A redelivered job still waiting for a worker leaves every ticket looking done, so the queue is checked too."""
+    from paidonce import audit
+    from paidonce.show import engine as engine_module
+
+    eng = Engine(ProcessManager())
+    eng.scene_tickets["s"] = [("lane1", "a")]
+    eng.flow = {"lane1": [{"ticket": "a", "at": "done", "state": "refunded"}], "lane2": []}
+    monkeypatch.setattr(audit, "compute_all", lambda **_: {"lane1": {"tickets": {"a": "ok"}}})
+    monkeypatch.setattr(engine_module, "SCENE_QUIET_S", 0.2)
+
+    eng.lane1_jobs = 1
+    started = time.time()
+
+    async def drain_queue():
+        await asyncio.sleep(1.0)
+        eng.lane1_jobs = 0
+
+    drain_task = asyncio.create_task(drain_queue())
+    await eng.settle("s")
+    await drain_task
+    assert time.time() - started >= 1.0  # it held for the queue, then needed the quiet window on top
