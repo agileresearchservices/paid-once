@@ -1,4 +1,5 @@
 import { OUTCOME_GLYPH } from "./outcomes";
+import { LegendIcon, TicketGlyph, type TicketKind } from "./TicketIcon";
 import type { FlowDot, LaneId, ShowEvent, Snapshot } from "./types";
 
 // One architecture diagram for both stacks. Tickets come in from the helpdesk on the left; a human approves or denies
@@ -52,25 +53,26 @@ const WIRES: { id: string; x1: number; x2: number; lane: LaneId; label?: string 
 ];
 
 const FLASH_S = 2.5;
+const PITCH = 20; // between ticket badges (each is 17 px across)
 
 function dotPos(at: string, i: number, lane: LaneId): { x: number; y: number; gone?: boolean } {
   if (at === "done") return { x: NODES.payments.x + 12, y: mid(lane), gone: true };
   // Closed with no refund: back in the helpdesk, in its lane's half.
-  if (at === "closed") return { x: NODES.helpdesk.x + 16 + (i % 6) * 15, y: ROW[lane] + NODE_H - 13 - Math.floor(i / 6) * 15 };
+  if (at === "closed") return { x: NODES.helpdesk.x + 22 + (i % 5) * PITCH, y: ROW[lane] + NODE_H - 16 - Math.floor(i / 5) * PITCH };
   const box = NODES[at];
-  if (box) return { x: box.x + 16 + (i % 10) * 15, y: box.y + box.h - 13 - Math.floor(i / 10) * 15 };
+  if (box) return { x: box.x + 22 + (i % 8) * PITCH, y: box.y + box.h - 16 - Math.floor(i / 8) * PITCH };
   const wire = WIRES.find((w) => w.id === at);
-  if (wire) return { x: wire.x1 + 40 + i * 18, y: mid(lane) };
+  if (wire) return { x: wire.x1 + 40 + i * (PITCH + 2), y: mid(lane) };
   return { x: 0, y: mid(lane), gone: true };
 }
 
-function dotClass(d: FlowDot): string {
-  if (d.at === "done") return "tdot done";
-  if (d.at === "closed") return "tdot closed";
-  if (d.state === "failed") return "tdot failed";
-  if (d.state.startsWith("waiting")) return "tdot waiting";
-  if (d.at.includes(">") || d.at === "payments_worker" || d.at === "endpoint") return "tdot paying";
-  return "tdot active";
+function ticketKind(d: FlowDot): TicketKind {
+  if (d.at === "done") return "done";
+  if (d.at === "closed") return "closed";
+  if (d.state === "failed") return "failed";
+  if (d.state.startsWith("waiting")) return "waiting";
+  if (d.at.includes(">") || d.at === "payments_worker" || d.at === "endpoint") return "paying";
+  return "active";
 }
 
 const EFFECT_MARK: Record<string, string> = { duplicate: "⚡ delivered twice", stall: "⚡ goes quiet" };
@@ -84,15 +86,16 @@ function Dots({ lane, dots }: { lane: LaneId; dots: FlowDot[] }) {
         .map((d) => {
           const i = (slot[d.at] = (slot[d.at] ?? -1) + 1);
           const p = dotPos(d.at, i, lane);
+          const kind = ticketKind(d);
           return (
-            <circle
+            <g
               key={d.ticket}
-              className={dotClass(d)}
-              r={5.5}
+              className={`tdot ${kind}`}
               style={{ transform: `translate(${p.x}px, ${p.y}px)`, opacity: p.gone ? 0 : 1 }}
             >
+              <TicketGlyph kind={kind} />
               <title>{`${d.ticket}: ${d.state}`}</title>
-            </circle>
+            </g>
           );
         })}
     </>
@@ -216,11 +219,11 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
             {/* The dots are where each stack thinks a ticket is. The ledger boxes are explained by the result line under each lane. */}
             <span className="lg-group">
               <b>Ticket</b>
-              <span><i className="lg active" /> in progress</span>
-              <span><i className="lg waiting" /> waiting for a human</span>
-              <span><i className="lg paying" /> refund in flight</span>
-              <span><i className="lg failed" /> job failed</span>
-              <span><i className="lg closed" /> denied</span>
+              <span><LegendIcon kind="active" /> in progress</span>
+              <span><LegendIcon kind="waiting" /> waiting for a human</span>
+              <span><LegendIcon kind="paying" /> refund in flight</span>
+              <span><LegendIcon kind="failed" /> job failed</span>
+              <span><LegendIcon kind="closed" /> denied</span>
               <span className="lg-stage">⏱ slowed on purpose</span>
             </span>
           </span>

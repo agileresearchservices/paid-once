@@ -82,12 +82,6 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .diagram-head { min-height: 52px; display: flex; align-items: center; font-size: 15px; }
 .legend { display: flex; gap: 22px; color: var(--ink-2); flex-wrap: wrap; }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
-.lg { display: inline-block; width: 11px; height: 11px; border-radius: 50%; }
-.lg.active { background: var(--sky); }
-.lg.waiting { border: 2px solid var(--ink-2); }
-.lg.paying { background: var(--violet); }
-.lg.failed { background: var(--critical); }
-.lg.closed { background: var(--muted); }
 .lg-stage { color: var(--warning); }
 .legend .lg-group { gap: 14px; }
 .lg-group b { color: var(--ink); font-weight: 600; }
@@ -97,8 +91,6 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .diagram .legend .lg-group { display: flex; align-items: center; gap: 34px; padding: 0; border: 0; }
 .diagram .legend .lg-group span { gap: 10px; }
 .diagram .legend .lg-group b { width: 86px; font-size: 22px; }
-.diagram .legend .lg { width: 18px; height: 18px; }
-.diagram .legend .lg.waiting { border-width: 3px; }
 .diagram .legend .lg-stage { margin-left: auto; font-size: 18px; }
 .locked-banner {
   margin: 0 0 12px; padding: 10px 16px; border-radius: 10px; font-size: 16px;
@@ -135,12 +127,22 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .diagram .packet { animation: travel 1.8s ease-in 3; }
 @keyframes travel { from { transform: translate(0, 0); opacity: 0; } 20% { opacity: 1; } to { transform: translate(var(--dx, 0px), var(--dy, 0px)); opacity: 0; } }
 /* Slow enough to follow a ticket by eye; the scenes' own timing is server-side and unchanged */
-.diagram .tdot { transition: transform 1.8s cubic-bezier(0.4, 0, 0.2, 1), opacity 1.4s ease-in; fill: var(--sky); }
-.diagram .tdot.waiting { fill: var(--page); stroke: var(--ink-2); stroke-width: 2; }
-.diagram .tdot.paying { fill: var(--violet); }
-.diagram .tdot.done { fill: var(--good); }
-.diagram .tdot.failed { fill: var(--critical); }
-.diagram .tdot.closed { fill: var(--muted); }
+.diagram .tdot { transition: transform 1.8s cubic-bezier(0.4, 0, 0.2, 1), opacity 1.4s ease-in; }
+/* Ticket status icons (TicketIcon.tsx): used on the diagram and in the legend. Shape and colour both say the status. */
+.ti-ring { fill: none; stroke: var(--sky); stroke-opacity: 0.3; stroke-width: 2.6; }
+.ti-arc { fill: none; stroke: var(--sky); stroke-width: 2.6; stroke-linecap: round; }
+.ti-spin { transform-box: view-box; transform-origin: 0 0; animation: spin 2.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.ti-face { fill: var(--page); stroke: var(--ink-2); stroke-width: 1.8; }
+.ti-ink-fill { fill: var(--ink); }
+.ti-fill-violet { fill: var(--violet); }
+.ti-fill-critical { fill: var(--critical); }
+.ti-fill-muted { fill: var(--muted); }
+.ti-fill-good { fill: var(--good); }
+.ti-line { fill: none; stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; }
+.ti-light { stroke: #fff; }
+.ti-dark { stroke: var(--page); }
+.diagram svg.lg-icon { display: inline-block; width: 26px; height: 26px; flex: none; overflow: visible; }
 .diagram .human .badge { fill: var(--page); stroke: var(--ink-2); stroke-width: 1.5; transition: stroke 0.3s; }
 .diagram .human .glyph { fill: var(--ink); }
 .diagram .human.now .badge { stroke: var(--sky); stroke-width: 2.5; }
