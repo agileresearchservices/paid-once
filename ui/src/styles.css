@@ -336,26 +336,33 @@ svg.lg-icon, .diagram svg.lg-icon { display: inline-block; width: 26px; height: 
 .beat.idle p { margin: 0; max-width: 90ch; color: var(--muted); font-size: 26px; text-align: center; }
 /* The walkthrough: three panes, one per role, each showing only what that role sees. */
 .panes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+/* Step 1 fills the window: the bottom panel takes whatever height is left, and the text grows with it (--wf), never below the
+   sizes that fit the smallest screen. 830 px is about what the rest of the page uses plus the panel's own chrome. */
+main.fill { display: flex; flex-direction: column; min-height: 100vh; }
+.beat { --wf: clamp(20px, calc((100vh - 753px) / 9), 34px); }
+main.fill > .beat:not(.idle) { flex: 1 1 auto; display: flex; flex-direction: column; }
+main.fill > .beat:not(.idle) .panes { flex: 1 1 auto; grid-template-rows: minmax(0, 1fr); }
+main.fill .pane { height: auto; min-height: 186px; }
 .pane { height: 186px; display: flex; flex-direction: column; border: 1px solid var(--axis); border-radius: 14px; background: var(--page); overflow: hidden; }
-.pane-bar { display: flex; align-items: center; gap: 10px; padding: 5px 14px; border-bottom: 1px solid var(--grid); font-size: 18px; font-weight: 600; color: var(--ink); }
+.pane-bar { display: flex; align-items: center; gap: 10px; padding: 5px 14px; border-bottom: 1px solid var(--grid); font-size: calc(var(--wf) * 0.9); font-weight: 600; color: var(--ink); }
 .pane-body { flex: 1; display: flex; flex-direction: column; justify-content: flex-start; gap: 5px; padding: 8px 14px; overflow: hidden; }
-.pane-row { display: flex; align-items: center; gap: 10px; font-size: 20px; line-height: 1.2; color: var(--ink); min-height: 27px; }
-.pane-empty { margin: auto; font-size: 20px; color: var(--muted); }
+.pane-row { display: flex; align-items: center; gap: 10px; font-size: var(--wf); line-height: 1.2; color: var(--ink); min-height: calc(var(--wf) * 1.35); }
+.pane-empty { margin: auto; font-size: var(--wf); color: var(--muted); }
 .msg { display: flex; }
-.msg p { margin: 0; padding: 4px 14px; border-radius: 16px; font-size: 21px; line-height: 1.25; color: var(--ink); background: var(--surface); }
+.msg p { margin: 0; padding: 4px 14px; border-radius: 16px; font-size: var(--wf); line-height: 1.25; color: var(--ink); background: var(--surface); }
 .msg.customer { justify-content: flex-end; }
 .msg.customer p { background: var(--accent-wash); }
 .review { display: flex; flex-direction: column; gap: 8px; }
-.review-ask { font-size: 24px; font-weight: 700; color: var(--ink); }
-.review-quote { font-size: 17px; color: var(--ink-2); line-height: 1.25; }
+.review-ask { font-size: calc(var(--wf) * 1.2); font-weight: 700; color: var(--ink); }
+.review-quote { font-size: calc(var(--wf) * 0.85); color: var(--ink-2); line-height: 1.25; }
 .review-actions { display: flex; gap: 10px; margin-top: 2px; }
-.act { padding: 5px 16px; border: 1px solid var(--axis); border-radius: 8px; font-size: 19px; font-weight: 600; color: var(--ink-2); }
+.act { padding: 5px 16px; border: 1px solid var(--axis); border-radius: 8px; font-size: calc(var(--wf) * 0.95); font-weight: 600; color: var(--ink-2); }
 .act.approve.on { background: #0b3a22; border-color: var(--good); color: var(--good-ink); }
-.avatar { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--grid); color: var(--ink-2); font-size: 14px; font-weight: 700; }
+.avatar { flex: none; width: calc(var(--wf) * 1.5); height: calc(var(--wf) * 1.5); border-radius: 50%; display: grid; place-items: center; background: var(--grid); color: var(--ink-2); font-size: calc(var(--wf) * 0.7); font-weight: 700; }
 .pane:nth-child(2) .avatar { background: var(--sky); color: var(--page); }
-.avatar .lg-icon { width: 24px; height: 24px; }
-.pane-row .lg-icon { width: 24px; height: 24px; }
-.typing { display: inline-flex; gap: 6px; align-items: center; height: 26px; }
+.avatar .lg-icon { width: calc(var(--wf) * 1.2); height: calc(var(--wf) * 1.2); }
+.pane-row .lg-icon { width: calc(var(--wf) * 1.2); height: calc(var(--wf) * 1.2); }
+.typing { display: inline-flex; gap: 6px; align-items: center; height: calc(var(--wf) * 1.2); }
 .typing i { width: 9px; height: 9px; border-radius: 50%; background: var(--ink-2); animation: typing 1.2s ease-in-out infinite; }
 .typing i:nth-child(2) { animation-delay: 0.2s; }
 .typing i:nth-child(3) { animation-delay: 0.4s; }

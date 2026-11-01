@@ -143,7 +143,7 @@ export function App() {
   else if (finished) status = { text: "Done ✓", cls: "ok" };
 
   return (
-    <main>
+    <main className={step.arch ? "fill" : undefined}>
       <header>
         <h1>
           <Wordmark /> Paid Once <span className="tagline">Refunds over Nexus</span>
