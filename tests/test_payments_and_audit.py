@@ -115,3 +115,21 @@ def test_calls_count_replays_per_ticket():
         assert calls["lane1"]["t2"] == {"calls": 2, "replays": 0}
         client.post("/admin/reset")
         assert client.get("/admin/calls").json() == {}
+
+
+def test_audit_can_leave_a_scene_out_or_score_it_alone():
+    """The scoreboard leaves the walkthrough out; the walkthrough is still scored on its own."""
+    audit.record_ticket("lane1", "demo", "walkthrough", 4200)
+    audit.record_ticket("lane1", "real", "intro", 1000)
+    audit.record_decision("lane1", "demo", approved=True, delivered=True)
+    audit.record_decision("lane1", "real", approved=True, delivered=True)
+    ledger.record_refund("demo", 4200, "a", "lane1")
+    ledger.record_refund("real", 1000, "b", "lane1")
+
+    board = audit.compute("lane1", exclude_scenes=("walkthrough",))
+    assert (board["submitted"], board["approved"], board["refunded_once"]) == (1, 1, 1)
+    assert list(board["tickets"]) == ["real"]
+    demo = audit.compute("lane1", only_scenes=("walkthrough",))
+    assert (demo["submitted"], demo["approved"], demo["refunded_once"]) == (1, 1, 1)
+    assert list(demo["tickets"]) == ["demo"]
+    assert audit.compute("lane1")["submitted"] == 2

@@ -40,6 +40,14 @@ In `worker_crash` Lane 1 paid the 3 in-flight refunds twice (a new key per attem
 Lane 2 replayed with the same key and refunded all 6 once. In `nexus_kill` the payments-side activity attempt peaked at
 3 and the caller's operation at 1; every failure hit all 5 refunds.
 
+## Note: the walkthrough no longer counts toward the scoreboard
+
+The tables above include the one-ticket walkthrough from step 1 (it was a Lane 1 and Lane 2 ticket in every scored
+run). The show server's scoreboard now leaves it out (`DEMO_SCENES` in `paidonce/show/engine.py`) and scores it on its
+own as `demo_audit`, which `make scenario` checks. A fresh run therefore reads one ticket less per lane than the
+latest tables: Lane 1 29 submitted and 21 approved, Lane 2 36 submitted and 26 approved. The recorded runs were not
+repeated.
+
 ## Before the merge: every scene with two tickets owed nothing (2026-10-31, `c085fb9`)
 
 Each scene's cohort now adds one ticket outside the agent's policy and one a human denies (7 tickets per scene, 8 in

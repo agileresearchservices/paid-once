@@ -73,13 +73,27 @@ def reset() -> None:
         conn.execute("DELETE FROM decisions")
 
 
-def compute(lane: str, settle_s: float = 25.0, now: float | None = None) -> dict:
-    """Score one lane. A ticket approved less than settle_s ago is in flight, not missing."""
+def compute(
+    lane: str,
+    settle_s: float = 25.0,
+    now: float | None = None,
+    exclude_scenes: tuple[str, ...] = (),
+    only_scenes: tuple[str, ...] | None = None,
+) -> dict:
+    """Score one lane. A ticket approved less than settle_s ago is in flight, not missing. `exclude_scenes` and
+    `only_scenes` pick tickets by the scene that submitted them (the scoreboard leaves out the walkthrough)."""
     init()
     now = time.time() if now is None else now
     with connect(config.AUDIT_DB) as conn:
         tickets = [dict(r) for r in conn.execute("SELECT * FROM tickets WHERE lane = ?", (lane,))]
+        tickets = [
+            t
+            for t in tickets
+            if t["scene"] not in exclude_scenes and (only_scenes is None or t["scene"] in only_scenes)
+        ]
         decisions = {r["ticket_id"]: dict(r) for r in conn.execute("SELECT * FROM decisions WHERE lane = ?", (lane,))}
+    kept = {t["ticket_id"] for t in tickets}
+    decisions = {tid: d for tid, d in decisions.items() if tid in kept}
     approvals = {tid: d for tid, d in decisions.items() if d["approved"]}
     refunds_by_ticket: dict[str, list[dict]] = {}
     for row in ledger.all_refunds(lane):
@@ -135,5 +149,5 @@ def compute(lane: str, settle_s: float = 25.0, now: float | None = None) -> dict
     return out
 
 
-def compute_all(settle_s: float = 25.0) -> dict:
-    return {lane: compute(lane, settle_s) for lane in LANES}
+def compute_all(settle_s: float = 25.0, **scenes) -> dict:
+    return {lane: compute(lane, settle_s, **scenes) for lane in LANES}

@@ -338,3 +338,10 @@ def test_the_second_review_gets_the_rest_and_never_the_policy_ticket():
         assert "approves 2, denies 1" in eng.events[0][1] and "policy" not in eng.events[0][1]
 
     asyncio.run(go())
+
+
+def test_every_run_of_the_walkthrough_counts_as_a_demo_ticket():
+    from paidonce.show.engine import _is_demo
+
+    assert _is_demo("ab12-walkthrough-r1-00-lane1") and _is_demo("ab12-walkthrough-r4-00-lane2")
+    assert not _is_demo("ab12-intro-r1-00-lane1") and not _is_demo("ab12-worker_crash-r2-03-lane2")

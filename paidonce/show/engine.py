@@ -11,6 +11,7 @@ import asyncio
 import random
 import time
 import uuid
+from collections import Counter
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, fields
 
@@ -39,6 +40,7 @@ AGENT_WORKERS = ["lane1_worker", "support_worker"]
 # The worker-crash scene (step 3): the first few approved refunds are in flight at payments when the workers die;
 # the rest of the cohort is still waiting for a human.
 WORKER_CRASH_APPROVED = 6
+DEMO_SCENES = ("walkthrough",)  # scored on their own; left out of the scoreboard totals
 WORKER_CRASH_IN_FLIGHT = 3
 
 # The Nexus gauntlet (step 6): four failures, each landing on refunds still in flight.
@@ -127,6 +129,9 @@ class Engine:
         self.lane1_view: dict[str, int] = {}  # this scene's tickets, by the queue's own status
         self.lane1_view_all: dict[str, int] = {}  # every ticket since reset: the scoreboard compares it with the ledger
         self.lane2_view: dict[str, int] = {}
+        # Every Lane 2 ticket's last-seen workflow status since reset, so the card header accumulates like the scoreboard.
+        self.lane2_status: dict[str, str] = {}
+        self.lane2_view_all: dict[str, int] = {}
         # How each completed Lane 2 workflow ended (done, denied or rejected), read once from its result.
         self.lane2_outcomes: dict[str, TicketOutcome] = {}
         self.faults: dict = {}
@@ -139,6 +144,7 @@ class Engine:
         self.payments_calls: dict[str, dict[str, int]] = {}
         # The same counter per ticket ({lane: {ticket: {calls, replays}}}), and when each Lane 2 refund was booked.
         self.payments_calls_by_ticket: dict[str, dict[str, dict[str, int]]] = {}
+        self.payments_calls_all: dict[str, dict[str, int]] = {}  # the same counter, every ticket since reset
         self.booked_at: dict[str, float] = {}
         # Where each stack thinks each of this scene's tickets is, for the architecture diagram.
         self.flow: dict[str, list[dict]] = {"lane1": [], "lane2": []}
@@ -680,7 +686,11 @@ class Engine:
         self.decisions.clear()
         self.lane2_outcomes.clear()
         self.payments_calls = {}
+        self.payments_calls_all = {}
         self.payments_calls_by_ticket = {}
+        self.lane2_status.clear()
+        self.lane2_view = {}
+        self.lane2_view_all = {}
         self.booked_at = {}
         self.nexus_seen = {}
         self.flow = {"lane1": [], "lane2": []}
@@ -701,7 +711,8 @@ class Engine:
             ours = {tid for lane, tid in pairs if lane == "lane1"}
             flow1 = []
             for t in r.json():
-                counts_all[t["status"]] = counts_all.get(t["status"], 0) + 1
+                if not _is_demo(t["ticket_id"]):
+                    counts_all[t["status"]] = counts_all.get(t["status"], 0) + 1
                 if t["ticket_id"] in ours:
                     counts[t["status"]] = counts.get(t["status"], 0) + 1
                     at, state = LANE1_STAGES.get(t["status"], ("lane1_api", t["status"]))
@@ -719,6 +730,15 @@ class Engine:
             r = await self.http.get(f"{config.PAYMENTS_URL}/admin/calls")
             self.payments_calls_by_ticket = r.json()
             self.payments_calls = _scene_calls(self.payments_calls_by_ticket, pairs)
+            self.payments_calls_all = _scene_calls(
+                self.payments_calls_by_ticket,
+                [
+                    (lane, tid)
+                    for lane, per in self.payments_calls_by_ticket.items()
+                    for tid in per
+                    if not _is_demo(tid)
+                ],
+            )
             r = await self.http.get(f"{config.PAYMENTS_URL}/refunds", params={"lane": "lane2"})
             self.booked_at = {row["ticket_id"]: row["created_at"] for row in r.json()}
             run = self.scene_runs.get(self.current) if self.current else None
@@ -744,6 +764,8 @@ class Engine:
                 continue
             status = desc.status.name if desc.status else "UNKNOWN"
             states[status] = states.get(status, 0) + 1
+            if not _is_demo(tid):
+                self.lane2_status[tid] = status
             ops = desc.raw_description.pending_nexus_operations
             if status == "COMPLETED" and tid not in self.lane2_outcomes:
                 # describe() can't tell a refund from a denial. The result can, and reading it needs no worker.
@@ -835,6 +857,7 @@ class Engine:
                 seen[tid]["ledger"] = _ticket_ledger(self.payments_calls_by_ticket, self.booked_at, "lane2", tid)
         if seen is self.nexus_seen:
             self.lane2_view = states
+            self.lane2_view_all = dict(Counter(self.lane2_status.values()))
             self.flow["lane2"] = flow2
 
     def _current_pairs(self) -> list[tuple[str, str]]:
@@ -869,7 +892,10 @@ class Engine:
             self.temporal_ui = None
 
     def snapshot(self) -> dict:
-        board = audit.compute_all(SETTLE_S)
+        # The scoreboard leaves out the walkthrough: page 1 is a demonstration, and the scenes are what add up. It is
+        # still scored on its own (`demo_audit`) so the headless run and the page 1 diagram can read it.
+        board = audit.compute_all(SETTLE_S, exclude_scenes=DEMO_SCENES)
+        demo = audit.compute_all(SETTLE_S, only_scenes=DEMO_SCENES)
         return {
             "now": time.time(),
             "running": self.running,
@@ -877,14 +903,17 @@ class Engine:
             "scene_runs": self.scene_runs,
             "scenes": [{"id": s.id, "title": s.title} for s in SCENES],
             "audit": board,
+            "demo_audit": demo,
             "processes": self.procs.status(),
             "events": self.events[-60:],
             "nexus": list(self.nexus_seen.values()),
             "lane1_view": self.lane1_view,
             "lane1_view_all": self.lane1_view_all,
             "lane2_view": self.lane2_view,
+            "lane2_view_all": self.lane2_view_all,
             "faults": self.faults,
             "payments_calls": self.payments_calls,
+            "payments_calls_all": self.payments_calls_all,
             "flow": self.flow,
             "beat": self.beat,
             "temporal_ui": self.temporal_ui,
@@ -1049,6 +1078,11 @@ def _unsettled(
 def _ticket_index(ticket_id: str) -> int:
     """The ticket's position in its cohort: ids end in `...-<index>-<lane>` (see Engine._make_ticket)."""
     return int(ticket_id.rsplit("-", 2)[1])
+
+
+def _is_demo(ticket_id: str) -> bool:
+    """A walkthrough ticket, from any run of it: ids read `<run>-<scene>-r<n>-<i>-<lane>` (Engine._make_ticket)."""
+    return any(f"-{scene}-r" in ticket_id for scene in DEMO_SCENES)
 
 
 def _scene_calls(calls: dict, pairs: list[tuple[str, str]]) -> dict[str, dict[str, int]]:

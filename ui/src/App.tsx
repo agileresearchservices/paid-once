@@ -23,7 +23,8 @@ function Chips({ counts, empty }: { counts: Record<string, number>; empty: strin
   );
 }
 
-// What payments saw from this lane in this scene: a retry that reuses the key is answered from the ledger.
+// What payments saw from this lane since the reset, like the scoreboard under it: a retry that reuses the key is
+// answered from the ledger.
 function PaymentsCalls({ c }: { c?: { calls: number; booked: number; replays: number } }) {
   if (!c || c.calls === 0) return null;
   return (
@@ -125,8 +126,9 @@ export function App() {
     return <main className="loading">{connected ? "Loading…" : "Waiting for the show server on port 8100…"}</main>;
   }
 
-  // Scene-scoped views (Nexus rows, workflow status, payments calls) describe the scene the engine last ran,
-  // so a step shows them only when that scene is this step's.
+  // Scene-scoped views (Nexus rows, the page 6 payments line, the walkthrough flow) describe the scene the engine
+  // last ran, so a step shows them only when that scene is this step's. The scoreboard card's header (job table,
+  // workflow status, payments calls) accumulates since the reset, like the numbers under it.
   const onScreen = step.scene != null && snap.current === step.scene;
   const thisRunning = running && onScreen;
   const run = step.scene ? snap.scene_runs?.[step.scene] : undefined;
@@ -221,8 +223,8 @@ export function App() {
                   <h2>{l.name}</h2>
                   <div className="believes">
                     <span className="muted">{l.id === "lane1" ? "Job table:" : "Workflow status:"}</span>{" "}
-                    <Chips counts={onScreen ? (l.id === "lane1" ? snap.lane1_view : snap.lane2_view) : {}} empty="nothing yet" />
-                    <PaymentsCalls c={onScreen ? snap.payments_calls?.[l.id] : undefined} />
+                    <Chips counts={l.id === "lane1" ? snap.lane1_view_all : snap.lane2_view_all} empty="nothing yet" />
+                    <PaymentsCalls c={snap.payments_calls_all?.[l.id]} />
                   </div>
                 </div>
               ) : (
