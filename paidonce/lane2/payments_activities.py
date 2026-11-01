@@ -1,4 +1,4 @@
-"""Payments team's activity: the one place the HTTP call to the payments service happens."""
+"""Payments team's activity: the one place the HTTPS call to the payments service happens."""
 
 import httpx
 from temporalio import activity
