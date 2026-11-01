@@ -7,8 +7,8 @@ import { post, useSnapshot } from "./useSnapshot";
 import { Walkthrough } from "./Walkthrough";
 
 const LANES = [
-  { id: "lane1" as const, name: "Queue + LangGraph", subtitle: "What most teams run today: queue, polling worker, in-memory agent state, HTTPS to payments" },
-  { id: "lane2" as const, name: "Temporal + Nexus", subtitle: "Durable workflow; support calls payments over Nexus" },
+  { id: "lane1" as const, name: "Queue + LangGraph", subtitle: "What most teams run today" },
+  { id: "lane2" as const, name: "Temporal + Nexus", subtitle: "Durable workflow, payments over Nexus" },
 ];
 
 function Chips({ counts, empty }: { counts: Record<string, number>; empty: string }) {
@@ -28,8 +28,7 @@ function PaymentsCalls({ c }: { c?: { calls: number; booked: number; replays: nu
   if (!c || c.calls === 0) return null;
   return (
     <div className="calls">
-      <span className="muted">Payments got</span> <b>{c.calls}</b> calls · booked <b>{c.booked}</b> · answered{" "}
-      <b>{c.replays}</b> from the ledger
+      <span className="muted">Payments:</span> <b>{c.calls}</b> calls · <b>{c.booked}</b> booked · <b>{c.replays}</b> replayed
     </div>
   );
 }
@@ -207,7 +206,7 @@ export function App() {
               <p className="muted">{l.subtitle}</p>
               {step.scene && (
                 <div className="believes">
-                  <span className="muted">{l.id === "lane1" ? "Its own job table (this scene):" : "Temporal workflow status (this scene):"}</span>{" "}
+                  <span className="muted">{l.id === "lane1" ? "Job table:" : "Workflow status:"}</span>{" "}
                   <Chips counts={onScreen ? (l.id === "lane1" ? snap.lane1_view : snap.lane2_view) : {}} empty="nothing yet" />
                   <PaymentsCalls c={onScreen ? snap.payments_calls?.[l.id] : undefined} />
                 </div>
@@ -216,7 +215,7 @@ export function App() {
                 audit={snap.audit[l.id]}
                 name={l.name}
                 believedDone={!step.scene && l.id === "lane1" ? (snap.lane1_view_all?.done ?? 0) : undefined}
-                note={l.id === "lane2" && snap.scene_runs?.nexus_kill ? "Includes the Nexus scene, which runs on Temporal only." : undefined}
+                note={l.id === "lane2" && snap.scene_runs?.nexus_kill ? "Includes the Nexus scene (Temporal only)." : undefined}
               />
             </article>
           ))}

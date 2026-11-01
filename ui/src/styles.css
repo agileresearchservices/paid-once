@@ -42,6 +42,7 @@ h1 { font-size: 20px; margin: 0; white-space: nowrap; display: flex; align-items
 .wordmark-text { font-weight: 400; color: var(--muted); }
 .tagline { font-size: 15px; font-weight: 400; color: var(--muted); }
 h2 { font-size: 22px; margin: 0 0 4px; }
+.story h2 { font-size: 32px; margin-bottom: 6px; }
 h3 { font-size: 14px; margin: 0 0 8px; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.04em; }
 p { margin: 0 0 8px; }
 .muted { color: var(--muted); }
@@ -64,9 +65,9 @@ button.primary:disabled { background: var(--surface); border-color: var(--axis);
 button.danger { border-color: var(--critical); color: #fff; background: var(--critical-wash); }
 
 .story { display: grid; grid-template-columns: 1fr auto; gap: 24px; background: var(--surface); border-radius: 12px; padding: 16px 24px; }
-.story-text p { max-width: 110ch; color: var(--ink-2); font-size: 18px; margin-bottom: 6px; }
-.story-text .watch { color: var(--ink); font-size: 16px; }
-.story-text .result { color: var(--ink); font-size: 16px; border-left: 3px solid var(--accent); padding-left: 10px; }
+.story-text p { max-width: 70ch; color: var(--ink-2); font-size: 24px; margin-bottom: 6px; }
+.story-text .watch { color: var(--ink); font-size: 22px; }
+.story-text .result { color: var(--ink); font-size: 22px; border-left: 3px solid var(--accent); padding-left: 10px; }
 .story-text .result.pending { visibility: hidden; }
 .controls { display: grid; gap: 8px; align-content: start; min-width: 200px; }
 .scene-status { margin: 0; font-size: 15px; text-align: center; }
@@ -78,7 +79,7 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 /* The architecture diagram: faults land on the node they hit, dots are tickets. */
 .diagram { background: var(--surface); border: 1px solid var(--grid); border-radius: 12px; padding: 8px 12px 4px; }
 .diagram svg { display: block; width: 100%; height: auto; }
-.diagram-head { min-height: 30px; display: flex; align-items: center; font-size: 15px; }
+.diagram-head { min-height: 82px; display: flex; align-items: center; font-size: 15px; }
 .legend { display: flex; gap: 22px; color: var(--ink-2); flex-wrap: wrap; }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .lg { display: inline-block; width: 11px; height: 11px; border-radius: 50%; }
@@ -100,11 +101,15 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .lg-slot.missing { background: #4a2306; border-color: var(--serious); color: var(--serious); }
 .lg-slot.bad { background: var(--critical-wash); border-color: var(--critical); color: var(--critical-ink); }
 .lg-slot.none { color: var(--ink-2); }
-.fault-caption {
-  background: var(--critical-wash); border: 1px solid var(--critical); color: var(--ink); border-radius: 8px;
-  padding: 3px 12px; font-size: 16px; animation: flash 0.9s ease-in-out 2;
-}
-@keyframes flash { 50% { background: #5a1f19; } }
+/* The key to the dots and boxes: two rows, big enough to read from the back of a room. */
+.diagram .legend { display: grid; gap: 12px; width: 100%; font-size: 22px; }
+.diagram .legend .lg-group { display: flex; align-items: center; gap: 34px; padding: 0; border: 0; }
+.diagram .legend .lg-group span { gap: 10px; }
+.diagram .legend .lg-group b { width: 86px; font-size: 22px; }
+.diagram .legend .lg { width: 18px; height: 18px; }
+.diagram .legend .lg.waiting { border-width: 3px; }
+.diagram .legend .lg-slot { min-width: 34px; height: 28px; font-size: 17px; border-radius: 5px; }
+.diagram .legend .lg-stage { margin-left: auto; font-size: 18px; }
 .locked-banner {
   margin: 0 0 12px; padding: 10px 16px; border-radius: 10px; font-size: 16px;
   background: #3a2c05; border: 1px solid var(--warning); color: var(--ink);
@@ -134,8 +139,6 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .diagram .bolt { font-size: 38px; animation: bolt 0.9s ease-out 2; transform-box: fill-box; transform-origin: center; }
 @keyframes bolt { from { transform: scale(0.3); opacity: 1; } to { transform: scale(1.5); opacity: 0; } }
 .diagram .staged { fill: var(--warning); font-size: 13.5px; font-weight: 600; }
-.diagram .stall { fill: var(--warning); font-size: 13.5px; }
-.diagram .stall.now { fill: var(--critical-ink); animation: blink 0.6s step-end 4; }
 @keyframes blink { 50% { opacity: 0.2; } }
 .diagram .packet rect { fill: var(--critical-wash); stroke: var(--critical); }
 .diagram .packet text { fill: var(--critical-ink); font-size: 13px; font-weight: 700; }
@@ -162,14 +165,16 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .diagram .slot.none rect { stroke: var(--muted); stroke-dasharray: none; }
 .diagram .slot.none text { fill: var(--ink-2); }
 @media (prefers-reduced-motion: reduce) {
-  .diagram *, .fault-caption { animation: none !important; transition: none !important; }
+  .diagram * { animation: none !important; transition: none !important; }
 }
 
-.chip { display: inline-block; background: var(--surface); border: 1px solid var(--axis); border-radius: 999px; padding: 2px 10px; font-size: 14px; color: var(--ink-2); margin: 0 6px 4px 0; }
+.chip { display: inline-block; background: var(--surface); border: 1px solid var(--axis); border-radius: 999px; padding: 3px 12px; font-size: 19px; color: var(--ink-2); margin: 0 6px 4px 0; }
 .chip.warn { border-color: var(--warning); color: var(--ink); }
 
 .lanes { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 @media (max-width: 960px) { .lanes, .story, .nexus { grid-template-columns: 1fr; } }
+.lane h2 { font-size: 30px; }
+.lane > .muted { font-size: 21px; }
 .lane { background: var(--surface); border: 1px solid var(--grid); border-radius: 12px; padding: 16px 20px; }
 /* Lane 2 and the Nexus panel carry the brand gradient as a border; Lane 1 stays neutral. */
 .lane.lane2, .nexus, .endpoint-card {
@@ -184,20 +189,20 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .tile-state { font-weight: 700; font-size: 14px; letter-spacing: 0.05em; }
 .tile.down .tile-state { color: var(--critical-ink); }
 .tile-kills { color: var(--muted); font-size: 14px; }
-.believes { font-size: 15px; margin-bottom: 8px; }
+.believes { font-size: 20px; margin-bottom: 8px; }
 .calls { margin-top: 4px; }
 .calls b { font-variant-numeric: tabular-nums; }
 
 .scoreboard { border-top: 1px solid var(--grid); padding-top: 12px; margin-top: 8px; }
 .hero { display: flex; align-items: baseline; gap: 12px; }
-.hero-num { font-size: 52px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
-.hero-of { color: var(--ink-2); }
-.loss { color: var(--critical-ink); font-weight: 600; margin: 4px 0 0; min-height: 1.45em; }
+.hero-num { font-size: 76px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.hero-of { color: var(--ink-2); font-size: 26px; }
+.loss { color: var(--critical-ink); font-weight: 600; font-size: 26px; margin: 4px 0 0; min-height: 1.45em; }
 .loss.none { color: var(--good-ink); font-weight: 400; }
 .hero-note { color: var(--muted); font-size: 14px; margin: 2px 0 0; }
-.believed { color: var(--ink-2); font-size: 15px; margin: 4px 0 0; }
+.believed { color: var(--ink-2); font-size: 22px; margin: 4px 0 0; }
 
-.bar { display: flex; gap: 2px; height: 40px; margin: 12px 0 8px; }
+.bar { display: flex; gap: 2px; height: 56px; margin: 14px 0 16px; font-size: 20px; }
 .bar.empty { align-items: center; padding: 0 12px; color: var(--muted); background: var(--page); border-radius: 6px; }
 .seg {
   position: relative; display: flex; align-items: center; justify-content: center; min-width: 8px;
@@ -221,11 +226,11 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .legend { list-style: none; display: flex; gap: 14px; flex-wrap: wrap; padding: 0; margin: 0 0 12px; font-size: 15px; color: var(--ink-2); }
 .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; }
 
-.invariants { list-style: none; padding: 0; margin: 0 0 8px; display: grid; gap: 4px; }
-.invariant { display: grid; grid-template-columns: 22px 1fr auto; column-gap: 8px; font-size: 16px; }
+.invariants { list-style: none; padding: 0; margin: 0 0 8px; display: grid; gap: 10px; }
+.invariant { display: grid; grid-template-columns: 30px 1fr auto; column-gap: 10px; font-size: 24px; }
 .inv-icon { font-weight: 700; text-align: center; }
-.inv-verdict { font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: 0.04em; }
-.inv-detail { grid-column: 2 / 4; color: var(--muted); font-size: 14px; }
+.inv-verdict { font-weight: 700; font-size: 20px; text-transform: uppercase; letter-spacing: 0.04em; }
+.inv-detail { grid-column: 2 / 4; color: var(--muted); font-size: 19px; }
 .invariant.holds .inv-icon, .invariant.holds .inv-verdict { color: var(--good-ink); }
 .invariant.violated .inv-icon, .invariant.violated .inv-verdict { color: var(--critical-ink); }
 .invariant.settling .inv-icon, .invariant.settling .inv-verdict { color: var(--warning); }
@@ -313,16 +318,16 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 
 
 /* The walkthrough's explanation panel: in the page under the diagram, so the diagram stays in view. */
-.beat { min-height: 280px; padding: 16px 22px 18px; background: var(--surface); border: 2px solid var(--accent); border-radius: 14px; }
+.beat { min-height: 230px; padding: 16px 22px 18px; background: var(--surface); border: 2px solid var(--accent); border-radius: 14px; }
 .beat.idle { display: grid; place-items: center; border-color: var(--grid); }
-.beat.idle p { margin: 0; max-width: 90ch; color: var(--muted); font-size: 18px; text-align: center; }
+.beat.idle p { margin: 0; max-width: 90ch; color: var(--muted); font-size: 26px; text-align: center; }
 .beat-head { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
-.beat-head h3 { flex: 1; margin: 0; font-size: 26px; color: var(--ink); text-transform: none; letter-spacing: 0; }
+.beat-head h3 { flex: 1; margin: 0; font-size: 34px; color: var(--ink); text-transform: none; letter-spacing: 0; }
 .beat-n { color: var(--accent-ink); font-size: 14px; font-weight: 600; white-space: nowrap; }
 .beat kbd { font: 12px var(--mono); margin-left: 6px; padding: 1px 6px; border: 1px solid rgba(255, 255, 255, 0.5); border-radius: 4px; }
-.beat-intro { font-size: 21px; color: var(--ink); margin-bottom: 12px; }
+.beat-intro { font-size: 28px; color: var(--ink); margin-bottom: 12px; }
 .beat-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.beat-cols > div { padding: 10px 14px; border-radius: 10px; background: var(--page); font-size: 19px; color: var(--ink-2); }
+.beat-cols > div { padding: 10px 14px; border-radius: 10px; background: var(--page); font-size: 26px; color: var(--ink-2); }
 .beat-cols > div.t { background: var(--accent-wash); }
-.beat-cols b { display: block; margin-bottom: 6px; font-size: 17px; color: var(--ink); }
+.beat-cols b { display: block; margin-bottom: 6px; font-size: 20px; color: var(--ink); }
 .beat-cols p { margin: 0; }
