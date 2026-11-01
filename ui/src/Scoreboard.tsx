@@ -61,7 +61,7 @@ export function Scoreboard({
   name: string;
   believedDone?: number;
   note?: string;
-  compact?: boolean; // a scene step: the "refunded twice" amount sits beside the number and there is no table view
+  compact?: boolean; // a scene step: the "refunded twice" amount sits beside the number
 }) {
   const ps = parts(audit);
   const total = ps.reduce((n, p) => n + p.value, 0);
@@ -128,26 +128,6 @@ export function Scoreboard({
           detail={`${audit.missing} lost, ${audit.in_flight} settling`}
         />
       </ul>
-
-      {!compact && (
-      <details className="table-view">
-        <summary>Table view</summary>
-        <table>
-          <tbody>
-            <tr><th>Submitted</th><td>{audit.submitted}</td></tr>
-            <tr><th>Approved</th><td>{audit.approved}</td></tr>
-            <tr><th>Refunded once</th><td>{audit.refunded_once}</td></tr>
-            <tr><th>Tickets refunded more than once</th><td>{audit.duplicates}</td></tr>
-            <tr><th>Extra refunds</th><td>{audit.duplicate_refunds} ({dollars(audit.duplicate_cents)})</td></tr>
-            <tr><th>Approved, never refunded</th><td>{audit.missing}</td></tr>
-            <tr><th>Still settling</th><td>{audit.in_flight}</td></tr>
-            <tr><th>Refunded without approval</th><td>{audit.unapproved}</td></tr>
-            <tr><th>Denied by a human, not paid</th><td>{audit.rejected}</td></tr>
-            <tr><th>Outside the refund policy, not paid</th><td>{audit.declined}</td></tr>
-          </tbody>
-        </table>
-      </details>
-      )}
     </section>
   );
 }
