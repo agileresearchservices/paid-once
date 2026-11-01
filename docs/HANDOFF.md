@@ -115,7 +115,7 @@ whoever changes the code next.
   `double_delivery` resends each ticket's actual decision, never an approval the human didn't give.
 - **`describe()` shows a refunded and a denied workflow both as `COMPLETED`.** The engine reads each completed
   workflow's result once (from history, so no worker is needed) and caches it in `Engine.lane2_outcomes`; denied and
-  rejected tickets are drawn as grey dots back at the helpdesk, refunded ones at payments.
+  rejected tickets are drawn as grey dash badges back at the helpdesk, refunded ones at payments.
 - **Temporal look, local only.** Palette and fonts (Inter, Noto Sans Mono, bundled) follow temporal.io. The wordmark and
   favicon go in `ui/public/brand/`, which is gitignored because they are trademarks; without them the header shows
   text.
