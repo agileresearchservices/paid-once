@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { NexusTimeline } from "./NexusTimeline";
-import { shortTicket } from "./nexusLinks";
 import { ProcTile } from "./Processes";
 import type { NexusRow, ProcStatus, SceneRun, Topology } from "./types";
 
@@ -12,9 +11,8 @@ function Ext({ href, children }: { href: string; children: ReactNode }) {
   );
 }
 
-// The claim, left to right like the architecture diagram: support's code names one endpoint and one operation, and
-// everything behind it belongs to payments. The snippet and the list are built from the topology the server sends, so they
-// can't drift from support_side.py / the payments side. Each team's worker sits in its own box, so a kill shows where it lands.
+// The claim, left to right like the architecture diagram, in as few words as will carry it: support's code makes one call
+// to one endpoint; everything behind it is payments'. Each team's worker sits in its own box, so a kill shows where it lands.
 function ClaimCard({
   t,
   ui,
@@ -32,75 +30,51 @@ function ClaimCard({
 }) {
   const isDown = (p?: ProcStatus) => p !== undefined && !p.alive;
   return (
-    <>
-      <div className="strip">
-        <div className={isDown(support) ? "team down" : "team"}>
-          <div className="team-head">
-            <span className="team-name">Support team</span>
-            {ui && <Ext href={`${ui}/namespaces/${t.support.namespace}/workflows`}>namespace ↗</Ext>}
-          </div>
-          <span className="claim-label">Support's code knows only:</span>
-          <pre className="code">{`nexus = workflow.create_nexus_client(
-    service=${t.service},
-    endpoint="${t.endpoint}")
-await nexus.execute_operation(
-    ${t.service}.${t.operation}, request)`}</pre>
-          {support && <ProcTile p={support} kills={kills.support_worker} />}
+    <div className="strip">
+      <div className={isDown(support) ? "team down" : "team"}>
+        <div className="team-head">
+          <span className="team-name">Support team</span>
+          {ui && <Ext href={`${ui}/namespaces/${t.support.namespace}/workflows`}>namespace ↗</Ext>}
         </div>
-        <span className="strip-arrow" aria-hidden="true">
-          ▶
+        <span className="claim-line">
+          Makes one call: <code>{t.operation}</code>
         </span>
-        <div className={isDown(temporal) ? "endpoint-card down" : "endpoint-card"}>
-          <span className="headline-label">
-            {isDown(temporal) ? (
-              <>
-                ⚡ Temporal server down
-                <br />
-                {kills.temporal ? "killed during this run" : " "}
-              </>
-            ) : (
-              <>Team boundary</>
-            )}
-          </span>
-          <code>{t.endpoint}</code>
-          <code>
-            {t.service}.{t.operation}
-          </code>
-        </div>
-        <span className="strip-arrow" aria-hidden="true">
-          ▶
-        </span>
-        <div className={isDown(payments) ? "team down" : "team"}>
-          <div className="team-head">
-            <span className="team-name">Payments team</span>
-            {(kills.payments_worker ?? 0) > 0 && (
-              <span className="team-kills" title="kill -9 during this scene">
-                ⚡ killed {kills.payments_worker === 1 ? "once" : `${kills.payments_worker} times`}
-              </span>
-            )}
-            {ui && <Ext href={`${ui}/namespaces/${t.payments.namespace}/workflows`}>namespace ↗</Ext>}
-          </div>
-          <span className="claim-label">Payments owns:</span>
-          <ul className="owns">
-            <li>
-              namespace <code>{t.payments.namespace}</code> · task queue <code>{t.payments.task_queue}</code>
-            </li>
-            <li>
-              <code>{t.payments.workflow}</code> → <code>{t.payments.activity}</code>
-            </li>
-            <li>its own retries and timeouts</li>
-            <li>
-              idempotency key <code>refund-&lt;ticket&gt;</code>
-            </li>
-          </ul>
-          {payments && <ProcTile p={payments} />}
-        </div>
+        {support && <ProcTile p={support} kills={kills.support_worker} />}
       </div>
-      <p className="claim-note">
-        Support names one endpoint and one operation. The endpoint maps to payments' namespace and queue in its own config,
-        not in support's code.
-      </p>
-    </>
+      <span className="strip-arrow" aria-hidden="true">
+        ▶
+      </span>
+      <div className={isDown(temporal) ? "endpoint-card down" : "endpoint-card"}>
+        <span className="headline-label">
+          {isDown(temporal) ? (
+            <>
+              ⚡ Temporal server down
+              <br />
+              {kills.temporal ? "killed during this run" : " "}
+            </>
+          ) : (
+            <>Nexus endpoint</>
+          )}
+        </span>
+        <code>{t.endpoint}</code>
+      </div>
+      <span className="strip-arrow" aria-hidden="true">
+        ▶
+      </span>
+      <div className={isDown(payments) ? "team down" : "team"}>
+        <div className="team-head">
+          <span className="team-name">Payments team</span>
+          {(kills.payments_worker ?? 0) > 0 && (
+            <span className="team-kills" title="kill -9 during this scene">
+              ⚡ killed {kills.payments_worker === 1 ? "once" : `${kills.payments_worker} times`}
+            </span>
+          )}
+          {ui && <Ext href={`${ui}/namespaces/${t.payments.namespace}/workflows`}>namespace ↗</Ext>}
+        </div>
+        <span className="claim-line">Owns everything behind it: queue, workflow, retries</span>
+        {payments && <ProcTile p={payments} />}
+      </div>
+    </div>
   );
 }
 
@@ -133,7 +107,6 @@ export function NexusPanel({
 
   // This run's tickets, by the ledger (audit), never by the lane's own state.
   const scene = ran ? sceneTickets(ledgerTickets) : [];
-  const denied = scene.filter(([, v]) => v === "declined" || v === "rejected");
   const paidOnce = scene.filter(([, v]) => v === "ok").length;
   const paidTwice = scene.filter(([, v]) => v === "duplicate").length;
   const missing = scene.filter(([, v]) => v === "missing").length;
@@ -156,12 +129,7 @@ export function NexusPanel({
         <NexusTimeline rows={rows} t0={t0} now={now} faults={faults} temporalUi={temporalUi} />
         <div className="timeline-notes">
           <span>
-            {denied.length > 0
-              ? `${denied.map(([k, v]) => `${shortTicket(k)} denied ${v === "declined" ? "by policy" : "by a human"}`).join(" · ")} · no Nexus call made`
-              : " "}
-          </span>
-          <span>
-            <i className="key-dollar">$</i> booked in the ledger · support sees an error only after the 10-minute timeout
+            <i className="key-dollar">$</i> the ledger booked the refund
           </span>
         </div>
       </div>
@@ -171,10 +139,7 @@ export function NexusPanel({
           <span className="headline-label">Support saw</span>
           {show ? (
             <>
-              <b className={errors ? "n-bad" : "n-good"}>{errors}</b> error{errors === 1 ? "" : "s"}{" "}
-              <span className="muted">
-                · {rows.length} operations
-              </span>
+              <b className={errors ? "n-bad" : "n-good"}>{errors}</b> error{errors === 1 ? "" : "s"}
             </>
           ) : (
             <b className="muted">…</b>
@@ -184,25 +149,19 @@ export function NexusPanel({
           <span className="headline-label">Payments absorbed</span>
           {show ? (
             <>
-              <b>{retries}</b> retr{retries === 1 ? "y" : "ies"} <span className="muted">· on its own</span>
+              <b>{retries}</b> retr{retries === 1 ? "y" : "ies"}
             </>
           ) : (
             <b className="muted">…</b>
           )}
         </div>
-        <div>
+        <div title={calls ? `${calls.calls} calls to payments: ${calls.booked} booked, ${calls.replays} answered from the ledger` : undefined}>
           <span className="headline-label">The ledger</span>
           {show ? (
             <>
               <b className={paidTwice || missing ? "n-bad" : "n-good"}>{paidOnce}</b> paid once
               {paidTwice > 0 && <b className="n-bad"> · {paidTwice} paid twice</b>}
               {missing > 0 && <b className="n-bad"> · {missing} never paid</b>}
-              {calls && (
-                <span className="muted">
-                  {" "}
-                  · {calls.calls} calls: {calls.booked} booked, {calls.replays} replayed
-                </span>
-              )}
             </>
           ) : (
             <b className="muted">…</b>

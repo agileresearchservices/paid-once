@@ -2,22 +2,20 @@ import { OUTCOME_GLYPH } from "./outcomes";
 import type { FaultWindow, NexusRow, RefundAttempt } from "./types";
 import { shortTicket, workflowLink } from "./nexusLinks";
 
-// The Nexus scene over time. x = seconds since the scene started, on an axis fixed at 0-30 s (it only grows if a
-// run takes longer), so bars grow into it with the clock and nothing rescales. Each approved ticket gets two
-// thin tracks: what support's code sees (the caller's Nexus operation: one calm bar) and what payments does about it
-// (the refund activity's attempts, with the moment the ledger booked the money). Each track's words sit in a status
-// column on the right; the details of an attempt are on hover. Above them, one row per failure the scene
-// injects, in the order they land, each washing faintly down through the tickets it hit.
+// The Nexus scene over time. x = seconds since the scene started, on an axis fixed at 0-30 s (it only grows if a run
+// takes longer), so bars grow into it with the clock and nothing rescales. Two blocks, one word each, so the point reads
+// from across a room: SUPPORT SEES (the caller's Nexus operation per refund: one calm bar, stacked) above PAYMENTS DOES
+// (the refund activity's attempts per refund: the retries). Above both, one red bar per failure, in the order they land,
+// each washing faintly down through everything it hit. Per-refund detail is on hover and in the Temporal UI links.
 
 const W = 1400; // viewBox width; the SVG scales to the panel
-const LABEL = 196; // left column: ticket number and the two track labels
-const RIGHT = 250; // reserved on the right for each track's status text, so it never moves while a bar grows
-const FAULT_ROW = 21;
+const LABEL = 230; // left column: the block names
+const RIGHT = 190; // right column: one status per block
+const FAULT_ROW = 22;
 const TICKS = 26;
-const TRACK = 14; // thin strips: the story is the shape (one calm bar over a busy strip), the words are in the status column
-const TRACK_GAP = 4;
-const ROW_GAP = 14;
-const ROW = TRACK * 2 + TRACK_GAP + ROW_GAP;
+const BAR = 15; // one refund's bar
+const BAR_GAP = 5;
+const BLOCK_GAP = 26;
 const MIN_ROWS = 5; // the scene approves five: reserve their height so the page doesn't jump when they arrive
 const MIN_SPAN = 30; // seconds on the axis before it ever grows
 
@@ -43,15 +41,27 @@ export function NexusTimeline({ rows, t0, now, faults, temporalUi }: Props) {
   const ends = rows.flatMap((r) => [r.op_closed_at ?? now, ...r.attempts.map((a) => a.ended_at ?? now)]);
   const latest = Math.max(0, ...ends.map(t));
   const faultEnds = faults.map((f) => (f.end != null ? Math.min(f.end, now) : now)).map(t);
-  const span = Math.max(MIN_SPAN, Math.ceil(Math.max(latest, ...faultEnds) / 5) * 5);
+  const span = Math.max(MIN_SPAN, Math.ceil(Math.max(latest, ...faultEnds) / 10) * 10);
   const x = (ts: number) => LABEL + (Math.max(0, Math.min(span, t(ts))) / span) * (W - LABEL - RIGHT);
   const TOP = PLANNED.length * FAULT_ROW + TICKS;
-  const H = TOP + Math.max(MIN_ROWS, rows.length) * ROW;
+  const n = Math.max(MIN_ROWS, rows.length);
+  const BLOCK = n * (BAR + BAR_GAP);
+  const ySupport = TOP + 6;
+  const yPayments = ySupport + BLOCK + BLOCK_GAP;
+  const H = yPayments + BLOCK + 4;
   const byKey = new Map(faults.map((f) => [f.key, f]));
+  const first = rows[0];
+
+  const supportErrors = rows.filter((r) => r.caller_saw_failure || r.state === "FAILED").length;
+  const open = rows.some((r) => r.live);
+  const supportStatus =
+    rows.length === 0 ? null : supportErrors ? { cls: "bad", text: `✕ saw ${supportErrors} error${supportErrors === 1 ? "" : "s"}` } : open ? { cls: "calm", text: "no errors" } : { cls: "ok", text: `${OUTCOME_GLYPH.ok} no errors` };
+  const paymentsStatus =
+    rows.length === 0 ? null : open ? { cls: "running", text: "retrying…" } : { cls: "ok", text: `${OUTCOME_GLYPH.ok} all done` };
 
   return (
     <svg className="timeline" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Nexus operations over time">
-      {Array.from({ length: span / 5 + 1 }, (_, i) => i * 5).map((s) => (
+      {Array.from({ length: span / 10 + 1 }, (_, i) => i * 10).map((s) => (
         <g key={s} className="tick">
           <line x1={x(start + s)} x2={x(start + s)} y1={TOP - 6} y2={H} />
           <text x={x(start + s)} y={TOP - 9} textAnchor="middle">
@@ -65,19 +75,65 @@ export function NexusTimeline({ rows, t0, now, faults, temporalUi }: Props) {
       ))}
 
       {rows.length === 0 && (
-        <text className="empty" x={LABEL + 12} y={TOP + ROW}>
+        <text className="empty" x={LABEL + 12} y={ySupport + 3 * BAR}>
           {t0 == null ? "Press Run. Four failures hit refunds in flight." : "Waiting for the first approved refund…"}
         </text>
       )}
 
+      <BlockLabel
+        y={ySupport}
+        h={BLOCK}
+        text="Support sees"
+        href={historyLink(temporalUi, first, "caller")}
+      />
+      <BlockLabel y={yPayments} h={BLOCK} text="Payments does" href={historyLink(temporalUi, first, "handler")} />
+
       {rows.map((r, i) => (
-        <Ticket key={r.ticket} r={r} y={TOP + 8 + i * ROW} x={x} now={now} ui={temporalUi} />
+        <g key={r.ticket}>
+          <SupportBar r={r} y={ySupport + i * (BAR + BAR_GAP)} x={x} now={now} />
+          <PaymentsBars r={r} y={yPayments + i * (BAR + BAR_GAP)} x={x} now={now} />
+        </g>
       ))}
+
+      {supportStatus && <Status y={ySupport} h={BLOCK} {...supportStatus} />}
+      {paymentsStatus && <Status y={yPayments} h={BLOCK} {...paymentsStatus} />}
     </svg>
   );
 }
 
-// One failure: its label on the left, a solid bar for how long it lasted, and a faint wash down through the tickets.
+// The Temporal UI link for the first refund's history (the block's name opens it); null without a UI.
+function historyLink(base: string | null, r: NexusRow | undefined, side: "caller" | "handler"): string | null {
+  if (!base || !r) return null;
+  if (side === "caller") return workflowLink(base, r.caller_namespace, r.caller_workflow_id, r.caller_run_id);
+  return r.handler.namespace && r.handler.workflow_id ? workflowLink(base, r.handler.namespace, r.handler.workflow_id, r.handler.run_id) : null;
+}
+
+function BlockLabel({ y, h, text, href }: { y: number; h: number; text: string; href: string | null }) {
+  const label = (
+    <text className={href ? "block-label link" : "block-label"} x={8} y={y + h / 2 + 6}>
+      {text}
+      {href ? " ↗" : ""}
+    </text>
+  );
+  return href ? (
+    <a href={href} target="_blank" rel="noreferrer">
+      <title>Open the first refund's history in the Temporal UI</title>
+      {label}
+    </a>
+  ) : (
+    label
+  );
+}
+
+function Status({ y, h, cls, text }: { y: number; h: number; cls: string; text: string }) {
+  return (
+    <text className={`status ${cls}`} x={W - RIGHT + 16} y={y + h / 2 + 6}>
+      {text}
+    </text>
+  );
+}
+
+// One failure: its label on the left, a solid bar for how long it lasted, and a faint wash down through the refunds.
 function FaultRow({
   label,
   f,
@@ -98,109 +154,53 @@ function FaultRow({
   const live = f != null && f.start != null;
   const x0 = live ? x(f.start!) : 0;
   const x1 = live ? x(f.end != null ? Math.min(f.end, now) : now) : 0;
-  const secs = live ? Math.max(0, Math.round((f.end != null ? Math.min(f.end, now) : now) - f.start!)) : 0;
-  const what = f?.effect === "stall" ? `quiet · ${f.hit} booked` : `down${f?.end != null ? ` ${secs} s` : ""} · ${f?.hit ?? 0} in flight`;
   return (
     <g className={live ? "fault on" : "fault"}>
-      <text className="fault-label" x={8} y={y + FAULT_ROW - 5}>
+      <text className="fault-label" x={8} y={y + FAULT_ROW - 6}>
         ⚡ {label}
       </text>
       {live && (
         <>
           <rect className="fault-wash" x={x0} y={top - 6} width={Math.max(2, x1 - x0)} height={washTo - top + 6} />
-          <rect className="fault-bar" x={x0} y={y + 2} width={Math.max(2, x1 - x0)} height={FAULT_ROW - 4} rx={3} />
-          <text className="fault-text" x={x1 + 6} y={y + FAULT_ROW - 5}>
-            {what}
-          </text>
+          <rect className="fault-bar" x={x0} y={y + 3} width={Math.max(2, x1 - x0)} height={FAULT_ROW - 6} rx={3}>
+            <title>{f?.effect === "stall" ? `${label} · ${f.hit} booked` : `${label} · ${f?.hit ?? 0} in flight`}</title>
+          </rect>
         </>
       )}
     </g>
   );
 }
 
-function Ticket({ r, y, x, now, ui }: { r: NexusRow; y: number; x: (ts: number) => number; now: number; ui: string | null }) {
-  const yPay = y + TRACK + TRACK_GAP;
-  const h = r.handler;
-  return (
-    <g className="ticket-row">
-      <text className="tnum" x={8} y={y + TRACK + TRACK_GAP + 6}>
-        {shortTicket(r.ticket)}
-      </text>
-      <TrackLabel
-        x={64}
-        y={y}
-        text="support sees"
-        href={ui ? workflowLink(ui, r.caller_namespace, r.caller_workflow_id, r.caller_run_id) : null}
-      />
-      <TrackLabel
-        x={64}
-        y={yPay}
-        text="payments does"
-        href={ui && h.namespace && h.workflow_id ? workflowLink(ui, h.namespace, h.workflow_id, h.run_id) : null}
-      />
-      <SupportTrack r={r} y={y} x={x} now={now} />
-      <PaymentsTrack r={r} y={yPay} x={x} now={now} />
-    </g>
-  );
-}
-
-function TrackLabel({ x, y, text, href }: { x: number; y: number; text: string; href: string | null }) {
-  const label = (
-    <text className={href ? "track-label link" : "track-label"} x={x} y={y + TRACK - 1}>
-      {text}
-      {href ? " ↗" : ""}
-    </text>
-  );
-  return href ? (
-    <a href={href} target="_blank" rel="noreferrer">
-      <title>Open this workflow's history in the Temporal UI</title>
-      {label}
-    </a>
-  ) : (
-    label
-  );
-}
-
-// The caller's operation, exactly as support's workflow sees it: any SCHEDULED or BACKING_OFF stretch (payments
-// hadn't accepted yet), then STARTED until it closes. On a normal run that is one calm bar.
-function SupportTrack({ r, y, x, now }: { r: NexusRow; y: number; x: (ts: number) => number; now: number }) {
+// The caller's operation, exactly as support's workflow sees it: any SCHEDULED or BACKING_OFF stretch (payments hadn't
+// accepted yet), then STARTED until it closes. On a normal run that is one calm bar.
+function SupportBar({ r, y, x, now }: { r: NexusRow; y: number; x: (ts: number) => number; now: number }) {
   const end = r.op_closed_at ?? now;
   const phases = r.phases.length ? r.phases : [{ state: r.state, at: r.op_scheduled_at }];
-  const failed = r.state === "FAILED";
   const startAttempts = `${r.peak_attempt} start attempt${r.peak_attempt === 1 ? "" : "s"}`;
-  const bad = failed || r.caller_saw_failure;
-  const label = failed
-    ? `✕ FAILED · ${r.last_failure || "the operation failed"}`
-    : r.caller_saw_failure
-      ? `${r.state} · ${startAttempts} · saw: ${r.last_failure}`
-      : r.live
-        ? "STARTED · no error"
-        : `${OUTCOME_GLYPH.ok} completed · no error`;
+  const hover =
+    r.state === "FAILED"
+      ? `${shortTicket(r.ticket)} · FAILED · ${r.last_failure || "the operation failed"}`
+      : r.caller_saw_failure
+        ? `${shortTicket(r.ticket)} · ${r.state} · ${startAttempts} · saw: ${r.last_failure}`
+        : `${shortTicket(r.ticket)} · STARTED · no error`;
   return (
-    <g className="support-track">
+    <g>
       {phases.map((p, i) => {
         const from = i === 0 ? r.op_scheduled_at : p.at;
         const to = phases[i + 1]?.at ?? end;
         const cls = p.state === "STARTED" ? "seg calm" : "seg waiting";
-        return <rect key={i} className={cls} x={x(from)} y={y} width={Math.max(2, x(to) - x(from))} height={TRACK} rx={3} />;
+        return (
+          <rect key={i} className={cls} x={x(from)} y={y} width={Math.max(2, x(to) - x(from))} height={BAR} rx={2}>
+            <title>{hover}</title>
+          </rect>
+        );
       })}
-      <StatusText y={y} cls={bad ? (failed ? "bad" : "warn") : r.live ? "calm" : "ok"} text={label} />
     </g>
   );
 }
 
-// A track's words, in the column on the right.
-function StatusText({ y, cls, text }: { y: number; cls: string; text: string }) {
-  return (
-    <text className={`status ${cls}`} x={W - RIGHT + 14} y={y + TRACK - 1}>
-      <title>{text}</title>
-      {text}
-    </text>
-  );
-}
-
 // The refund activity's attempts inside payments, the wait between them, and the moment the money was booked.
-function PaymentsTrack({ r, y, x, now }: { r: NexusRow; y: number; x: (ts: number) => number; now: number }) {
+function PaymentsBars({ r, y, x, now }: { r: NexusRow; y: number; x: (ts: number) => number; now: number }) {
   const booked = r.ledger.booked_at;
   const atts = r.attempts;
   const last = atts[atts.length - 1];
@@ -208,36 +208,33 @@ function PaymentsTrack({ r, y, x, now }: { r: NexusRow; y: number; x: (ts: numbe
   const replayed = (a: RefundAttempt) => booked != null && r.ledger.replays > 0 && a.started_at > booked && a.outcome === "ok";
   const describe = (a: RefundAttempt) => {
     const secs = Math.round((a.ended_at ?? now) - a.started_at);
-    return a.outcome === "failed"
-      ? `✕ attempt ${a.n} ${timedOut(a) ? "timed out" : `failed after ${secs} s`}`
-      : a.outcome === "ok"
-        ? `${OUTCOME_GLYPH.ok} attempt ${a.n}${replayed(a) ? " · from the ledger" : ""}`
-        : `attempt ${a.n}…`;
+    const what =
+      a.outcome === "failed"
+        ? `✕ attempt ${a.n} ${timedOut(a) ? "timed out" : `failed after ${secs} s`}`
+        : a.outcome === "ok"
+          ? `${OUTCOME_GLYPH.ok} attempt ${a.n}${replayed(a) ? " · from the ledger" : ""}`
+          : `attempt ${a.n}…`;
+    return `${shortTicket(r.ticket)} · ${what}${a.failure ? ` · ${a.failure}` : ""}`;
   };
   return (
-    <g className="payments-track">
+    <g>
       {atts.slice(1).map((a, i) => {
         const prevEnd = atts[i].ended_at ?? now;
-        return <line key={`gap${a.n}`} className="gap" x1={x(prevEnd)} x2={x(a.started_at)} y1={y + TRACK / 2} y2={y + TRACK / 2} />;
+        return <line key={`gap${a.n}`} className="gap" x1={x(prevEnd)} x2={x(a.started_at)} y1={y + BAR / 2} y2={y + BAR / 2} />;
       })}
       {last && last.outcome !== "running" && last.outcome !== "ok" && r.live && (
-        <line className="gap" x1={x(last.ended_at ?? now)} x2={x(now)} y1={y + TRACK / 2} y2={y + TRACK / 2} />
+        <line className="gap" x1={x(last.ended_at ?? now)} x2={x(now)} y1={y + BAR / 2} y2={y + BAR / 2} />
       )}
       {atts.map((a) => (
-        <rect key={a.n} className={`seg ${a.outcome}`} x={x(a.started_at)} y={y} width={Math.max(2, x(a.ended_at ?? now) - x(a.started_at))} height={TRACK} rx={3}>
-          <title>{a.failure ? `${describe(a)} · ${a.failure}` : describe(a)}</title>
+        <rect key={a.n} className={`seg ${a.outcome}`} x={x(a.started_at)} y={y} width={Math.max(2, x(a.ended_at ?? now) - x(a.started_at))} height={BAR} rx={2}>
+          <title>{describe(a)}</title>
         </rect>
       ))}
-      {last ? (
-        <StatusText y={y} cls={last.outcome === "ok" ? "ok" : last.outcome === "failed" ? "failed" : "running"} text={describe(last)} />
-      ) : (
-        <StatusText y={y} cls="muted" text="not accepted yet" />
-      )}
       {booked != null && (
         <g className="booked">
-          <title>The ledger booked this refund (refund-&lt;ticket&gt;)</title>
-          <circle cx={x(booked)} cy={y + TRACK / 2} r={TRACK / 2 + 3} />
-          <text x={x(booked)} y={y + TRACK / 2 + 4} textAnchor="middle">
+          <title>{shortTicket(r.ticket)} · the ledger booked this refund (refund-&lt;ticket&gt;)</title>
+          <circle cx={x(booked)} cy={y + BAR / 2} r={BAR / 2 + 2} />
+          <text x={x(booked)} y={y + BAR / 2 + 4} textAnchor="middle">
             $
           </text>
         </g>
