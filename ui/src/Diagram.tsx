@@ -236,7 +236,6 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
               <span><LegendIcon kind="paying" /> refund in flight</span>
               <span><LegendIcon kind="failed" /> job failed</span>
               <span><LegendIcon kind="closed" /> denied</span>
-              <span className="lg-stage">⏱ slowed on purpose</span>
             </span>
           </span>
         )}
