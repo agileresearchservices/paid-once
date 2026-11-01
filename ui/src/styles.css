@@ -375,4 +375,3 @@ main.fill .pane { height: auto; min-height: 186px; }
 .beat-head { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
 .beat-head h3 { flex: 1; margin: 0; font-size: 32px; color: var(--ink); text-transform: none; letter-spacing: 0; }
 .beat-n { color: var(--accent-ink); font-size: 14px; font-weight: 600; white-space: nowrap; }
-.beat kbd { font: 12px var(--mono); margin-left: 6px; padding: 1px 6px; border: 1px solid rgba(255, 255, 255, 0.5); border-radius: 4px; }
