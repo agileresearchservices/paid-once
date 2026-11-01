@@ -7,21 +7,20 @@ Run with `make test-temporal`: it starts a throwaway Temporal server, creates th
 import asyncio
 import os
 import uuid
+from contextlib import asynccontextmanager
 
 import httpx
 import pytest
 from temporalio.worker import Worker
 
 from paidonce import config
-from paidonce.lane2.client import connect
+from paidonce.lane2.client import connect_temporal
 from paidonce.lane2.payments_activities import post_refund
 from paidonce.lane2.payments_side import PaymentsServiceHandler, RefundWorkflow
 from paidonce.lane2.support_activities import run_agent
 from paidonce.lane2.support_side import SupportTicketWorkflow, ticket_workflow_id
 from paidonce.models import ApprovalDecision, Ticket
 from paidonce.payments import ledger
-from paidonce.payments.service import app as payments_app
-from tests.helpers import Server
 
 pytestmark = pytest.mark.temporal
 
@@ -37,29 +36,34 @@ def own_temporal_server():
         )
 
 
+@asynccontextmanager
+async def both_teams_running(support, payments_ns):
+    """The support team's worker and the payments team's worker (with its Nexus handler), each on its own namespace."""
+    async with (
+        Worker(
+            support,
+            task_queue=config.SUPPORT_TASK_QUEUE,
+            workflows=[SupportTicketWorkflow],
+            activities=[run_agent],
+        ),
+        Worker(
+            payments_ns,
+            task_queue=config.PAYMENTS_TASK_QUEUE,
+            workflows=[RefundWorkflow],
+            activities=[post_refund],
+            nexus_service_handlers=[PaymentsServiceHandler()],
+        ),
+    ):
+        yield
+
+
 @pytest.fixture
-async def stack(monkeypatch):
-    with Server(payments_app) as pay:
-        monkeypatch.setattr(config, "PAYMENTS_URL", pay.url)
-        monkeypatch.setattr(config, "PAYMENTS_CLIENT_TIMEOUT_S", 1.0)
-        support = await connect(config.SUPPORT_NAMESPACE)
-        payments = await connect(config.PAYMENTS_NAMESPACE)
-        async with (
-            Worker(
-                support,
-                task_queue=config.SUPPORT_TASK_QUEUE,
-                workflows=[SupportTicketWorkflow],
-                activities=[run_agent],
-            ),
-            Worker(
-                payments,
-                task_queue=config.PAYMENTS_TASK_QUEUE,
-                workflows=[RefundWorkflow],
-                activities=[post_refund],
-                nexus_service_handlers=[PaymentsServiceHandler()],
-            ),
-        ):
-            yield support, pay
+async def stack(payments):
+    """Both teams' workers on this server; yields the support client and the payments service."""
+    support = await connect_temporal(config.SUPPORT_NAMESPACE)
+    payments_ns = await connect_temporal(config.PAYMENTS_NAMESPACE)
+    async with both_teams_running(support, payments_ns):
+        yield support, payments
 
 
 def new_ticket():
@@ -117,38 +121,22 @@ async def test_timeout_after_commit_is_one_refund(stack):
     assert len(ledger.all_refunds("lane2")) == 1
 
 
-async def test_approval_before_any_worker_is_picked_up_survives():
+async def test_approval_before_any_worker_is_picked_up_survives(payments):
     """Signal a workflow while no support worker is running; start the worker afterwards."""
-    with Server(payments_app) as pay:
-        config.PAYMENTS_URL = pay.url
-        support = await connect(config.SUPPORT_NAMESPACE)
-        payments = await connect(config.PAYMENTS_NAMESPACE)
-        t = new_ticket()
-        handle = await support.start_workflow(
-            SupportTicketWorkflow.run,
-            t,
-            id=ticket_workflow_id(t.ticket_id),
-            task_queue=config.SUPPORT_TASK_QUEUE,
-        )
-        await handle.signal(SupportTicketWorkflow.approve, ApprovalDecision(True))
-        await asyncio.sleep(1)
-        async with (
-            Worker(
-                support,
-                task_queue=config.SUPPORT_TASK_QUEUE,
-                workflows=[SupportTicketWorkflow],
-                activities=[run_agent],
-            ),
-            Worker(
-                payments,
-                task_queue=config.PAYMENTS_TASK_QUEUE,
-                workflows=[RefundWorkflow],
-                activities=[post_refund],
-                nexus_service_handlers=[PaymentsServiceHandler()],
-            ),
-        ):
-            outcome = await asyncio.wait_for(handle.result(), 30)
-        assert outcome.status == "done"
+    support = await connect_temporal(config.SUPPORT_NAMESPACE)
+    payments_ns = await connect_temporal(config.PAYMENTS_NAMESPACE)
+    t = new_ticket()
+    handle = await support.start_workflow(
+        SupportTicketWorkflow.run,
+        t,
+        id=ticket_workflow_id(t.ticket_id),
+        task_queue=config.SUPPORT_TASK_QUEUE,
+    )
+    await handle.signal(SupportTicketWorkflow.approve, ApprovalDecision(True))
+    await asyncio.sleep(1)  # nothing is polling the queue: the signal just sits in history
+    async with both_teams_running(support, payments_ns):
+        outcome = await asyncio.wait_for(handle.result(), 30)
+    assert outcome.status == "done"
 
 
 async def test_human_rejection_ends_rejected_with_no_refund(stack):

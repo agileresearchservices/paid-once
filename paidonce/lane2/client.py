@@ -22,8 +22,10 @@ from temporalio.service import RPCError, RPCStatusCode
 from paidonce import config
 from paidonce.lane2.contract import NEXUS_ENDPOINT
 
+NAMESPACE_RETENTION_S = 86400  # a dev server keeps a finished workflow's history for a day
 
-async def connect(namespace: str) -> Client:
+
+async def connect_temporal(namespace: str) -> Client:
     return await Client.connect(config.TEMPORAL_ADDRESS, namespace=namespace)
 
 
@@ -42,13 +44,13 @@ async def _wait_usable(client: Client, namespace: str, timeout_s: float = 15.0) 
 
 async def _ensure_setup() -> list[str]:
     lines: list[str] = []
-    client = await connect("default")
+    client = await connect_temporal("default")
     for ns in (config.SUPPORT_NAMESPACE, config.PAYMENTS_NAMESPACE):
         try:
             await client.workflow_service.register_namespace(
                 RegisterNamespaceRequest(
                     namespace=ns,
-                    workflow_execution_retention_period=Duration(seconds=86400),
+                    workflow_execution_retention_period=Duration(seconds=NAMESPACE_RETENTION_S),
                 )
             )
             lines.append(f"namespace {ns}: created")
@@ -72,6 +74,10 @@ async def _ensure_setup() -> list[str]:
             raise
         # An endpoint left by an older setup may point at a namespace that has since been renamed: retarget it.
         found = await client.operator_service.list_nexus_endpoints(ListNexusEndpointsRequest(name=NEXUS_ENDPOINT))
+        if not found.endpoints:  # deleted between our create and our list
+            raise RuntimeError(
+                f"nexus endpoint {NEXUS_ENDPOINT} exists but could not be listed; run setup again"
+            ) from e
         current = found.endpoints[0]
         if current.spec.target == spec.target:
             lines.append(f"nexus endpoint {NEXUS_ENDPOINT}: already there")

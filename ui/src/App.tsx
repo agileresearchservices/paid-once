@@ -42,7 +42,7 @@ function Wordmark() {
   return <img className="wordmark" src="/brand/temporal-wordmark.svg" alt="Temporal" onError={() => setMissing(true)} />;
 }
 
-// The step lives in the URL hash (#1..#8), so a refresh mid-demo stays on the same step.
+// The step lives in the URL hash (#1..#7), so a refresh mid-demo stays on the same step.
 function stepFromHash(): number {
   const n = Number(window.location.hash.slice(1));
   return Number.isInteger(n) && n >= 1 && n <= STEPS.length ? n - 1 : 0;
@@ -131,9 +131,9 @@ export function App() {
   // workflow status, payments calls) accumulates since the reset, like the numbers under it.
   const onScreen = step.scene != null && snap.current === step.scene;
   const thisRunning = running && onScreen;
-  const run = step.scene ? snap.scene_runs?.[step.scene] : undefined;
+  const run = step.scene ? snap.scene_runs[step.scene] : undefined;
   const finished = !thisRunning && run?.finished_at != null;
-  const settling = LANES.some((l) => snap.audit[l.id].in_flight + (snap.demo_audit?.[l.id]?.in_flight ?? 0) > 0);
+  const settling = LANES.some((l) => snap.audit[l.id].in_flight + (snap.demo_audit[l.id]?.in_flight ?? 0) > 0);
   const elapsed = run ? Math.max(0, Math.round(snap.now - run.started_at)) : 0;
   let status: { text: string; cls: string } | null = null;
   if (finished && run?.ok === false) status = { text: `Scene failed: ${run.error ?? "see the server log"}`, cls: "fail" };
@@ -148,7 +148,7 @@ export function App() {
         </h1>
         <nav aria-label="Steps">
           {STEPS.map((s, i) => (
-            <button key={s.id} className={i === index ? "step on" : "step"} onClick={() => setIndex(i)} aria-current={i === index}>
+            <button type="button" key={s.id} className={i === index ? "step on" : "step"} onClick={() => setIndex(i)} aria-current={i === index ? "step" : undefined}>
               <b>{i + 1}</b> {s.short}
             </button>
           ))}
@@ -177,16 +177,16 @@ export function App() {
         </div>
         <div className="controls">
           {step.scene && (
-            <button className="primary" disabled={running || !!locked} onClick={() => void act(`/api/scenes/${step.scene}/run`)}>
+            <button type="button" className="primary" disabled={running || !!locked} onClick={() => void act(`/api/scenes/${step.scene}/run`)}>
               {locked ? "Locked by the test run" : thisRunning ? `Running ${elapsed}s…` : running ? "Another scene is running" : finished ? "Run again" : step.runLabel ?? "Run this scene"}
             </button>
           )}
           {status && <p className={`scene-status ${status.cls}`} role="status">{status.text}</p>}
           <div className="nav">
-            {index > 0 && <button onClick={() => go(-1)}>← Back</button>}{/* nothing to go back to on page 1 */}
-            <button onClick={() => go(1)} disabled={index === STEPS.length - 1}>Next →</button>
+            {index > 0 && <button type="button" onClick={() => go(-1)}>← Back</button>}{/* nothing to go back to on step 1 */}
+            <button type="button" onClick={() => go(1)} disabled={index === STEPS.length - 1}>Next →</button>
           </div>
-          <button className={confirmReset ? "danger" : ""} onClick={onReset} disabled={!!locked}>
+          <button type="button" className={confirmReset ? "danger" : ""} onClick={onReset} disabled={!!locked}>
             {confirmReset ? "Click again to reset" : "Reset scoreboard"}
           </button>
           {error && <p className="fail" role="alert">{error}</p>}
@@ -203,11 +203,11 @@ export function App() {
           finished={finished}
           now={snap.now}
           ledgerTickets={{ ...(snap.audit.lane2.tickets ?? {}), ...(snap.demo_audit?.lane2?.tickets ?? {}) }}
-          calls={onScreen ? snap.payments_calls?.lane2 : undefined}
+          calls={onScreen ? snap.payments_calls.lane2 : undefined}
         />
       )}
 
-      {/* Page 1 leads with the walkthrough (customer, agent, human), then the architecture it runs on. */}
+      {/* Step 1 leads with the walkthrough (customer, agent, human), then the architecture it runs on. */}
       {step.arch && <Walkthrough beat={beat} flow={onScreen ? snap.flow : undefined} />}
 
       {(step.arch || (step.scene && !step.nexus)) && <Diagram snap={snap} scene={step.scene} />}
@@ -224,7 +224,7 @@ export function App() {
                   <div className="believes">
                     <span className="muted">{l.id === "lane1" ? "Job table:" : "Workflow status:"}</span>{" "}
                     <Chips counts={l.id === "lane1" ? snap.lane1_view_all : snap.lane2_view_all} empty="nothing yet" />
-                    <PaymentsCalls c={snap.payments_calls_all?.[l.id]} />
+                    <PaymentsCalls c={snap.payments_calls_all[l.id]} />
                   </div>
                 </div>
               ) : (
@@ -243,8 +243,6 @@ export function App() {
           ))}
         </div>
       )}
-
-      {/* Scene steps show faults on the diagram, so the event log only appears on the scoreboard. */}
     </main>
   );
 }

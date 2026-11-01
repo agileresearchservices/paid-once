@@ -7,6 +7,7 @@ import json
 import os
 import signal
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
@@ -39,32 +40,44 @@ async def lifespan(_: FastAPI):
     config.ensure_data_dir()
     audit.init()
     procs = ProcessManager()
-    note = await asyncio.to_thread(procs.ensure_temporal)
-    setup_notes = await asyncio.to_thread(ensure_setup)
-    engine = Engine(procs)
-    state.update(procs=procs, engine=engine)
-    if config.PAYMENTS_TLS or config.LANE1_TLS:
-        await asyncio.to_thread(tls.ensure_certs)  # before any process starts, so every caller finds the certificate
-    procs.start_all()
-    ready = await asyncio.to_thread(procs.wait_ready)
-    await asyncio.sleep(2.0)  # let the workers register their pollers
-    await engine.reset()  # a demo starts from zero, not from the last session's scoreboard
-    engine.emit("boot", note)
-    for line in setup_notes:
-        engine.emit("boot", line)
-    engine.emit("boot", "services ready" if ready else "services are slow to start")
-
-    async def refresher() -> None:
-        while True:
-            await engine.refresh_views()
-            await asyncio.sleep(1.0)
-
-    task = asyncio.create_task(refresher())
-    try:
+    task: asyncio.Task | None = None
+    try:  # from here on, a failed startup must still stop whatever has already started
+        note = await asyncio.to_thread(procs.ensure_temporal)
+        setup_notes = await asyncio.to_thread(ensure_setup)
+        engine = Engine(procs)
+        state.update(procs=procs, engine=engine)
+        if config.PAYMENTS_TLS or config.LANE1_TLS:
+            await asyncio.to_thread(
+                tls.ensure_certs
+            )  # before any process starts, so every caller finds the certificate
+        procs.start_all()
+        ready = await asyncio.to_thread(procs.wait_ready)
+        await asyncio.sleep(2.0)  # let the workers register their pollers
+        await engine.reset()  # a demo starts from zero, not from the last session's scoreboard
+        engine.emit("boot", note)
+        for line in setup_notes:
+            engine.emit("boot", line)
+        engine.emit("boot", "services ready" if ready else "services are slow to start")
+        task = asyncio.create_task(_refresh_forever(engine))
         yield
     finally:
-        task.cancel()
+        if task:
+            task.cancel()
         procs.stop_all()
+
+
+async def _refresh_forever(engine: Engine) -> None:
+    """Keep the live views fresh. One failed refresh (a Temporal blip, say) must not freeze the page for good."""
+    last_error = ""
+    while True:
+        try:
+            await engine.refresh_views()
+            last_error = ""
+        except Exception as exc:
+            if repr(exc) != last_error:  # say it once, not every second
+                last_error = repr(exc)
+                engine.emit("error", f"refreshing the live views failed: {last_error[:120]}")
+        await asyncio.sleep(1.0)
 
 
 app = FastAPI(title="Paid Once", lifespan=lifespan)
@@ -112,13 +125,29 @@ async def kill(proc: str, request: Request) -> dict:
     return {"killed": procs.kill(proc, 4.0)}
 
 
+def spa_response(root: Path, path: str) -> FileResponse:
+    """A file under `root`, else the app's index.html for the in-page router.
+
+    Never a file outside `root` (a `..` in the path), and never index.html for an API path or a missing asset:
+    those are a 404, so a typo doesn't look like a working endpoint.
+    """
+    if path.startswith("api/"):
+        raise HTTPException(404, "no such endpoint")
+    root = root.resolve()
+    candidate = (root / path).resolve()
+    if path and candidate.is_relative_to(root) and candidate.is_file():
+        return FileResponse(candidate)
+    if path.startswith("brand/"):  # the optional, gitignored logo and favicon
+        raise HTTPException(404, "not found")
+    return FileResponse(root / "index.html")
+
+
 if UI_DIST.exists():
     app.mount("/assets", StaticFiles(directory=UI_DIST / "assets"), name="assets")
 
     @app.get("/{path:path}")
-    def spa(path: str):
-        candidate = UI_DIST / path
-        return FileResponse(candidate if path and candidate.is_file() else UI_DIST / "index.html")
+    def spa(path: str) -> FileResponse:
+        return spa_response(UI_DIST, path)
 
 
 def main() -> None:

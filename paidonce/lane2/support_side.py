@@ -19,6 +19,11 @@ with workflow.unsafe.imports_passed_through():
         TicketOutcome,
     )
 
+# One model call has to finish well inside this (see LLM_TIMEOUT_S in paidonce/agent.py).
+AGENT_START_TO_CLOSE = timedelta(seconds=60)
+# How long support waits for payments to answer the Nexus operation, retries included.
+NEXUS_SCHEDULE_TO_CLOSE = timedelta(minutes=10)
+
 
 def ticket_workflow_id(ticket_id: str) -> str:
     return f"ticket-{ticket_id}"
@@ -43,7 +48,7 @@ class SupportTicketWorkflow:
             "run_agent",
             ticket,
             result_type=Proposal,
-            start_to_close_timeout=timedelta(seconds=60),
+            start_to_close_timeout=AGENT_START_TO_CLOSE,
             retry_policy=RetryPolicy(
                 initial_interval=timedelta(seconds=1),
                 maximum_interval=timedelta(seconds=10),
@@ -62,14 +67,14 @@ class SupportTicketWorkflow:
         if not self._decision.approved:
             self._state = "rejected"
             return TicketOutcome(ticket.ticket_id, "rejected", detail="human said no", events=self._events)
-        self._events.append(f"approved by {self._decision.approver}")
+        self._events.append("approved by a human")
 
         self._state = "refunding"
         nexus = workflow.create_nexus_client(service=PaymentsService, endpoint=NEXUS_ENDPOINT)
         result = await nexus.execute_operation(
             PaymentsService.issue_refund,
             RefundRequest(ticket.ticket_id, proposal.amount_cents),
-            schedule_to_close_timeout=timedelta(minutes=10),
+            schedule_to_close_timeout=NEXUS_SCHEDULE_TO_CLOSE,
         )
         self._refund_id = result.refund_id
         self._events.append(f"refund {result.refund_id} issued")

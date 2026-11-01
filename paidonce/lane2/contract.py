@@ -8,7 +8,7 @@ import nexusrpc
 
 from paidonce.models import RefundRequest, RefundResult
 
-NEXUS_ENDPOINT = "payments-endpoint"  # mirrored in paidonce/config.py
+NEXUS_ENDPOINT = "payments-endpoint"
 
 
 @nexusrpc.service

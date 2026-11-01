@@ -1,4 +1,5 @@
-// Shape of Engine.snapshot() in paidonce/show/engine.py, streamed from /api/stream.
+// Shape of the snapshot streamed from /api/stream: Engine.snapshot() in paidonce/show/engine.py, plus `locked`
+// from paidonce/show/server.py.
 
 export type LaneId = "lane1" | "lane2";
 
@@ -29,7 +30,7 @@ export interface ProcStatus {
 
 export interface ShowEvent {
   ts: number;
-  kind: string; // boot | scene | human | fault | scene_done | reset | note | error
+  kind: "boot" | "reset" | "submit" | "scene" | "human" | "fault" | "kill" | "restart" | "scene_done" | "note" | "error";
   msg: string;
   scene?: string;
   ok?: boolean; // scene_done only
@@ -47,13 +48,9 @@ export interface FlowDot {
 
 // The payments side, read by the dashboard straight from the payments namespace. Support never sees it.
 export interface NexusHandler {
-  workflow_id?: string;
-  run_id?: string;
-  namespace?: string;
   status?: string;
   activity_attempt?: number;
   peak_activity_attempt?: number;
-  activity_failure?: string;
 }
 
 // One attempt of the refund activity inside payments. Times are epoch seconds.
@@ -69,22 +66,13 @@ export interface RefundAttempt {
 export interface NexusRow {
   ticket: string;
   live: boolean;
-  caller_workflow_id: string;
-  caller_run_id: string;
-  caller_namespace: string;
   handler: NexusHandler;
-  endpoint: string;
-  service: string;
-  operation: string;
-  state: string;
-  attempt: number; // start attempts on the caller side, not activity retries
-  peak_attempt: number;
+  state: string; // the caller's operation state (STARTED while payments retries), or COMPLETED / FAILED once closed
   last_failure: string;
   caller_saw_failure: boolean;
-  // The timeline: what support saw over time, what payments did, and what the ledger says.
-  op_scheduled_at: number;
-  op_closed_at: number | null;
-  phases: { state: string; at: number }[]; // the caller's operation state, each time it changed
+  attempt: number; // support's own start attempts of the operation (not payments' retries); read by `make scenario`
+  peak_attempt: number;
+  // What payments did (every attempt of the refund activity) and what the ledger says.
   attempts: RefundAttempt[];
   ledger: { calls: number; replays: number; booked_at: number | null };
 }
@@ -112,7 +100,7 @@ export interface SceneRun {
   ok: boolean | null;
   error?: string | null; // why the scene failed, when ok is false
   kills: Record<string, number>; // kill -9s during this run, by process
-  faults?: FaultWindow[]; // the failures this run injected, each with its window (the Nexus gauntlet records these)
+  faults: FaultWindow[]; // the failures this run injected, each with its window (the Nexus gauntlet records these)
 }
 
 // One injected failure: when it started and ended (null while it lasts), and how many refunds were in flight.
@@ -130,15 +118,12 @@ export interface Snapshot {
   running: boolean;
   current: string | null;
   scene_runs: Record<string, SceneRun>; // last run of each scene since the last reset
-  scenes: { id: string; title: string }[];
   audit: Record<LaneId, LaneAudit>;
   demo_audit: Record<LaneId, LaneAudit>; // the walkthrough's ticket, scored on its own and left out of `audit`
   processes: Record<string, ProcStatus>;
   events: ShowEvent[];
   nexus: NexusRow[];
-  lane1_view: Record<string, number>; // this scene's tickets, by the queue's own job table
   lane1_view_all: Record<string, number>; // every ticket since reset, by the queue's own job table
-  lane2_view: Record<string, number>;
   lane2_view_all: Record<string, number>; // every Lane 2 workflow since reset, by its Temporal status
   faults: Partial<Record<LaneId, FaultState>>;
   // This scene's calls to payments, counted by payments: booked = new ledger rows, replays = answered from the key.
@@ -146,7 +131,6 @@ export interface Snapshot {
   payments_calls_all: Partial<Record<LaneId, { calls: number; booked: number; replays: number }>>; // since reset
   flow: Record<LaneId, FlowDot[]>; // this scene's tickets only
   beat: { scene: string; id: string; at: number } | null; // the walkthrough step on screen
-  temporal_ui: string | null; // Temporal Web UI base URL, or null when it is not answering
   topology: Topology;
   locked: string | null; // what owns the server's controls (`make scenario`), or null for a normal show
 }

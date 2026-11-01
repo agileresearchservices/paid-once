@@ -1,10 +1,11 @@
-"""Run the real payments service on a free port inside the test process."""
+"""Test helpers: a real service on a free port inside the test process, and polling instead of sleeping."""
 
 from __future__ import annotations
 
 import socket
 import threading
 import time
+from collections.abc import Callable
 
 import httpx
 import uvicorn
@@ -51,3 +52,12 @@ def drain(worker, max_jobs: int = 50) -> int:
     while n < max_jobs and worker.run_one():
         n += 1
     return n
+
+
+def wait_until(condition: Callable[[], object], timeout: float = 5.0, interval: float = 0.05) -> None:
+    """Poll until `condition()` is truthy. A fixed sleep either wastes time or flakes on a loaded machine."""
+    deadline = time.monotonic() + timeout
+    while not condition():
+        if time.monotonic() > deadline:
+            raise AssertionError(f"condition not met within {timeout}s")
+        time.sleep(interval)

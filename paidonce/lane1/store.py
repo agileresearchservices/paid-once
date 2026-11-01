@@ -10,12 +10,16 @@ import json
 import time
 
 from paidonce import config
-from paidonce.db import connect
+from paidonce.db import connect, ensure_schema, transaction
+from paidonce.models import DEFAULT_ORDER_AGE_DAYS
+
+# Statuses from which a ticket has been approved: the human's "yes" is in, whether or not the refund has landed.
+APPROVED_STATES = ("approved", "executing", "done")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS tickets (
   ticket_id TEXT PRIMARY KEY, customer TEXT, order_id TEXT, amount_cents INTEGER, message TEXT,
-  order_age_days INTEGER NOT NULL DEFAULT 3,
+  order_age_days INTEGER NOT NULL,
   status TEXT NOT NULL, proposal TEXT, refund_id TEXT, detail TEXT DEFAULT '',
   created_at REAL NOT NULL, updated_at REAL NOT NULL
 );
@@ -30,23 +34,16 @@ CREATE TABLE IF NOT EXISTS job_log (
 
 
 def init() -> None:
-    with connect(config.LANE1_DB) as conn:
-        conn.executescript(SCHEMA)
-        # data/lane1.db outlives code changes: add columns that came after the table was made.
-        cols = {r["name"] for r in conn.execute("PRAGMA table_info(tickets)")}
-        if "order_age_days" not in cols:
-            conn.execute("ALTER TABLE tickets ADD COLUMN order_age_days INTEGER NOT NULL DEFAULT 3")
+    ensure_schema(config.LANE1_DB, SCHEMA)
 
 
 def create_ticket(ticket: dict) -> bool:
     """Insert a ticket and enqueue its first job. Returns False if it already exists."""
     init()
     now = time.time()
-    with connect(config.LANE1_DB) as conn:
-        conn.execute("BEGIN IMMEDIATE")
+    with transaction(config.LANE1_DB) as conn:
         exists = conn.execute("SELECT 1 FROM tickets WHERE ticket_id = ?", (ticket["ticket_id"],)).fetchone()
         if exists:
-            conn.execute("COMMIT")
             return False
         conn.execute(
             "INSERT INTO tickets (ticket_id, customer, order_id, amount_cents, message, order_age_days, status, "
@@ -57,7 +54,7 @@ def create_ticket(ticket: dict) -> bool:
                 ticket["order_id"],
                 ticket["amount_cents"],
                 ticket["message"],
-                ticket.get("order_age_days", 3),
+                ticket.get("order_age_days", DEFAULT_ORDER_AGE_DAYS),
                 now,
                 now,
             ),
@@ -66,7 +63,6 @@ def create_ticket(ticket: dict) -> bool:
             "INSERT INTO jobs (kind, ticket_id, available_at) VALUES ('decide', ?, ?)",
             (ticket["ticket_id"], now),
         )
-        conn.execute("COMMIT")
     return True
 
 
@@ -115,15 +111,12 @@ def approve(ticket_id: str) -> str:
     """Human approval. Returns accepted | not_ready | unknown | already."""
     init()
     now = time.time()
-    with connect(config.LANE1_DB) as conn:
-        conn.execute("BEGIN IMMEDIATE")
+    with transaction(config.LANE1_DB) as conn:
         row = conn.execute("SELECT status FROM tickets WHERE ticket_id = ?", (ticket_id,)).fetchone()
         if row is None:
-            conn.execute("COMMIT")
             return "unknown"
         if row["status"] != "awaiting_approval":
-            conn.execute("COMMIT")
-            return "already" if row["status"] in ("approved", "executing", "done") else "not_ready"
+            return "already" if row["status"] in APPROVED_STATES else "not_ready"
         conn.execute(
             "UPDATE tickets SET status = 'approved', updated_at = ? WHERE ticket_id = ?",
             (now, ticket_id),
@@ -132,7 +125,6 @@ def approve(ticket_id: str) -> str:
             "INSERT INTO jobs (kind, ticket_id, available_at) VALUES ('execute', ?, ?)",
             (ticket_id, now),
         )
-        conn.execute("COMMIT")
     return "accepted"
 
 
@@ -140,44 +132,43 @@ def reject(ticket_id: str) -> str:
     """Human denial. Closes the row at the API: no job is queued, so nothing can re-drive it.
     Returns accepted | not_ready | unknown | already | approved."""
     init()
-    with connect(config.LANE1_DB) as conn:
-        conn.execute("BEGIN IMMEDIATE")
+    with transaction(config.LANE1_DB) as conn:
         row = conn.execute("SELECT status FROM tickets WHERE ticket_id = ?", (ticket_id,)).fetchone()
         if row is None:
-            conn.execute("COMMIT")
             return "unknown"
         if row["status"] != "awaiting_approval":
-            conn.execute("COMMIT")
             if row["status"] == "rejected":
                 return "already"
-            return "approved" if row["status"] in ("approved", "executing", "done") else "not_ready"
+            return "approved" if row["status"] in APPROVED_STATES else "not_ready"
         conn.execute(
             "UPDATE tickets SET status = 'rejected', detail = 'denied by a human', updated_at = ? WHERE ticket_id = ?",
             (time.time(), ticket_id),
         )
-        conn.execute("COMMIT")
     return "accepted"
+
+
+_NEXT_JOB = (
+    "SELECT * FROM jobs WHERE available_at <= ? AND (lease_until IS NULL OR lease_until < ?) ORDER BY job_id LIMIT 1"
+)
 
 
 def claim_job() -> dict | None:
     """Claim the next visible job and hide it for the visibility timeout."""
     init()
     now = time.time()
+    # Four threads poll every fraction of a second: look with a plain read first, and take the write lock only
+    # when there is something to claim.
     with connect(config.LANE1_DB) as conn:
-        conn.execute("BEGIN IMMEDIATE")
-        row = conn.execute(
-            "SELECT * FROM jobs WHERE available_at <= ? AND (lease_until IS NULL OR lease_until < ?) "
-            "ORDER BY job_id LIMIT 1",
-            (now, now),
-        ).fetchone()
+        if conn.execute(_NEXT_JOB, (now, now)).fetchone() is None:
+            return None
+    with transaction(config.LANE1_DB) as conn:
+        row = conn.execute(_NEXT_JOB, (now, now)).fetchone()  # another worker may have taken it meanwhile
         if row is None:
-            conn.execute("COMMIT")
             return None
         conn.execute(
             "UPDATE jobs SET lease_until = ?, attempts = attempts + 1 WHERE job_id = ?",
             (now + config.VISIBILITY_TIMEOUT_S, row["job_id"]),
         )
-        conn.execute("COMMIT")
     return dict(row)
 
 
@@ -203,8 +194,7 @@ def redeliver(n: int) -> int:
     """Chaos: the broker delivers some recent execute jobs a second time (at-least-once)."""
     init()
     now = time.time()
-    with connect(config.LANE1_DB) as conn:
-        conn.execute("BEGIN IMMEDIATE")
+    with transaction(config.LANE1_DB) as conn:
         rows = conn.execute(
             "SELECT DISTINCT ticket_id FROM jobs WHERE kind = 'execute' "
             "UNION SELECT ticket_id FROM (SELECT ticket_id FROM job_log WHERE kind = 'execute' ORDER BY id DESC LIMIT ?)",
@@ -216,7 +206,6 @@ def redeliver(n: int) -> int:
                 "INSERT INTO jobs (kind, ticket_id, available_at) VALUES ('execute', ?, ?)",
                 (ticket_id, now),
             )
-        conn.execute("COMMIT")
     return len(picked)
 
 

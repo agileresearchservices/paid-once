@@ -1,6 +1,5 @@
 // The deck: one step per scene, in order, then the scoreboard, then the Nexus page on its own (the scoreboard doesn't
 // count it). `scene` is the show-server scene id.
-// Talk-track material that doesn't fit on screen lives in drafts/talk-track.md (private).
 
 export interface Step {
   id: string;
@@ -76,7 +75,7 @@ export const STEPS: Step[] = [
     id: "payments_timeout",
     scene: "payments_timeout",
     short: "Payments quiet",
-    title: "Payments books it, then goes quiet",
+    title: "Payments pays it, then goes quiet",
     story: "Payments saves the refund, but the reply never arrives. Both stacks retry.",
     watch: "Which retries does the ledger recognise?",
     result: "Temporal reuses the ticket's key: answered from the ledger. Queue + LangGraph sends a new key: paid again.",

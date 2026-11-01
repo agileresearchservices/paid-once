@@ -40,12 +40,10 @@ PAYMENTS_URL = os.environ.get(
 LANE1_URL = os.environ.get("PAIDONCE_LANE1_URL", f"{'https' if LANE1_TLS else 'http'}://127.0.0.1:{LANE1_PORT}")
 
 TEMPORAL_ADDRESS = os.environ.get("TEMPORAL_ADDRESS", "127.0.0.1:7233")
-TEMPORAL_UI_URL = os.environ.get("TEMPORAL_UI_URL", "http://127.0.0.1:8233")
 SUPPORT_NAMESPACE = os.environ.get("PAIDONCE_SUPPORT_NS", "support")
 PAYMENTS_NAMESPACE = os.environ.get("PAIDONCE_PAYMENTS_NS", "payments")
 SUPPORT_TASK_QUEUE = "support-agent"
 PAYMENTS_TASK_QUEUE = "payments-nexus"
-NEXUS_ENDPOINT = "payments-endpoint"  # keep in sync with paidonce.lane2.contract.NEXUS_ENDPOINT
 
 # The model is a real Anthropic model by default. Tests set PAIDONCE_STUB_LLM=1.
 MODEL = os.environ.get("PAIDONCE_MODEL", "claude-sonnet-5-5")

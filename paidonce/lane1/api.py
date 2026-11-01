@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from paidonce import config, tls
 from paidonce.lane1 import store
+from paidonce.models import DEFAULT_ORDER_AGE_DAYS
 
 
 @asynccontextmanager
@@ -26,7 +27,7 @@ class TicketBody(BaseModel):
     order_id: str
     amount_cents: int
     message: str
-    order_age_days: int = 3
+    order_age_days: int = DEFAULT_ORDER_AGE_DAYS
 
 
 class RedeliverBody(BaseModel):
@@ -47,14 +48,6 @@ def submit(body: TicketBody) -> dict:
 @app.get("/tickets")
 def tickets() -> list[dict]:
     return store.list_tickets()
-
-
-@app.get("/tickets/{ticket_id}")
-def get_ticket(ticket_id: str) -> dict:
-    ticket = store.get_ticket(ticket_id)
-    if ticket is None:
-        raise HTTPException(404, "unknown ticket")
-    return ticket
 
 
 @app.post("/tickets/{ticket_id}/approve")

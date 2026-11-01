@@ -2,23 +2,13 @@ import threading
 import time
 
 import httpx
-import pytest
 from fastapi.testclient import TestClient
 
 from paidonce import audit, config
 from paidonce.lane1 import api, store
 from paidonce.lane1.worker import Worker
 from paidonce.payments import ledger
-from paidonce.payments.service import app as payments_app
-from tests.helpers import Server, drain
-
-
-@pytest.fixture
-def payments(monkeypatch):
-    with Server(payments_app) as srv:
-        monkeypatch.setattr(config, "PAYMENTS_URL", srv.url)
-        monkeypatch.setattr(config, "PAYMENTS_CLIENT_TIMEOUT_S", 1.0)
-        yield srv
+from tests.helpers import drain, wait_until
 
 
 def submit(tid="t1", amount=2500):
@@ -119,11 +109,9 @@ def test_crash_after_commit_then_recovery_double_refunds(payments, monkeypatch):
     # Run the execute job on a thread we then abandon, the way kill -9 abandons a process.
     t = threading.Thread(target=first.run_one, daemon=True)
     t.start()
-    time.sleep(0.4)  # payments has committed; the client is still waiting on the stalled response
-    assert len(ledger.all_refunds("lane1")) == 1
-    time.sleep(0.4)  # lease expires; a fresh worker (empty memory) picks the job up
-    restarted = Worker()
-    restarted.run_one()
+    wait_until(lambda: len(ledger.all_refunds("lane1")) == 1)  # payments has committed; the client still waits
+    restarted = Worker()  # fresh memory; it can claim the job once the abandoned worker's lease expires
+    wait_until(restarted.run_one)
     assert store.get_ticket("t1")["status"] == "done"
     assert len(ledger.all_refunds("lane1")) == 2
 

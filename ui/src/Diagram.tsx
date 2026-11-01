@@ -27,11 +27,11 @@ const NODES: Record<string, Box> = {
   helpdesk: { x: 2, y: ROW.lane1, w: 116, h: ROW.lane2 + NODE_H - ROW.lane1, title: "Helpdesk", sub: "support tickets" },
   lane1_api: { x: 158, y: ROW.lane1, w: 180, h: NODE_H, title: "Queue API", sub: "jobs table (SQLite)", proc: "lane1_api" },
   lane1_worker: { x: 378, y: ROW.lane1, w: 236, h: NODE_H, title: "Queue worker", sub: "agent · state in memory", note: "policy rules, then Claude", proc: "lane1_worker" },
-  temporal: { x: 158, y: ROW.lane2, w: 180, h: NODE_H, title: "Temporal server", sub: "durable history" },
+  temporal: { x: 158, y: ROW.lane2, w: 180, h: NODE_H, title: "Temporal server", sub: "durable history", proc: "temporal" },
   support_worker: { x: 378, y: ROW.lane2, w: 236, h: NODE_H, title: "Support worker", sub: "agent · SupportTicketWorkflow", note: "policy rules, then Claude", proc: "support_worker" },
   endpoint: { x: 650, y: ROW.lane2, w: 150, h: NODE_H, title: "Nexus endpoint", sub: "payments-endpoint" },
   payments_worker: { x: 860, y: ROW.lane2, w: 210, h: NODE_H, title: "Payments worker", sub: "RefundWorkflow", proc: "payments_worker" },
-  payments: { x: 1170, y: ROW.lane1, w: 294, h: ROW.lane2 + NODE_H - ROW.lane1, title: "Payments service + ledger", sub: "the audit reads this ledger", proc: "payments" },
+  payments: { x: 1170, y: ROW.lane1, w: 284, h: ROW.lane2 + NODE_H - ROW.lane1, title: "Payments service + ledger", sub: "the audit reads this ledger", proc: "payments" },
 };
 
 const mid = (lane: LaneId) => ROW[lane] + NODE_H / 2;
@@ -124,7 +124,7 @@ function tallyParts(statuses: string[]): TallyPart[] {
   if (n("missing")) problems.push({ text: `${n("missing")} owed`, cls: "missing" });
   if (n("unapproved")) problems.push({ text: `${n("unapproved")} unapproved`, cls: "bad" });
   if (problems.length) return problems;
-  const open = statuses.filter((x) => x === "waiting" || x === "settling").length;
+  const open = statuses.filter((x) => x === "waiting" || x === "in_flight").length;
   return n("ok") > 0 && open === 0 ? [{ text: `all ${n("ok")} paid once`, cls: "ok" }] : [];
 }
 
@@ -182,7 +182,7 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
   // Only the scene that ran last is on screen: its dots, ledger, fault marks and kill badges all go together. Any other step
   // shows a bare diagram, however recently its own scene ran.
   const onScreen = scene != null && snap.current === scene;
-  const run = onScreen && scene ? snap.scene_runs?.[scene] : undefined;
+  const run = onScreen && scene ? snap.scene_runs[scene] : undefined;
   const flow: Record<LaneId, FlowDot[]> = onScreen && snap.flow ? snap.flow : { lane1: [], lane2: [] };
 
   // Faults from this scene's latest run: where they landed, and whether they just happened.
@@ -206,9 +206,9 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
       if (d.at === "endpoint") busy.add("support_worker>endpoint");
     }
 
-  const latency = (lane: LaneId) => snap.faults?.[lane]?.latency_s ?? 0;
-  // The walkthrough's ticket is scored apart from the scoreboard, but its dot still belongs on page 1's ledger.
-  const audit = (lane: LaneId) => ({ ...(snap.audit[lane]?.tickets ?? {}), ...(snap.demo_audit?.[lane]?.tickets ?? {}) });
+  const latency = (lane: LaneId) => snap.faults[lane]?.latency_s ?? 0;
+  // The walkthrough's ticket is scored apart from the scoreboard, but its dot still belongs on step 1's ledger.
+  const audit = (lane: LaneId) => ({ ...(snap.audit[lane]?.tickets ?? {}), ...(snap.demo_audit[lane]?.tickets ?? {}) });
 
   return (
     <section className="diagram" aria-label="Architecture, with where each fault lands">
@@ -309,9 +309,9 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
               <text className="n-title" x={b.x + 14} y={b.y + 22}>{b.title}</text>
               <text className="n-sub" x={b.x + 14} y={b.y + 40}>{b.sub}</text>
               {b.note && !down && <text className="n-sub" x={b.x + 14} y={b.y + 60}>{b.note}</text>}
-              {p && !down && (
-                <text className="n-state" x={b.x + b.w - 12} y={b.y + 22} textAnchor="end">UP</text>
-              )}
+              {/* Health dot: green while the process is up, red while it is down (the node and its DOWN badge agree).
+                  No dot for a Temporal server the show did not start: it cannot be killed, so it has no status here. */}
+              {p && <circle className={down ? "n-dot bad" : "n-dot"} cx={b.x + b.w - 14} cy={b.y + 17} r={3.5} />}
               {/* Down gets its own solid badge on the node's bottom strip: on the title line it ran into the title */}
               {down && (
                 <g className="n-down">

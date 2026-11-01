@@ -143,7 +143,8 @@ def test_urls_default_to_https():
     assert config.LANE1_URL.startswith("https://")
 
 
-def test_lane1_refund_goes_over_https(https_payments):
+@pytest.mark.usefixtures("https_payments")
+def test_lane1_refund_goes_over_https():
     audit.record_ticket("lane1", "t1", "test", 2500)
     assert call_payments("t1", 2500)
     assert len(ledger.all_refunds("lane1")) == 1

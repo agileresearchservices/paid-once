@@ -14,7 +14,7 @@ import subprocess
 import sys
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from paidonce import config
 
@@ -33,9 +33,6 @@ class Proc:
     popen: subprocess.Popen | None = None
     restart_at: float | None = None
     starts: int = 0
-    external: bool = False  # not ours to start or kill (e.g. a Temporal server already running)
-    started_at: float = 0.0
-    log: list[str] = field(default_factory=list)
 
 
 class ProcessManager:
@@ -58,6 +55,7 @@ class ProcessManager:
             ),
         }
         self._stop = threading.Event()
+        self._lock = threading.Lock()  # the watcher thread restarts processes while the loop kills and stops them
         self._thread = threading.Thread(target=self._watch, daemon=True)
 
     # -- lifecycle ---------------------------------------------------------
@@ -107,7 +105,6 @@ class ProcessManager:
             start_new_session=True,
         )
         p.starts += 1
-        p.started_at = time.time()
         p.restart_at = None
 
     def start_all(self) -> None:
@@ -117,9 +114,10 @@ class ProcessManager:
         self._thread.start()
 
     def stop_all(self) -> None:
-        self._stop.set()
-        for p in self.procs.values():
-            self._terminate(p)
+        with self._lock:  # after this, the watcher can no longer start anything
+            self._stop.set()
+            for p in self.procs.values():
+                self._terminate(p)
 
     @staticmethod
     def _terminate(p: Proc) -> None:
@@ -133,27 +131,39 @@ class ProcessManager:
     def kill(self, name: str, restart_after: float = 4.0) -> bool:
         """kill -9 a process. It comes back after `restart_after` seconds."""
         p = self.procs[name]
-        if p.popen is None or p.popen.poll() is not None:
-            return False
-        try:
-            os.killpg(p.popen.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            return False
-        p.restart_at = time.time() + restart_after
+        with self._lock:
+            if p.popen is None or p.popen.poll() is not None:
+                return False
+            try:
+                os.killpg(p.popen.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                return False
+            p.restart_at = time.time() + restart_after
         self.emit("kill", f"kill -9 {p.label}", proc=name)
         return True
 
     def _watch(self) -> None:
         while not self._stop.is_set():
-            now = time.time()
+            try:
+                self._restart_dead(time.time())
+            except Exception as exc:  # the watcher is the only thing that restarts a process: it must not die
+                self.emit("error", f"process watcher: {exc!r}"[:160])
+            time.sleep(0.25)
+
+    def _restart_dead(self, now: float) -> None:
+        restarted = []
+        with self._lock:
+            if self._stop.is_set():
+                return
             for p in self.procs.values():
                 dead = p.popen is None or p.popen.poll() is not None
                 if dead and p.restart_at is None:
                     p.restart_at = now + 2.0  # an unplanned exit: restart like an orchestrator would
                 if dead and p.restart_at is not None and now >= p.restart_at:
                     self._spawn(p)
-                    self.emit("restart", f"{p.label} restarted", proc=name_of(p))
-            time.sleep(0.25)
+                    restarted.append(p)
+        for p in restarted:
+            self.emit("restart", f"{p.label} restarted", proc=p.name)
 
     # -- views -------------------------------------------------------------
     def status(self) -> dict:
@@ -174,7 +184,3 @@ class ProcessManager:
                 return True
             time.sleep(0.3)
         return False
-
-
-def name_of(p: Proc) -> str:
-    return p.name

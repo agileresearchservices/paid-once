@@ -38,7 +38,7 @@ def test_audit_scores_each_invariant():
     for tid in ("ok", "dup", "gone", "late", "waiting", "rogue"):
         audit.record_ticket("lane1", tid, "s", 1000)
     for tid in ("ok", "dup", "gone", "late"):
-        audit.record_decision("lane1", tid, approved=True, delivered=True)
+        audit.record_decision("lane1", tid, approved=True)
     ledger.record_refund("ok", 1000, "a", "lane1")
     ledger.record_refund("dup", 1000, "b", "lane1")
     ledger.record_refund("dup", 1000, "c", "lane1")
@@ -65,10 +65,10 @@ def test_audit_scores_tickets_owed_nothing():
     audit.record_ticket("lane1", "policy", "s", 30000, expect="policy")
     audit.record_ticket("lane1", "policy-paid", "s", 30000, expect="policy")
     audit.record_ticket("lane1", "yes", "s", 1000)
-    audit.record_decision("lane1", "no", approved=False, delivered=True)
-    audit.record_decision("lane1", "no-paid", approved=False, delivered=True)
-    audit.record_decision("lane1", "yes", approved=True, delivered=True)
-    audit.record_decision("lane1", "yes", approved=False, delivered=True)  # the first decision stands
+    audit.record_decision("lane1", "no", approved=False)
+    audit.record_decision("lane1", "no-paid", approved=False)
+    audit.record_decision("lane1", "yes", approved=True)
+    audit.record_decision("lane1", "yes", approved=False)  # the first decision stands
     ledger.record_refund("no-paid", 1000, "a", "lane1")
     ledger.record_refund("policy-paid", 30000, "b", "lane1")
     ledger.record_refund("yes", 1000, "c", "lane1")
@@ -121,8 +121,8 @@ def test_audit_can_leave_a_scene_out_or_score_it_alone():
     """The scoreboard leaves the walkthrough out; the walkthrough is still scored on its own."""
     audit.record_ticket("lane1", "demo", "walkthrough", 4200)
     audit.record_ticket("lane1", "real", "intro", 1000)
-    audit.record_decision("lane1", "demo", approved=True, delivered=True)
-    audit.record_decision("lane1", "real", approved=True, delivered=True)
+    audit.record_decision("lane1", "demo", approved=True)
+    audit.record_decision("lane1", "real", approved=True)
     ledger.record_refund("demo", 4200, "a", "lane1")
     ledger.record_refund("real", 1000, "b", "lane1")
 
