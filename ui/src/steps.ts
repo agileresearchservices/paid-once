@@ -78,7 +78,7 @@ export const STEPS: Step[] = [
     title: "Payments books it, then goes quiet",
     story: "Payments saves the refund, but the reply never arrives. Both stacks retry.",
     watch: "Which retries does the ledger recognise?",
-    result: "Temporal reuses the ticket's key: answered from the ledger. Queue + LangGraph sends a new key: booked again.",
+    result: "Temporal reuses the ticket's key: answered from the ledger. Queue + LangGraph sends a new key: paid again.",
   },
   {
     id: "nexus_kill",

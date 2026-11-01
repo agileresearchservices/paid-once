@@ -28,7 +28,7 @@ function PaymentsCalls({ c }: { c?: { calls: number; booked: number; replays: nu
   if (!c || c.calls === 0) return null;
   return (
     <div className="calls">
-      <span className="muted">Payments:</span> <b>{c.calls}</b> calls · <b>{c.booked}</b> booked · <b>{c.replays}</b> replayed
+      <span className="muted">Payments:</span> <b>{c.calls}</b> calls · <b>{c.booked}</b> paid · <b>{c.replays}</b> replayed
     </div>
   );
 }

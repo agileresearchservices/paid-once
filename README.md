@@ -109,9 +109,9 @@ Run of show, about ten minutes:
   helpdesk as grey dash badges.
 - **Steps 3-5** (workers die, double delivery, payments goes quiet): the same chaos hits both
   lanes; watch the ledger-based scoreboards diverge. The payments node's slots mark each ticket in the ledger
-  (`✓` paid once, `×2` paid twice, `∅` owed, never paid, `—` denied, nothing owed), and each lane shows what payments saw in the scene: calls, refunds booked, and
+  (`✓` paid once, `×2` paid twice, `∅` owed, never paid, `—` denied, nothing owed), and each lane shows what payments saw in the scene: calls, refunds paid, and
   calls answered from an existing key. On step 5 that line is the evidence: Temporal's retry is answered from the
-  ledger, the queue's is booked again.
+  ledger, the queue's is paid again.
 - **Step 6, Nexus** says what Nexus is and why it matters, then proves it. Two static pictures on top: **Without Nexus**,
   support's code reaches across the team line into payments' namespace, task queue, workflow type and retries; **With
   Nexus**, support makes one call (`issue_refund`) to one endpoint (`payments-endpoint`) and payments owns everything
