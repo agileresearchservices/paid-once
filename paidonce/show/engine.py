@@ -40,10 +40,13 @@ AGENT_WORKERS = ["lane1_worker", "support_worker"]
 # The worker-crash scene (step 3): the first few approved refunds are in flight at payments when the workers die;
 # the rest of the cohort is still waiting for a human.
 WORKER_CRASH_APPROVED = 6
-DEMO_SCENES = ("walkthrough",)  # scored on their own; left out of the scoreboard totals
+DEMO_SCENES = (
+    "walkthrough",
+    "nexus_kill",
+)  # scored on their own; left out of the scoreboard totals (Nexus is its own page)
 WORKER_CRASH_IN_FLIGHT = 3
 
-# The Nexus gauntlet (step 6): four failures, each landing on refunds still in flight.
+# The Nexus gauntlet (step 7): four failures, each landing on refunds still in flight.
 GAUNTLET_STALL_S = 9.0  # payments holds its reply this long after booking: past the activity's 8 s timeout
 GAUNTLET_LATENCY_S = 2.0  # every payments call takes this long, so a kill lands mid-call
 GAUNTLET_DOWN_S = {"support_worker": 5.0, "payments_worker": 6.0, "temporal": 5.0}
@@ -892,8 +895,9 @@ class Engine:
             self.temporal_ui = None
 
     def snapshot(self) -> dict:
-        # The scoreboard leaves out the walkthrough: page 1 is a demonstration, and the scenes are what add up. It is
-        # still scored on its own (`demo_audit`) so the headless run and the page 1 diagram can read it.
+        # The scoreboard leaves out the walkthrough (a demonstration) and the Nexus scene (a page of its own, Temporal
+        # only): the Lane 1 vs Lane 2 scenes are what add up. They are still scored on their own (`demo_audit`) so the
+        # headless run and those pages can read them.
         board = audit.compute_all(SETTLE_S, exclude_scenes=DEMO_SCENES)
         demo = audit.compute_all(SETTLE_S, only_scenes=DEMO_SCENES)
         return {

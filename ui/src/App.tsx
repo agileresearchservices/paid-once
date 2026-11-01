@@ -126,14 +126,14 @@ export function App() {
     return <main className="loading">{connected ? "Loading…" : "Waiting for the show server on port 8100…"}</main>;
   }
 
-  // Scene-scoped views (Nexus rows, the page 6 payments line, the walkthrough flow) describe the scene the engine
+  // Scene-scoped views (Nexus rows, the Nexus page's payments line, the walkthrough flow) describe the scene the engine
   // last ran, so a step shows them only when that scene is this step's. The scoreboard card's header (job table,
   // workflow status, payments calls) accumulates since the reset, like the numbers under it.
   const onScreen = step.scene != null && snap.current === step.scene;
   const thisRunning = running && onScreen;
   const run = step.scene ? snap.scene_runs?.[step.scene] : undefined;
   const finished = !thisRunning && run?.finished_at != null;
-  const settling = snap.audit.lane1.in_flight + snap.audit.lane2.in_flight > 0;
+  const settling = LANES.some((l) => snap.audit[l.id].in_flight + (snap.demo_audit?.[l.id]?.in_flight ?? 0) > 0);
   const elapsed = run ? Math.max(0, Math.round(snap.now - run.started_at)) : 0;
   let status: { text: string; cls: string } | null = null;
   if (finished && run?.ok === false) status = { text: `Scene failed: ${run.error ?? "see the server log"}`, cls: "fail" };
@@ -202,7 +202,7 @@ export function App() {
           run={run}
           finished={finished}
           now={snap.now}
-          ledgerTickets={snap.audit.lane2.tickets ?? {}}
+          ledgerTickets={{ ...(snap.audit.lane2.tickets ?? {}), ...(snap.demo_audit?.lane2?.tickets ?? {}) }}
           calls={onScreen ? snap.payments_calls?.lane2 : undefined}
         />
       )}
@@ -238,7 +238,6 @@ export function App() {
                 audit={snap.audit[l.id]}
                 name={l.name}
                 believedDone={!step.scene && l.id === "lane1" ? (snap.lane1_view_all?.done ?? 0) : undefined}
-                note={l.id === "lane2" && snap.scene_runs?.nexus_kill ? "Includes the Nexus scene (Temporal only)." : undefined}
               />
             </article>
           ))}
