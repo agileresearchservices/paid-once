@@ -205,7 +205,7 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
         <text className="row-label" x={838} y={20}>PAYMENTS TEAM</text>
         <text className="row-label" x={158} y={20}>QUEUE + LANGGRAPH</text>
         {/* Under its row, lined up with the Queue label above its own: the human's bubble sits between the rows */}
-        <text className="row-label" x={158} y={ROW.lane2 + NODE_H + 18}>TEMPORAL + NEXUS · SUPPORT TEAM</text>
+        <text className="row-label" x={158} y={ROW.lane2 + NODE_H + 18}>TEMPORAL + NEXUS</text>
 
         <g className={humanNow ? "human now" : "human"}>
           <line className="wire" x1={HUMAN_X} x2={HUMAN_X} y1={HUMAN.y} y2={ROW.lane1 + NODE_H + 3} markerEnd="url(#arrow)" />
