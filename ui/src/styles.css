@@ -73,6 +73,7 @@ button.danger { border-color: var(--critical); color: #fff; background: var(--cr
 .controls { display: grid; gap: 8px; align-content: start; min-width: 200px; }
 .scene-status { margin: 0; font-size: 15px; text-align: center; }
 .scene-status.ok { color: var(--good-ink); }
+.scene-status.warn { color: var(--warning); font-size: 13px; }
 .scene-status.fail { font-size: 13px; text-align: left; overflow-wrap: anywhere; }
 .nav { display: flex; gap: 8px; }
 .nav button { flex: 1; }
@@ -157,6 +158,7 @@ svg.lg-icon, .diagram svg.lg-icon { display: inline-block; width: 26px; height: 
 .diagram .tally-ok { fill: var(--good-ink); }
 .diagram .tally-bad { fill: var(--critical-ink); }
 .diagram .tally-missing { fill: var(--serious); }
+.diagram .tally-wait { fill: var(--warning); font-size: 14px; font-weight: 700; }
 .diagram .slot.ok rect { fill: var(--good-wash); stroke: var(--good); stroke-dasharray: none; }
 .diagram .slot.ok text { fill: var(--good-ink); }
 .diagram .slot.missing rect { fill: var(--serious-wash); stroke: var(--serious); stroke-dasharray: none; }

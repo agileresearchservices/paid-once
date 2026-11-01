@@ -50,10 +50,13 @@ def test_audit_scores_each_invariant():
     assert in_flight["duplicates"] == 1 and in_flight["duplicate_cents"] == 1000
     assert in_flight["in_flight"] == 2 and in_flight["missing"] == 0
     assert in_flight["unapproved"] == 1
+    # Each in-flight ticket says when the audit will call it lost: its approval plus the settle window.
+    assert set(in_flight["pending"]) == {"late", "gone"}
+    assert all(p["verdict_at"] == p["since"] + 60 for p in in_flight["pending"].values())
 
     # After the settle window those two count as lost.
     settled = audit.compute("lane1", settle_s=60, now=now + 120)
-    assert settled["missing"] == 2 and settled["in_flight"] == 0
+    assert settled["missing"] == 2 and settled["in_flight"] == 0 and settled["pending"] == {}
     assert settled["violations"] == 4  # dup + 2 missing + rogue
     assert settled["tickets"]["waiting"] == "waiting"
 

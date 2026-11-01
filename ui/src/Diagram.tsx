@@ -1,4 +1,4 @@
-import { OUTCOME_GLYPH } from "./outcomes";
+import { auditWait, OUTCOME_GLYPH } from "./outcomes";
 import { LegendIcon, TicketGlyph, type TicketKind } from "./TicketIcon";
 import type { FlowDot, LaneId, ShowEvent, Snapshot } from "./types";
 
@@ -134,11 +134,13 @@ function Ledger({
   label,
   dots,
   tickets,
+  wait,
 }: {
   lane: LaneId;
   label: string;
   dots: FlowDot[];
   tickets: Record<string, string>;
+  wait: { count: number; secs: number } | null;
 }) {
   const ids = dots.map((d) => d.ticket).sort();
   const x0 = NODES.payments.x + 16;
@@ -164,6 +166,12 @@ function Ledger({
           </g>
         );
       })}
+      {/* Approved, still no refund: the audit gives each ticket a fixed window before it counts it lost, so say so */}
+      {wait && (
+        <text x={x0} y={at.tally + 20} className="tally-wait">
+          {wait.count} unpaid · audit waits {wait.secs}s more
+        </text>
+      )}
       {tally.length > 0 && (
         <text x={x0} y={at.tally} className="tally">
           {tally.map((t, i) => (
@@ -208,6 +216,7 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
 
   const latency = (lane: LaneId) => snap.faults[lane]?.latency_s ?? 0;
   // The walkthrough's ticket is scored apart from the scoreboard, but its dot still belongs on step 1's ledger.
+  const wait = (lane: LaneId) => (onScreen ? auditWait(snap.audit[lane]?.pending, snap.now) : null);
   const audit = (lane: LaneId) => ({ ...(snap.audit[lane]?.tickets ?? {}), ...(snap.demo_audit[lane]?.tickets ?? {}) });
 
   return (
@@ -332,8 +341,8 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
 
         {scene != null && (
           <>
-            <Ledger lane="lane1" label="Queue" dots={flow.lane1} tickets={audit("lane1")} />
-            <Ledger lane="lane2" label="Temporal" dots={flow.lane2} tickets={audit("lane2")} />
+            <Ledger lane="lane1" label="Queue" dots={flow.lane1} tickets={audit("lane1")} wait={wait("lane1")} />
+            <Ledger lane="lane2" label="Temporal" dots={flow.lane2} tickets={audit("lane2")} wait={wait("lane2")} />
           </>
         )}
 

@@ -20,6 +20,8 @@ export interface LaneAudit {
   violations: number;
   // ledger state per ticket: ok | duplicate | in_flight | missing | waiting | unapproved | rejected | declined
   tickets?: Record<string, string>;
+  // approved, no refund yet: when it was approved, and when the audit stops waiting and counts it lost
+  pending?: Record<string, { since: number; verdict_at: number }>;
 }
 
 export interface ProcStatus {

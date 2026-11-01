@@ -110,6 +110,9 @@ def compute(
         "waiting": 0,
         "violations": 0,
         "tickets": {},
+        # Approved tickets with no refund yet, and when each stops being "in flight" and counts as lost, so the page
+        # can show the wait instead of leaving it unexplained.
+        "pending": {},
     }
     for t in tickets:
         tid = t["ticket_id"]
@@ -136,6 +139,7 @@ def compute(
         elif now - approval["decided_at"] < settle_s:
             state = "in_flight"
             out["in_flight"] += 1
+            out["pending"][tid] = {"since": approval["decided_at"], "verdict_at": approval["decided_at"] + settle_s}
         else:
             state = "missing"
             out["missing"] += 1

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Diagram } from "./Diagram";
 import { NexusPanel } from "./NexusPanel";
+import { auditWait } from "./outcomes";
 import { Scoreboard } from "./Scoreboard";
 import { STEPS } from "./steps";
 import { post, useSnapshot } from "./useSnapshot";
@@ -135,9 +136,18 @@ export function App() {
   const finished = !thisRunning && run?.finished_at != null;
   const settling = LANES.some((l) => snap.audit[l.id].in_flight + (snap.demo_audit[l.id]?.in_flight ?? 0) > 0);
   const elapsed = run ? Math.max(0, Math.round(snap.now - run.started_at)) : 0;
+  // The audit gives an approved ticket a fixed window to show up in the ledger before it counts it lost. A scene that
+  // waits out that window says so, instead of just counting seconds.
+  const waits = LANES.map((l) => ({ lane: l, wait: auditWait(snap.audit[l.id].pending, snap.now) })).filter((w) => w.wait);
   let status: { text: string; cls: string } | null = null;
   if (finished && run?.ok === false) status = { text: `Scene failed: ${run.error ?? "see the server log"}`, cls: "fail" };
-  else if (finished && settling) status = { text: "Done, settling…", cls: "muted" };
+  else if (thisRunning && waits.length > 0) {
+    const w = waits[0];
+    status = {
+      text: `Waiting on the audit: ${w.wait!.count} approved ticket${w.wait!.count === 1 ? "" : "s"} in ${w.lane.name} still unpaid. Counted lost in ${w.wait!.secs}s.`,
+      cls: "warn",
+    };
+  } else if (finished && settling) status = { text: "Done, settling…", cls: "muted" };
   else if (finished) status = { text: "Done ✓", cls: "ok" };
 
   return (
