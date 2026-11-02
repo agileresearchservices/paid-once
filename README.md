@@ -29,6 +29,9 @@ You need Python 3.12 (uv fetches it for you), [uv](https://docs.astral.sh/uv/), 
 [Temporal CLI](https://docs.temporal.io/cli), Node 22 or newer (only to build the UI), git and make. The live demo also
 needs your own [Anthropic API key](https://console.anthropic.com/).
 
+Prefer not to install anything? If the person who sent you this runs a hosted copy, open their link and sign in; the
+steps below are for running it yourself. To host your own, see [`docs/deploy-gcp.md`](docs/deploy-gcp.md).
+
 ### 1. Install the tools
 
 **macOS.** Install [Homebrew](https://brew.sh), then:
