@@ -30,7 +30,7 @@ from paidonce.show.catalog import DEMO_SCENES, SCENE_QUIET_S, SCENE_SETTLE_MAX_S
 from paidonce.show.harness import HarnessMixin
 from paidonce.show.procs import ProcessManager
 from paidonce.show.scenes import SceneMixin
-from paidonce.show.timeline import unsettled
+from paidonce.show.timeline import hold_at_entry, unsettled
 from paidonce.show.views import ViewsMixin
 
 
@@ -233,8 +233,11 @@ class Engine(HarnessMixin, SceneMixin, ViewsMixin):
         # headless run and those pages can read them.
         board = audit.compute_all(exclude_scenes=DEMO_SCENES)
         demo = audit.compute_all(only_scenes=DEMO_SCENES)
+        now = time.time()
+        run = self.scene_runs.get(self.current) if self.running and self.current else None
+        flow = hold_at_entry(self.flow, run["started_at"], now) if run else self.flow
         return {
-            "now": time.time(),
+            "now": now,
             "running": self.running,
             "current": self.current,
             "scene_runs": self.scene_runs,
@@ -248,7 +251,7 @@ class Engine(HarnessMixin, SceneMixin, ViewsMixin):
             "faults": self.faults,
             "payments_calls": self.payments_calls,
             "payments_calls_all": self.payments_calls_all,
-            "flow": self.flow,
+            "flow": flow,
             "beat": self.beat,
             "topology": TOPOLOGY,
         }
