@@ -31,7 +31,7 @@ show as the `paidonce` systemd service. Caddy gets its certificate for the `ssli
 | Command | What it does |
 |---|---|
 | `deploy/gcp.sh status` | VM state and the URL |
-| `deploy/gcp.sh update` | Pull the latest `main`, rebuild the UI, restart the show |
+| `deploy/gcp.sh update` | Send this checkout's `deploy/startup.sh` to the VM, pull the latest `main`, rebuild the UI, restart the show. Run it from an up-to-date `main` |
 | `deploy/gcp.sh stop` / `start` | Pause and resume (the address and URL stay the same) |
 | `deploy/gcp.sh logs` | Last lines of the install log and the service status |
 | `deploy/gcp.sh destroy` | Delete the VM, address and firewall rule |
