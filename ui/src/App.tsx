@@ -46,8 +46,7 @@ function PaymentsCalls({ c }: { c?: { calls: number; booked: number; replays: nu
   );
 }
 
-// Temporal's wordmark lives in ui/public/brand/, which is gitignored. On a fresh clone it isn't there and the
-// header shows text instead.
+// Temporal's wordmark lives in ui/public/brand/. If the file is ever missing, the header shows text instead.
 function Wordmark() {
   const [missing, setMissing] = useState(false);
   if (missing) return <span className="wordmark-text">Temporal ·</span>;
