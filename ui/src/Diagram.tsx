@@ -223,7 +223,7 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
     }
 
   const latency = (lane: LaneId) => snap.faults[lane]?.latency_s ?? 0;
-  // The walkthrough's ticket is scored apart from the scoreboard, but its dot still belongs on step 1's ledger.
+  // The walkthrough's ticket is scored apart from the scoreboard, but its dot still belongs on step 2's ledger.
   const wait = (lane: LaneId) => (onScreen ? auditWait(snap.audit[lane]?.pending, flow[lane], snap.now) : null);
   const audit = (lane: LaneId) => ({ ...(snap.audit[lane]?.tickets ?? {}), ...(snap.demo_audit[lane]?.tickets ?? {}) });
 
