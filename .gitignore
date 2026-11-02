@@ -7,9 +7,6 @@ data/*
 !data/.gitkeep
 node_modules/
 ui/dist/
-# Temporal's wordmark is a trademark: kept local, never committed. The header falls back to text without it.
-# The favicon (ui/public/brand/favicon.svg) is committed so the hosted demo and fresh clones get the tab icon.
-ui/public/brand/temporal-wordmark.svg
 .env
 *.tgz
 *.egg-info/
