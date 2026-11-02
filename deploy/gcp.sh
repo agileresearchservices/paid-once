@@ -44,7 +44,8 @@ case "${1:-}" in
     echo "Created. The first boot installs everything (about 10 minutes): ./deploy/gcp.sh logs"
     echo "Then open https://$HOST  (user: panel)"
     ;;
-  update)  # pull the latest main and rebuild: re-run the startup script
+  update)  # pull the latest main and rebuild: push this checkout's startup script to the VM, then re-run it
+    "${G[@]}" compute instances add-metadata "$VM" --zone "$ZONE" --metadata-from-file startup-script="$HERE/startup.sh" >/dev/null
     "${G[@]}" compute ssh "$VM" --zone "$ZONE" --command 'sudo google_metadata_script_runner startup'
     ;;
   stop)    "${G[@]}" compute instances stop "$VM" --zone "$ZONE" ;;
