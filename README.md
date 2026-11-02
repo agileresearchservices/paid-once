@@ -47,20 +47,22 @@ make ui                                 # builds the UI into ui/dist
 make demo                               # http://127.0.0.1:8100
 ```
 
-The page is a seven-step stepper for a laptop browser in full screen. Arrow keys or `1`-`7` move between steps, and the
+The page is a nine-step stepper for a laptop browser in full screen. Arrow keys or `1`-`9` move between steps, and the
 step is kept in the URL (`#5`). The scoreboard resets whenever the show server starts.
 
 | Step | What it shows |
 |---|---|
-| 1 Architectures | The two stacks side by side, and a one-ticket walkthrough of the flow |
-| 2 Happy path | Seven tickets per lane, no faults. Both lanes refund the five approved once |
-| 3 Crash | The agent workers are killed with refunds in flight and approvals waiting for a human |
-| 4 Redelivery | The queue delivers the same message twice |
-| 5 Payments quiet | Payments commits a refund, then the reply never arrives |
-| 6 Scoreboard | Totals since the reset for steps 2-5, from the ledger |
-| 7 Nexus | What Nexus is, then a gauntlet of four failures on the same in-flight refunds (Lane 2 only) |
+| 1 Problem | What goes wrong on a refund's path, and how the demo tests two builds against it |
+| 2 Architectures | The two stacks side by side, and a one-ticket walkthrough of the flow |
+| 3 Happy path | Seven tickets per lane, no faults. Both lanes refund the five approved once |
+| 4 Crash | The agent workers are killed with refunds in flight and approvals waiting for a human |
+| 5 Redelivery | The queue delivers the same message twice |
+| 6 Payments quiet | Payments commits a refund, then the reply never arrives |
+| 7 Scoreboard | Totals since the reset for steps 3-6, from the ledger |
+| 8 Nexus | What Nexus is, then a gauntlet of four failures on the same in-flight refunds (Lane 2 only) |
+| 9 Conclusion | At-least-once delivery, exactly-once effect: the idempotency key per attempt vs per refund, and the next steps for a customer |
 
-Steps 2-5 run the same chaos against both lanes; the scoreboards diverge. The payments node in the diagram marks each
+Steps 3-6 run the same chaos against both lanes; the scoreboards diverge. The payments node in the diagram marks each
 ticket in the ledger: `✓` paid once, `×2` paid twice, `∅` owed and never paid, `—` denied and nothing owed.
 
 The Temporal wordmark and favicon are trademarks, so they are not in the repo. Put `temporal-wordmark.svg` and

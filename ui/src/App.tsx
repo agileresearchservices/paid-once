@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Diagram } from "./Diagram";
+import { ExactlyOnce } from "./ExactlyOnce";
 import { NexusPanel } from "./NexusPanel";
+import { Problem } from "./Problem";
 import { auditWait } from "./outcomes";
 import { Scoreboard } from "./Scoreboard";
 import { STEPS } from "./steps";
@@ -43,7 +45,7 @@ function Wordmark() {
   return <img className="wordmark" src="/brand/temporal-wordmark.svg" alt="Temporal" onError={() => setMissing(true)} />;
 }
 
-// The step lives in the URL hash (#1..#7), so a refresh mid-demo stays on the same step.
+// The step lives in the URL hash (#1..#9), so a refresh mid-demo stays on the same step.
 function stepFromHash(): number {
   const n = Number(window.location.hash.slice(1));
   return Number.isInteger(n) && n >= 1 && n <= STEPS.length ? n - 1 : 0;
@@ -85,7 +87,7 @@ export function App() {
   const beat = snap?.beat && snap.beat.scene === step.scene ? snap.beat.id : null;
 
   // Pressing Run on a scene step: scroll down so the diagram and the scoreboards below it are on screen together, and
-  // stop at the diagram's top (the explanation above may scroll away). The first step does its own scrolling (Walkthrough).
+  // stop at the diagram's top (the explanation above may scroll away). The architecture step does its own scrolling (Walkthrough).
   const sceneRunning = !!snap && snap.running && step.scene != null && snap.current === step.scene;
   const wasRunning = useRef(false);
   useEffect(() => {
@@ -100,7 +102,7 @@ export function App() {
     wasRunning.current = sceneRunning;
   }, [sceneRunning, step.arch]);
 
-  // Arrows step, 1-7 jump. Scenes run from the button only.
+  // Arrows step, 1-9 jump. Scenes run from the button only.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -194,7 +196,7 @@ export function App() {
           {/* Always rendered on a scene step, so the buttons below don't jump when a message appears */}
           {step.scene && <p className={`scene-status ${status?.cls ?? ""}`} role="status">{status?.text}</p>}
           <div className="nav">
-            {index > 0 && <button type="button" onClick={() => go(-1)}>← Back</button>}{/* nothing to go back to on step 1 */}
+            {index > 0 && <button type="button" onClick={() => go(-1)}>← Back</button>}{/* nothing to go back to on the first step */}
             <button type="button" onClick={() => go(1)} disabled={index === STEPS.length - 1}>Next →</button>
           </div>
           <button type="button" className={confirmReset ? "danger" : ""} onClick={onReset} disabled={!!locked}>
@@ -218,12 +220,15 @@ export function App() {
         />
       )}
 
-      {/* Step 1 leads with the walkthrough (customer, agent, human), then the architecture it runs on. */}
+      {/* The architecture step leads with the walkthrough (customer, agent, human), then the architecture it runs on. */}
       {step.arch && <Walkthrough beat={beat} flow={onScreen ? snap.flow : undefined} />}
 
       {(step.arch || (step.scene && !step.nexus)) && <Diagram snap={snap} scene={step.scene} />}
 
-      {step.arch || step.nexus ? null : (
+      {step.problem && <Problem />}
+      {step.conclusion && <ExactlyOnce />}
+
+      {step.arch || step.nexus || step.problem || step.conclusion ? null : (
         <div className="lanes">
           {LANES.map((l) => (
             <article key={l.id} className={step.scene ? `lane ${l.id} compact` : `lane ${l.id}`}>

@@ -1,4 +1,4 @@
-// The deck: one step per scene, in order, then the scoreboard, then the Nexus page on its own (the scoreboard doesn't
+// The deck: the problem, then one step per scene in order, then the scoreboard, the Nexus page on its own (the scoreboard doesn't
 // count it). `scene` is the show-server scene id.
 
 export interface Step {
@@ -10,11 +10,13 @@ export interface Step {
   watch?: string; // what to look at, without giving the outcome away (the scoreboard page has none)
   result?: string; // what the scene shows and why; on screen from the start, beside "watch"
   nexus?: boolean; // show the Nexus panel
+  problem?: boolean; // the opening page: what goes wrong on a refund's path and how the demo tests it; no scene, no scoreboards
+  conclusion?: boolean; // the closing page: at-least-once vs exactly-once, and the next steps; no scene, no scoreboards
   arch?: boolean; // the architecture page: the diagram and the walkthrough, no lane scoreboards
   runLabel?: string; // the run button, when "Run this scene" doesn't say what it does
 }
 
-// The walkthrough on step 1 plays these in order, each on screen for a few seconds. `id` is the engine's beat id
+// The walkthrough on step 2 plays these in order, each on screen for a few seconds. `id` is the engine's beat id
 // (Engine.scene_walkthrough). Every line says what this repo's code does (paidonce/lane1/, paidonce/lane2/).
 export interface Beat {
   id: string;
@@ -33,6 +35,15 @@ export const BEATS: Beat[] = [
 ];
 
 export const STEPS: Step[] = [
+  {
+    id: "problem",
+    scene: null,
+    short: "Problem",
+    title: "The problem: pay the customer exactly once",
+    story: "An agent proposes a refund, a human approves it, payments moves the money. Along the way workers crash, messages repeat and replies get lost.",
+    watch: "Three ways a refund goes wrong, and how we test two builds against them.",
+    problem: true,
+  },
   {
     id: "architecture",
     scene: "walkthrough",
@@ -96,5 +107,14 @@ export const STEPS: Step[] = [
     watch: "Support never sees an error. Payments does the retrying.",
     result: "Support saw no errors. Payments retried with the same key. Each refund paid once.",
     nexus: true,
+  },
+  {
+    id: "exactly_once",
+    scene: null,
+    short: "Conclusion",
+    title: "Delivered at least once, paid exactly once",
+    story: "Neither stack can stop a message arriving twice. What differs is whether the second arrival can cause a second payment.",
+    result: "A key per attempt pays twice. A key per refund pays once.",
+    conclusion: true,
   },
 ];

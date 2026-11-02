@@ -3,7 +3,7 @@ import { BEATS, WALKTHROUGH_TICKET } from "./steps";
 import { LegendIcon, type TicketKind } from "./TicketIcon";
 import type { FlowDot, LaneId } from "./types";
 
-// The walkthrough's panel, above the diagram on step 1: the refund as three role panes that fill in as the scene plays on its
+// The walkthrough's panel, above the diagram on step 2: the refund as three role panes that fill in as the scene plays on its
 // own. Each step stays up for a few seconds (the engine's WALKTHROUGH_DWELL_S), so the diagram below shows what the panes
 // say. Before the scene runs the three panes are already there, empty, so the roles are on screen and nothing jumps. This page outlines the flow
 // in general; it does not compare the two stacks.
@@ -182,7 +182,7 @@ export function Walkthrough({ beat, flow }: { beat: string | null; flow?: Record
   return (
     <section className="beat" aria-label={b ? `Step ${i + 1} of ${BEATS.length}: ${b.title}` : "Walkthrough"}>
       <div className="beat-head">
-        {/* Before the run the headline row stays (blank) so the panes don't move when step 1 starts. */}
+        {/* Before the run the headline row stays (blank) so the panes don't move when the walkthrough starts. */}
         <span className="beat-n">{b ? `Step ${i + 1} of ${BEATS.length}` : "\u00a0"}</span>
         <h3>{b ? b.title : "\u00a0"}</h3>
       </div>

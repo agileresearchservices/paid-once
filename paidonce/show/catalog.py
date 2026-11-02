@@ -22,7 +22,7 @@ LANE_NAMES = {"lane1": "Queue + LangGraph", "lane2": "Temporal + Nexus"}
 
 AGENT_WORKERS = ["lane1_worker", "support_worker"]
 
-# The worker-crash scene (step 3): the first few approved refunds are in flight at payments when the workers die;
+# The worker-crash scene (step 4): the first few approved refunds are in flight at payments when the workers die;
 # the rest of the cohort is still waiting for a human.
 WORKER_CRASH_COHORT = 6
 WORKER_CRASH_IN_FLIGHT = 3
@@ -31,13 +31,13 @@ WORKER_CRASH_IN_FLIGHT = 3
 # its own step.
 DEMO_SCENES = ("walkthrough", "nexus_kill")
 
-# The Nexus gauntlet (step 7): four failures, each landing on refunds still in flight.
+# The Nexus gauntlet (step 8): four failures, each landing on refunds still in flight.
 GAUNTLET_REFUNDS = 5  # refunds in the gauntlet, and how many payments stalls
 GAUNTLET_STALL_S = REFUND_START_TO_CLOSE.total_seconds() + 1.0  # payments holds its reply past the activity's timeout
 GAUNTLET_LATENCY_S = 2.0  # every payments call takes this long, so a kill lands mid-call
 GAUNTLET_DOWN_S = {"support_worker": 5.0, "payments_worker": 6.0, "temporal": 5.0}
 
-# The walkthrough (step 1): one ticket, with the refund slowed a little so it is visible in flight. Stays under Lane 1's
+# The walkthrough (step 2): one ticket, with the refund slowed a little so it is visible in flight. Stays under Lane 1's
 # 3 s payments client timeout, or its retry would book the refund twice on the happy path.
 WALKTHROUGH_LATENCY_S = 2.5
 # How long each walkthrough step stays on screen before the scene moves on, so a viewer can follow it unprompted. The
@@ -84,7 +84,7 @@ TOPOLOGY = {
     "endpoint": NEXUS_ENDPOINT,
     "service": PaymentsService.__name__,
     "operation": "issue_refund",
-    # The contract's two messages, field by field, read off the dataclasses so step 7 can't drift from the code.
+    # The contract's two messages, field by field, read off the dataclasses so step 8 can't drift from the code.
     "sends": [f.name for f in fields(RefundRequest)],
     "returns": [f.name for f in fields(RefundResult)],
     "payments": {
