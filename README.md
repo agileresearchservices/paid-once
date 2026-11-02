@@ -19,7 +19,8 @@ An agent proposes a refund, a human approves it, and payments moves the money. T
 design is in [`docs/architecture.md`](docs/architecture.md), the measured results in
 [`docs/scenario-results.md`](docs/scenario-results.md), and how to change the code in
 [`docs/development.md`](docs/development.md). A written case study of the whole exercise, with figures, is
-[`docs/case-study.pdf`](docs/case-study.pdf).
+[`docs/case-study.pdf`](docs/case-study.pdf). A 20-slide replay of the live demo, with a screenshot of every step, is
+[`docs/paid-once-deck.pdf`](docs/paid-once-deck.pdf).
 
 ## Quick start
 
@@ -187,7 +188,7 @@ flight; workflow versioning; approval waits longer than seconds; and the quality
 | `scripts/` | `smoke.py` (the headless runner behind `make scenario`) and `test-temporal.sh` |
 | `tests/` | The pytest suites. `-m temporal` tests need `make test-temporal` |
 | `ui/` | The Vite + React + TypeScript demo UI |
-| `docs/` | `architecture.md`, `development.md`, `scenario-results.md`, `case-study.pdf` |
+| `docs/` | `architecture.md`, `development.md`, `scenario-results.md`, `case-study.pdf`, `paid-once-deck.pdf` |
 
 ## License
 
