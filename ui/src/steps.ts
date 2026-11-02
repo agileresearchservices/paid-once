@@ -39,9 +39,8 @@ export const STEPS: Step[] = [
     id: "problem",
     scene: null,
     short: "Problem",
-    title: "The problem: pay the customer exactly once",
-    story: "An agent proposes a refund, a human approves it, payments moves the money. Along the way workers crash, messages repeat and replies get lost.",
-    watch: "Three ways a refund goes wrong, and how we test two builds against them.",
+    title: "The problem",
+    story: "A refund looks simple. Then something fails.",
     problem: true,
   },
   {

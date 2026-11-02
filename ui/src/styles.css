@@ -428,30 +428,48 @@ main.fill .pane { height: auto; min-height: 186px; }
 .eo-cta li span { color: var(--ink-2); }
 .eo-ask { margin: 16px 0 0; padding: 2px 0 2px 16px; border-left: 3px solid var(--accent-ink); font-size: 22px; font-style: italic; color: var(--ink-2); }
 
-/* The opening page (Problem.tsx): the refund's path with three failures, one card each, and how the demo tests them. */
-.pb-page { display: grid; gap: 12px; }
-.pb-top { background: var(--surface); border-radius: 12px; padding: 10px 14px 6px; }
-.pb-path { width: 100%; height: auto; display: block; }
-.pb-node rect { fill: var(--page); stroke: var(--ink-2); stroke-width: 1.5; }
-.pb-node text { fill: var(--ink); font-size: 22px; font-weight: 700; }
-.pb-node text.sub { fill: var(--ink-2); font-size: 17px; font-weight: 400; }
-.pb-wire { stroke: var(--axis); stroke-width: 3; }
-.pb-head { fill: var(--axis); }
-.pb-fail line { stroke: var(--critical); stroke-width: 2; stroke-dasharray: 4 3; }
-.pb-fail circle { fill: var(--critical); }
-.pb-fail text.n { fill: #fff; font-size: 20px; font-weight: 800; }
-.pb-fail text.label { fill: var(--critical-ink); font-size: 18px; font-weight: 600; }
-.pb-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-@media (max-width: 960px) { .pb-cards { grid-template-columns: 1fr; } }
-.pb-card { background: var(--surface); border-radius: 12px; border-top: 3px solid var(--critical); padding: 14px 20px 16px; }
-.pb-card h3 { font-size: 26px; margin: 0 0 6px; display: flex; align-items: center; gap: 10px; }
-.pb-n { display: inline-grid; place-items: center; width: 32px; height: 32px; flex: none; border-radius: 50%; background: var(--critical); color: #fff; font-size: 20px; font-weight: 800; }
-.pb-card p { margin: 0 0 8px; font-size: 21px; color: var(--ink-2); }
-.pb-card .pb-risk { color: var(--critical-ink); margin: 0; }
-.pb-card .pb-risk b { color: var(--critical-ink); }
-.pb-test { background: var(--surface); border-radius: 12px; border: 2px solid var(--accent); padding: 14px 22px 16px; }
-.pb-test h3 { font-size: 26px; margin: 0 0 6px; }
-.pb-test p { margin: 0 0 8px; font-size: 21px; color: var(--ink-2); max-width: 100ch; }
-.pb-test b { color: var(--ink); }
-.pb-test ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; }
-.pb-test li { font-size: 21px; font-weight: 600; padding: 4px 14px; border-radius: 999px; background: var(--good-wash); color: var(--good-ink); }
+/* The opening slide (Problem.tsx): a headline, the refund's path with a coin on it, and the three outcomes. */
+.pb-page { display: grid; gap: 14px; padding: 14px 0 0; position: relative; }
+.pb-page::before {
+  content: ""; position: absolute; inset: -40px -24px 0; pointer-events: none; z-index: -1;
+  background: radial-gradient(60% 55% at 50% 0%, rgba(68, 76, 231, 0.28), transparent 70%), radial-gradient(40% 40% at 85% 55%, rgba(182, 100, 255, 0.14), transparent 70%);
+}
+.pb-hero { text-align: center; }
+.pb-eyebrow { margin: 0 0 4px; font-size: 18px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent-ink); font-weight: 600; }
+.pb-headline { margin: 0; font-size: 76px; line-height: 1.05; font-weight: 800; letter-spacing: -0.02em; }
+.pb-headline em { font-style: normal; background: linear-gradient(90deg, #7b83ff, #c58bff 60%, #ff8fd0); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.pb-lede { margin: 10px auto 0; font-size: 28px; color: var(--ink-2); max-width: 70ch; }
+.pb-path { width: 100%; height: auto; display: block; overflow: visible; }
+.pb-glowline { fill: none; stroke: #7b83ff; stroke-width: 10; opacity: 0.18; filter: blur(6px); }
+.pb-line { fill: none; stroke: url(#pb-line); stroke-width: 3; opacity: 0.45; }
+.pb-hop { stroke: #8f7cff; stroke-width: 3; }
+.pb-node .halo { fill: rgba(123, 131, 255, 0.10); }
+.pb-node .disc { fill: url(#pb-gloss); stroke: #7b83ff; stroke-width: 2; }
+.pb-node .shine { fill: none; stroke: rgba(255, 255, 255, 0.28); stroke-width: 3; stroke-linecap: round; }
+.pb-node .icon { fill: none; stroke: #fff; stroke-width: 1.15; stroke-linecap: round; stroke-linejoin: round; }
+.pb-node .icon .fill { fill: #fff; stroke: none; }
+.pb-node .title { fill: var(--ink); font-size: 26px; font-weight: 700; }
+.pb-node .sub { fill: var(--ink-2); font-size: 19px; }
+.pb-hazard line { stroke: var(--critical); stroke-width: 2; stroke-dasharray: 4 4; opacity: 0.8; }
+.pb-hazard .glow { fill: var(--critical); opacity: 0.28; animation: pb-pulse 2.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.pb-hazard .dot { fill: var(--critical); }
+.pb-hazard .bolt { fill: #fff; }
+.pb-hazard .label { fill: var(--critical-ink); font-size: 21px; font-weight: 600; }
+.pb-hazard:nth-of-type(2) .glow { animation-delay: 0.8s; }
+.pb-hazard:nth-of-type(3) .glow { animation-delay: 1.6s; }
+@keyframes pb-pulse { 0%, 100% { transform: scale(1); opacity: 0.28; } 50% { transform: scale(1.35); opacity: 0.05; } }
+.pb-coin text { fill: #6b4a00; font-size: 19px; font-weight: 800; }
+.pb-outcomes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 6px; }
+.pb-outcome { display: flex; align-items: center; gap: 16px; padding: 14px 20px; border-radius: 16px; background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)); border: 1px solid var(--grid); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08); }
+.pb-outcome .mark { display: grid; place-items: center; flex: none; width: 46px; height: 46px; border-radius: 50%; font-size: 26px; font-weight: 800; color: #fff; }
+.pb-outcome .txt { display: grid; line-height: 1.2; }
+.pb-outcome b { font-size: 30px; }
+.pb-outcome .txt span { font-size: 21px; color: var(--ink-2); }
+.pb-outcome.bad { border-color: rgba(242, 59, 47, 0.45); }
+.pb-outcome.bad .mark { background: var(--critical); box-shadow: 0 0 18px rgba(242, 59, 47, 0.45); }
+.pb-outcome.bad b { color: var(--critical-ink); }
+.pb-outcome.good { border-color: rgba(0, 225, 117, 0.6); background: linear-gradient(180deg, rgba(0, 225, 117, 0.16), rgba(0, 225, 117, 0.04)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 0 28px rgba(0, 225, 117, 0.16); }
+.pb-outcome.good .mark { background: var(--good); color: #04281a; box-shadow: 0 0 18px rgba(0, 225, 117, 0.5); }
+.pb-outcome.good b { color: var(--good-ink); }
+.pb-foot { margin: 6px 0 0; text-align: center; font-size: 24px; color: var(--ink-2); }
+@media (prefers-reduced-motion: reduce) { .pb-hazard .glow { animation: none; } }
