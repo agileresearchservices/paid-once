@@ -175,7 +175,7 @@ export function App() {
         </p>
       )}
 
-      {!step.problem && (
+      {!step.problem && !step.conclusion && (
       <section className="story">
         <div className="story-text">
           <h2>{step.title}</h2>

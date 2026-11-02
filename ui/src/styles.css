@@ -386,47 +386,70 @@ main.fill .pane { height: auto; min-height: 186px; }
 .beat-head h3 { flex: 1; margin: 0; font-size: 32px; color: var(--ink); text-transform: none; letter-spacing: 0; }
 .beat-n { color: var(--accent-ink); font-size: 14px; font-weight: 600; white-space: nowrap; }
 
-/* The closing page (ExactlyOnce.tsx): the duplicate delivery drawn twice, the key comparison, and the call to action. */
-.eo-page { display: grid; gap: 12px; }
-.eo { width: 100%; height: auto; display: block; }
-.eo .card { fill: var(--page); stroke: var(--axis); stroke-width: 1.5; }
-.eo-card.bad .card { stroke: var(--critical); stroke-opacity: 0.55; }
-.eo-card.good .card { stroke: var(--good); stroke-opacity: 0.55; }
+/* The closing slide (ExactlyOnce.tsx), in the opening slide's style: headline, the duplicate delivery drawn against both
+   ledgers, the key comparison, and the call to action. */
+.eo-page { display: grid; gap: 16px; align-content: center; min-height: calc(100vh - 90px); position: relative; }
+.eo-page::before {
+  content: ""; position: absolute; inset: -30px -24px 0; pointer-events: none; z-index: -1;
+  background: radial-gradient(60% 40% at 50% 0%, rgba(68, 76, 231, 0.26), transparent 70%), radial-gradient(35% 35% at 12% 45%, rgba(242, 59, 47, 0.09), transparent 70%), radial-gradient(35% 35% at 88% 45%, rgba(0, 225, 117, 0.09), transparent 70%);
+}
+.eo-hero { text-align: center; }
+.eo-headline { margin: 0; font-size: 62px; line-height: 1.08; font-weight: 800; letter-spacing: -0.02em; }
+.eo-headline em { font-style: normal; background: linear-gradient(90deg, #7b83ff, #c58bff 60%, #ff8fd0); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.eo-lede { margin: 8px auto 0; font-size: 26px; color: var(--ink-2); }
+.eo { width: 100%; height: auto; display: block; overflow: visible; }
+.eo .card { stroke-width: 1.5; }
+.eo-card.bad .card { stroke: rgba(242, 59, 47, 0.55); }
+.eo-card.good .card { stroke: rgba(0, 225, 117, 0.6); }
+.eo-card.good { filter: drop-shadow(0 0 14px rgba(0, 225, 117, 0.16)); }
+.eo .gleam { fill: rgba(255, 255, 255, 0.22); }
 .eo-title { font-size: 22px; font-weight: 700; }
 .eo-card.bad .eo-title { fill: var(--critical-ink); }
 .eo-card.good .eo-title { fill: var(--good-ink); }
-.eo-box rect { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.5; }
+.eo-box rect { stroke: rgba(201, 211, 227, 0.55); stroke-width: 1.5; }
 .eo-box text { fill: var(--ink); font-size: 20px; font-weight: 600; }
 .eo-box text.sub { fill: var(--ink-2); font-size: 16px; font-weight: 400; }
-.eo-ledger-title { font-size: 16px !important; fill: var(--ink-2) !important; font-weight: 600; }
+.eo-box .eo-ledger-title { font-size: 16px; fill: var(--ink-2); font-weight: 600; }
 .eo-row rect { stroke: none; }
-.eo-card.bad .eo-row rect { fill: var(--critical-wash); }
-.eo-card.good .eo-row rect { fill: var(--good-wash); }
-.eo-row text { font-family: var(--mono); font-size: 16px !important; font-weight: 400 !important; }
-.eo-replay { fill: var(--good-ink) !important; font-size: 15px !important; font-weight: 400 !important; }
+.eo-card.bad .eo-row rect { fill: rgba(242, 59, 47, 0.28); }
+.eo-card.good .eo-row rect { fill: rgba(0, 225, 117, 0.24); }
+.eo-box .eo-row text { font-family: var(--mono); font-size: 16px; font-weight: 400; }
+.eo-box .eo-replay { fill: var(--good-ink); font-size: 15px; font-weight: 400; }
 .eo-wire { stroke-width: 3; }
-.eo-card.bad .eo-wire { stroke: var(--critical); stroke-opacity: 0.85; }
+.eo-wireglow { stroke-width: 9; opacity: 0.18; filter: blur(4px); }
+.eo-card.bad .eo-wire { stroke: var(--critical); stroke-opacity: 0.9; }
+.eo-card.bad .eo-wireglow { stroke: var(--critical); }
 .eo-card.good .eo-wire { stroke: var(--good); }
+.eo-card.good .eo-wireglow { stroke: var(--good); }
+.eo-packet { stroke: #fff; stroke-width: 1.5; }
+.eo-card.bad .eo-packet { fill: #ff8a7a; }
+.eo-card.good .eo-packet { fill: #59fda0; }
 .eo-attempt { fill: var(--ink-2); font-size: 15px; }
-.eo-key { font-family: var(--mono); font-size: 17px; font-weight: 600; fill: var(--ink); }
+.eo-keypill { fill: rgba(255, 255, 255, 0.08); stroke: rgba(255, 255, 255, 0.16); stroke-width: 1; }
+.eo-key { font-family: var(--mono); font-size: 16px; font-weight: 600; fill: var(--ink); }
 .eo-caption { fill: var(--ink); font-size: 20px; }
 
-.eo-lower { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+.eo-lower { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: stretch; }
 @media (max-width: 960px) { .eo-lower { grid-template-columns: 1fr; } }
-.eo-left, .eo-cta { background: var(--surface); border-radius: 12px; padding: 14px 22px 16px; }
-.eo-left h3, .eo-cta h3 { font-size: 26px; margin: 0 0 8px; }
-.eo-table { width: 100%; border-collapse: collapse; font-size: 21px; }
-.eo-table th, .eo-table td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--grid); vertical-align: top; }
-.eo-table thead th { font-size: 18px; color: var(--ink-2); font-weight: 600; }
-.eo-table tbody th { color: var(--ink-2); font-weight: 500; width: 28%; }
-.eo-table td.no { color: var(--critical-ink); }
-.eo-table td.yes { color: var(--good-ink); }
-.eo-half { font-size: 21px; margin: 12px 0 0; color: var(--ink); }
-.eo-cta { border: 2px solid var(--accent); background: linear-gradient(180deg, var(--accent-wash), var(--surface) 70%); }
-.eo-cta ol { margin: 0; padding-left: 26px; display: grid; gap: 5px; font-size: 21px; line-height: 1.3; }
+.eo-left, .eo-cta { border-radius: 16px; padding: 14px 22px 16px; background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)); border: 1px solid var(--grid); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08); }
+.eo-left h3, .eo-cta h3 { font-size: 16px; letter-spacing: 0.14em; margin: 0 0 10px; color: var(--accent-ink); }
+.eo-table { width: 100%; border-collapse: separate; border-spacing: 0 6px; font-size: 22px; }
+.eo-table th, .eo-table td { text-align: left; padding: 6px 12px; vertical-align: middle; }
+.eo-table thead th { font-size: 18px; color: var(--ink-2); font-weight: 600; padding-bottom: 0; }
+.eo-table tbody th { color: var(--ink-2); font-weight: 500; width: 27%; padding-left: 0; }
+.eo-table td { font-weight: 600; }
+.eo-table td.no { background: rgba(242, 59, 47, 0.14); color: var(--critical-ink); border-radius: 10px 0 0 10px; }
+.eo-table td.yes { background: rgba(0, 225, 117, 0.13); color: var(--good-ink); border-radius: 0 10px 10px 0; }
+.eo-half { display: flex; gap: 14px; align-items: center; margin-top: 10px; padding: 10px 14px; border-radius: 12px; background: rgba(254, 193, 24, 0.1); border: 1px solid rgba(254, 193, 24, 0.35); }
+.eo-half p { margin: 0; font-size: 20px; color: var(--ink); }
+.eo-half-mark { display: grid; place-items: center; flex: none; width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(180deg, #ffd24d, #e5a50a); color: #3a2a00; font-size: 26px; font-weight: 800; box-shadow: 0 0 16px rgba(254, 193, 24, 0.35); }
+.eo-cta { border: 1px solid rgba(123, 131, 255, 0.6); background: linear-gradient(180deg, rgba(68, 76, 231, 0.26), rgba(34, 38, 92, 0.1) 60%, rgba(255, 255, 255, 0.02)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 0 30px rgba(68, 76, 231, 0.18); }
+.eo-cta ol { margin: 0; padding: 0; list-style: none; counter-reset: eo; display: grid; gap: 8px; font-size: 21px; line-height: 1.28; }
+.eo-cta li { counter-increment: eo; display: grid; grid-template-columns: 32px 1fr; gap: 12px; align-items: start; }
+.eo-cta li::before { content: counter(eo); display: grid; place-items: center; width: 30px; height: 30px; margin-top: 0; border-radius: 50%; background: var(--brand); color: #fff; font-size: 16px; font-weight: 800; box-shadow: 0 0 10px rgba(123, 131, 255, 0.4); }
 .eo-cta li b { color: var(--ink); }
-.eo-cta li span { color: var(--ink-2); }
-.eo-ask { margin: 16px 0 0; padding: 2px 0 2px 16px; border-left: 3px solid var(--accent-ink); font-size: 22px; font-style: italic; color: var(--ink-2); }
+.eo-step > span { color: var(--ink-2); }
+.eo-ask { margin: 16px 0 0; padding: 2px 0 2px 16px; border-left: 3px solid var(--accent-ink); font-size: 25px; font-style: italic; color: var(--ink); }
 
 /* The opening slide (Problem.tsx): a headline, the refund's path with a coin on it, and the three outcomes. */
 .pb-page { display: grid; gap: 18px; align-content: center; min-height: calc(100vh - 90px); padding: 0; position: relative; }

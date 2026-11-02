@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useStill } from "./useStill";
 
 // The opening slide: one idea, stated big. A refund has to be paid exactly once, and its path (customer, agent, human,
 // payments) is where it goes wrong. A coin travels the path; three things can hit it on the way; the outcomes below say
@@ -60,18 +60,6 @@ function Icon({ i }: { i: number }) {
         </g>
       );
   }
-}
-
-function useStill(): boolean {
-  const [still, setStill] = useState(false);
-  useEffect(() => {
-    const q = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setStill(q.matches);
-    const on = () => setStill(q.matches);
-    q.addEventListener("change", on);
-    return () => q.removeEventListener("change", on);
-  }, []);
-  return still;
 }
 
 function Path() {
