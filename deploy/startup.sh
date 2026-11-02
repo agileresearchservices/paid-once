@@ -73,7 +73,9 @@ UNIT
 
 cat >/etc/caddy/Caddyfile <<CADDY
 $HOST {
-	basic_auth {
+	# Chrome fetches the tab icon without the page's password, so /brand/* (two logo files from the public repo) is open.
+	@private not path /brand/*
+	basic_auth @private {
 		panel $HASH
 	}
 	reverse_proxy 127.0.0.1:8100 {
