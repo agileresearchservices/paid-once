@@ -100,7 +100,7 @@ payments service on a free port.
 - **A Nexus workflow-run operation stays `STARTED, attempt 1` on the caller** while the payments-side activity retries.
   The Nexus page needs every attempt, so the engine polls the refund workflow's pending activity and closes attempts
   from its history (`timeline.merge_attempts`, `finish_attempts`); backoff comes from `REFUND_RETRY`, not the server.
-- **Brand assets** (`ui/public/brand/`) are gitignored trademarks. Without them the header shows text.
+- **Brand assets** (`ui/public/brand/`): `favicon.svg` is committed (the tab icon); `temporal-wordmark.svg` is a gitignored trademark. Without the wordmark the header shows text.
 - **Do not claim live endpoint retargeting.** The repo only points `payments-endpoint` at the current namespace.
 
 ## Not verified

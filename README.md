@@ -105,8 +105,9 @@ ticket in the ledger: `✓` paid once, `×2` paid twice, `∅` owed and never pa
 about 2 s after the ticket's dot reaches payments, so the ledger follows the traffic you can see; the numbers come from
 the same audit (`paidonce/audit.py`).
 
-The Temporal wordmark and favicon are trademarks, so they are not in the repo. Put `temporal-wordmark.svg` and
-`favicon.svg` in `ui/public/brand/` (gitignored) before `make ui` to show them; otherwise the header shows text.
+The browser tab uses Temporal's favicon (`ui/public/brand/favicon.svg`, in the repo; Temporal's trademark, used here only
+to identify Temporal). The Temporal wordmark is not in the repo: put `temporal-wordmark.svg` in `ui/public/brand/`
+(gitignored) before `make ui` to show it in the header; otherwise the header shows text.
 
 On a fresh clone the whole path is `make install`, `make test`, `make scenario` (no key), then the `.env` line,
 `make ui` and `make demo`. Run `make scenario` once first: it proves the Temporal CLI, the ports and the audit work on
