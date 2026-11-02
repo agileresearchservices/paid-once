@@ -175,6 +175,7 @@ export function App() {
         </p>
       )}
 
+      {!step.problem && (
       <section className="story">
         <div className="story-text">
           <h2>{step.title}</h2>
@@ -205,6 +206,7 @@ export function App() {
           {error && <p className="fail" role="alert">{error}</p>}
         </div>
       </section>
+      )}
 
       {step.nexus && (
         <NexusPanel
@@ -225,7 +227,7 @@ export function App() {
 
       {(step.arch || (step.scene && !step.nexus)) && <Diagram snap={snap} scene={step.scene} />}
 
-      {step.problem && <Problem />}
+      {step.problem && <Problem onStart={() => go(1)} />}
       {step.conclusion && <ExactlyOnce />}
 
       {step.arch || step.nexus || step.problem || step.conclusion ? null : (

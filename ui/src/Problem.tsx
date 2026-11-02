@@ -148,7 +148,7 @@ const OUTCOMES = [
   { cls: "good", mark: "✓", title: "Paid once", sub: "The only right answer" },
 ];
 
-export function Problem() {
+export function Problem({ onStart }: { onStart: () => void }) {
   return (
     <section className="pb-page" aria-label="The problem">
       <div className="pb-hero">
@@ -171,6 +171,7 @@ export function Problem() {
         ))}
       </div>
       <p className="pb-foot">Same tickets. Same failures. Two builds. The payments ledger decides which one pays once.</p>
+      <button type="button" className="primary pb-start" onClick={onStart}>Start the demo →</button>
     </section>
   );
 }

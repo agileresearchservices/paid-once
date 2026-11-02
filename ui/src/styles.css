@@ -429,7 +429,7 @@ main.fill .pane { height: auto; min-height: 186px; }
 .eo-ask { margin: 16px 0 0; padding: 2px 0 2px 16px; border-left: 3px solid var(--accent-ink); font-size: 22px; font-style: italic; color: var(--ink-2); }
 
 /* The opening slide (Problem.tsx): a headline, the refund's path with a coin on it, and the three outcomes. */
-.pb-page { display: grid; gap: 14px; padding: 14px 0 0; position: relative; }
+.pb-page { display: grid; gap: 18px; align-content: center; min-height: calc(100vh - 90px); padding: 0; position: relative; }
 .pb-page::before {
   content: ""; position: absolute; inset: -40px -24px 0; pointer-events: none; z-index: -1;
   background: radial-gradient(60% 55% at 50% 0%, rgba(68, 76, 231, 0.28), transparent 70%), radial-gradient(40% 40% at 85% 55%, rgba(182, 100, 255, 0.14), transparent 70%);
@@ -472,4 +472,6 @@ main.fill .pane { height: auto; min-height: 186px; }
 .pb-outcome.good .mark { background: var(--good); color: #04281a; box-shadow: 0 0 18px rgba(0, 225, 117, 0.5); }
 .pb-outcome.good b { color: var(--good-ink); }
 .pb-foot { margin: 6px 0 0; text-align: center; font-size: 24px; color: var(--ink-2); }
+button.pb-start { justify-self: center; margin-top: 6px; padding: 12px 32px; font-size: 22px; border-radius: 999px; box-shadow: 0 0 28px rgba(123, 131, 255, 0.35); }
+button.pb-start:hover:not(:disabled) { filter: brightness(1.12); border-color: transparent; }
 @media (prefers-reduced-motion: reduce) { .pb-hazard .glow { animation: none; } }
