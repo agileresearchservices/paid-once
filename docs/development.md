@@ -41,6 +41,17 @@ Two rules keep the numbers honest. The scoreboard comes from `audit.compute_all`
 never scored. The walkthrough and the Nexus scene (`DEMO_SCENES`) are left out of the scoreboard and scored alone as
 `demo_audit`; `make scenario` adds them back and checks them.
 
+Two display-only delays keep the page in step with the traffic. Neither touches the audit, `Engine.flow` or what a scene
+waits for:
+
+- **`timeline.ENTRY_HOLD_S`** (1.2 s): at the start of a scene `snapshot()` draws tickets the agent is still deciding at
+  their stack's front door, so they do not appear already split across workers (Lane 1 has 4 worker threads, Temporal
+  hands out every activity at once).
+- **`ARRIVE_S`** in `ui/src/Diagram.tsx` (2.0 s): the ledger marks come from the audit, which sees a booking the moment
+  payments commits, while the dots are polled and glide for 1.8 s. A slot fills this long after its ticket's dot first
+  reaches payments' side (`useArrived`), and stays filled if a crash later pulls the ticket back. The "N of M refunded
+  once" cards under the diagram still read the audit directly, so they can lead the dots by about 2 s.
+
 ## Adding a scene
 
 1. Add `SceneInfo("my_scene", "Title")` to `SCENES` in `show/catalog.py`.
@@ -48,7 +59,9 @@ never scored. The walkthrough and the Nexus scene (`DEMO_SCENES`) are left out o
    lanes, `approve_scene` to play the human, and the fault primitives (`kill_window`, `set_fault`, `fault`) so the
    page can draw where each fault landed. Do not end a scene with a fixed sleep: `Engine.settle` holds it until the
    ledger has decided every ticket, both stacks have stopped, and Lane 1's queue is empty, then clears the faults.
-3. Add a `Step` to `STEPS` in `ui/src/steps.ts` (copy is read from a projector: short, concrete sentences).
+3. Add a `Step` to `STEPS` in `ui/src/steps.ts` (copy is read from a projector: short, concrete sentences). The deck is
+   nine steps; the first (`problem`) and last (`exactly_once`) are slides with no scene, and the scoreboard is a slide too.
+   Page numbers appear in `README.md`, `catalog.py` comments and the URL hash (`#1`..`#9`), so renumber them together.
 4. `scripts/smoke.py` runs every scene in `SCENES` and `make scenario` checks it, so there is nothing to register there.
 
 An unknown scene id answers 404; a scene already running answers 409.
