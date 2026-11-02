@@ -22,11 +22,12 @@ design is in [`docs/architecture.md`](docs/architecture.md), the measured result
 
 ## Quick start
 
-You need [uv](https://docs.astral.sh/uv/) and the [Temporal CLI](https://docs.temporal.io/cli). The demo UI also
-needs Node 22 or newer.
+You need [uv](https://docs.astral.sh/uv/) (it fetches Python 3.12 itself) and the
+[Temporal CLI](https://docs.temporal.io/cli). The demo UI also needs Node 22 or newer. Nothing else.
 
 ```bash
-brew install temporal uv     # macOS; on Linux install both from their docs
+brew install temporal uv node   # macOS; on Linux install them from their docs. Node is only for `make ui`
+git clone https://github.com/agileresearchservices/paid-once.git && cd paid-once
 make install                 # Python 3.12 environment from uv.lock
 make test                    # fast suite, no Temporal server needed
 make scenario                # the headless run: no API key, about four minutes
@@ -69,6 +70,10 @@ the same audit (`paidonce/audit.py`).
 
 The Temporal wordmark and favicon are trademarks, so they are not in the repo. Put `temporal-wordmark.svg` and
 `favicon.svg` in `ui/public/brand/` (gitignored) before `make ui` to show them; otherwise the header shows text.
+
+On a fresh clone the whole path is `make install`, `make test`, `make scenario` (no key), then the `.env` line,
+`make ui` and `make demo`. Run `make scenario` once first: it proves the Temporal CLI, the ports and the audit work on
+that machine before you present. It needs port 8100 free, so stop any `make demo` first.
 
 ## Make targets
 
