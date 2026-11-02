@@ -81,7 +81,7 @@ export function Scoreboard({
         {compact && loss}
       </div>
       {believedDone !== undefined && (
-        <p className="believed">
+        <p className={believedDone !== audit.refunded_once ? "believed differs" : "believed"}>
           Job table says <b>{believedDone}</b> done. Ledger says <b>{audit.refunded_once}</b> paid once.
         </p>
       )}

@@ -37,6 +37,10 @@ export function NexusWhy({ t }: { t: Topology }) {
         <marker id="why-arrow-good" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
           <path d="M0,0 L8,4 L0,8 z" className="why-head good" />
         </marker>
+        <linearGradient id="why-card" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#222a3a" /><stop offset="1" stopColor="#141414" /></linearGradient>
+        <linearGradient id="why-card-bad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#3d1612" stopOpacity="0.9" /><stop offset="1" stopColor="#141414" /></linearGradient>
+        <linearGradient id="why-card-good" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#0b3a22" stopOpacity="0.9" /><stop offset="1" stopColor="#141414" /></linearGradient>
+        <linearGradient id="why-box" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#273248" /><stop offset="1" stopColor="#161d2b" /></linearGradient>
       </defs>
 
       {/* Without: four things support has to know, each crossing the team line */}

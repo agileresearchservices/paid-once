@@ -5,6 +5,7 @@ import { NexusPanel } from "./NexusPanel";
 import { Problem } from "./Problem";
 import { auditWait } from "./outcomes";
 import { Scoreboard } from "./Scoreboard";
+import type { LaneAudit } from "./types";
 import { STEPS } from "./steps";
 import { post, useSnapshot } from "./useSnapshot";
 import { Walkthrough } from "./Walkthrough";
@@ -13,6 +14,14 @@ const LANES = [
   { id: "lane1" as const, name: "Queue + LangGraph", subtitle: "What most teams run today" },
   { id: "lane2" as const, name: "Temporal + Nexus", subtitle: "Durable workflow, payments over Nexus" },
 ];
+
+// The lane's card takes a glow from the ledger's verdict: red once an invariant is violated, green once money has moved and
+// nothing is wrong or still settling. Neutral before any money has moved.
+function verdictClass(a: LaneAudit): string {
+  if (a.duplicates + a.missing + a.unapproved > 0) return "verdict-bad";
+  if (a.refunded_once > 0 && a.in_flight === 0) return "verdict-good";
+  return "";
+}
 
 function Chips({ counts, empty }: { counts: Record<string, number>; empty: string }) {
   const entries = Object.entries(counts);
@@ -51,6 +60,31 @@ function stepFromHash(): number {
   return Number.isInteger(n) && n >= 1 && n <= STEPS.length ? n - 1 : 0;
 }
 
+// The bottom row on the slides that have no header bar: back, next, and on the scoreboard the reset.
+function SlideNav({
+  index,
+  last,
+  go,
+  reset,
+}: {
+  index: number;
+  last: number;
+  go: (delta: number) => void;
+  reset?: { confirm: boolean; onClick: () => void; disabled: boolean };
+}) {
+  return (
+    <div className="slide-nav">
+      <button type="button" onClick={() => go(-1)} disabled={index === 0}>← Back</button>
+      {reset && (
+        <button type="button" className={reset.confirm ? "danger" : ""} onClick={reset.onClick} disabled={reset.disabled}>
+          {reset.confirm ? "Click again to reset" : "Reset scoreboard"}
+        </button>
+      )}
+      <button type="button" onClick={() => go(1)} disabled={index === last}>Next →</button>
+    </div>
+  );
+}
+
 export function App() {
   const { snap, connected } = useSnapshot();
   const [index, setIndex] = useState(stepFromHash);
@@ -58,6 +92,8 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const resetTimer = useRef<number | undefined>(undefined);
   const step = STEPS[index];
+  // The opening, scoreboard and closing pages are slides: no header bar, their own headline.
+  const slide = !!(step.problem || step.conclusion || step.id === "scoreboard");
   const running = snap?.running ?? true;
   const locked = snap?.locked ?? null; // `make scenario` owns this server: look, don't touch
 
@@ -175,7 +211,7 @@ export function App() {
         </p>
       )}
 
-      {!step.problem && !step.conclusion && (
+      {!slide && (
       <section className="story">
         <div className="story-text">
           <h2>{step.title}</h2>
@@ -228,12 +264,25 @@ export function App() {
       {(step.arch || (step.scene && !step.nexus)) && <Diagram snap={snap} scene={step.scene} />}
 
       {step.problem && <Problem onStart={() => go(1)} />}
-      {step.conclusion && <ExactlyOnce />}
+      {step.conclusion && (
+        <>
+          <ExactlyOnce />
+          <SlideNav index={index} last={STEPS.length - 1} go={go} />
+        </>
+      )}
 
       {step.arch || step.nexus || step.problem || step.conclusion ? null : (
-        <div className="lanes">
+        <div className={step.scene ? undefined : "sb-page"}>
+          {step.id === "scoreboard" && (
+            <div className="sb-hero">
+              <p className="pb-eyebrow">The scoreboard</p>
+              <h2 className="sb-headline">The ledger has the <em>final word</em></h2>
+              <p className="sb-lede">Scored from the payments ledger, never from either build's own records.</p>
+            </div>
+          )}
+        <div className={step.scene ? "lanes" : "lanes slide"}>
           {LANES.map((l) => (
-            <article key={l.id} className={step.scene ? `lane ${l.id} compact` : `lane ${l.id}`}>
+            <article key={l.id} className={`${step.scene ? `lane ${l.id} compact` : `lane ${l.id}`} ${verdictClass(snap.audit[l.id])}`}>
               {step.scene ? (
                 // A scene step is read from across a room while it runs: name and what the stack believes on one line,
                 // so the diagram and both scoreboards fit one screen.
@@ -259,6 +308,9 @@ export function App() {
               />
             </article>
           ))}
+        </div>
+      
+          {slide && <SlideNav index={index} last={STEPS.length - 1} go={go} reset={step.id === "scoreboard" ? { confirm: confirmReset, onClick: onReset, disabled: !!locked } : undefined} />}
         </div>
       )}
     </main>

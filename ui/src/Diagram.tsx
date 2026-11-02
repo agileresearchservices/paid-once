@@ -253,6 +253,10 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
           <marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
             <path d="M0,0 L8,4 L0,8 z" className="arrowhead" />
           </marker>
+          <linearGradient id="node-gloss" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#212b3d" />
+            <stop offset="1" stopColor="#141414" />
+          </linearGradient>
         </defs>
 
         <rect className="team" x={822} y={4} width={W - 824} height={H - 8} rx={14} />
