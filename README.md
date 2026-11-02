@@ -63,7 +63,9 @@ step is kept in the URL (`#5`). The scoreboard resets whenever the show server s
 | 9 Conclusion | At-least-once delivery, exactly-once effect: the idempotency key per attempt vs per refund, and the next steps for a customer |
 
 Steps 3-6 run the same chaos against both lanes; the scoreboards diverge. The payments node in the diagram marks each
-ticket in the ledger: `✓` paid once, `×2` paid twice, `∅` owed and never paid, `—` denied and nothing owed.
+ticket in the ledger: `✓` paid once, `×2` paid twice, `∅` owed and never paid, `—` denied and nothing owed. A mark appears
+about 2 s after the ticket's dot reaches payments, so the ledger follows the traffic you can see; the numbers come from
+the same audit (`paidonce/audit.py`).
 
 The Temporal wordmark and favicon are trademarks, so they are not in the repo. Put `temporal-wordmark.svg` and
 `favicon.svg` in `ui/public/brand/` (gitignored) before `make ui` to show them; otherwise the header shows text.
