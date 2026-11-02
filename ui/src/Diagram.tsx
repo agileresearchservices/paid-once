@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { auditWait, OUTCOME_GLYPH } from "./outcomes";
 import { LegendIcon, TicketGlyph, type TicketKind } from "./TicketIcon";
 import type { FlowDot, LaneId, ShowEvent, Snapshot } from "./types";
@@ -53,6 +54,11 @@ const WIRES: { id: string; x1: number; x2: number; lane: LaneId; label?: string 
 ];
 
 const FLASH_S = 2.5;
+// The ledger is read from payments itself, so it knows a refund the moment it is booked, while the ticket's dot is still on
+// its way. A slot fills only once its ticket has reached payments' side (on the wire in, at the payments worker, or done) and
+// had time to glide in: the dot's move takes 1.8 s (.tdot in styles.css).
+const AT_PAYMENTS = new Set(["lane1_worker>payments", "payments_worker", "done"]);
+const ARRIVE_S = 2.0;
 const PITCH = 20; // between ticket badges (each is 17 px across)
 
 function dotPos(at: string, i: number, lane: LaneId): { x: number; y: number; gone?: boolean } {
@@ -62,7 +68,8 @@ function dotPos(at: string, i: number, lane: LaneId): { x: number; y: number; go
   const box = NODES[at];
   if (box) return { x: box.x + 22 + (i % 8) * PITCH, y: box.y + box.h - 16 - Math.floor(i / 8) * PITCH };
   const wire = WIRES.find((w) => w.id === at);
-  if (wire) return { x: wire.x1 + 40 + i * (PITCH + 2), y: mid(lane) };
+  // A wire into payments holds its dots at the payments end, so a ticket visibly travels there; the ledger fills on arrival.
+  if (wire) return { x: wire.id.endsWith(">payments") ? wire.x2 - 30 - i * (PITCH + 2) : wire.x1 + 40 + i * (PITCH + 2), y: mid(lane) };
   return { x: 0, y: mid(lane), gone: true };
 }
 
@@ -136,11 +143,13 @@ function Ledger({
   tickets,
   wait,
   finished,
+  arrived,
 }: {
   lane: LaneId;
   label: string;
   dots: FlowDot[];
   tickets: Record<string, string>;
+  arrived: Set<string>; // tickets whose dot has reached payments: until then a booking stays out of the ledger
   wait: { count: number; secs: number } | null;
   finished: boolean; // the scene has ended, so every ticket's verdict is in
 }) {
@@ -152,7 +161,10 @@ function Ledger({
   // once the scene has finished, so the ledger doesn't open with a denial in it.
   const statuses = ids.map((id) => {
     const st = tickets[id] ?? "waiting";
-    return (st === "declined" || st === "rejected") && !finished ? "waiting" : st;
+    if ((st === "declined" || st === "rejected") && !finished) return "waiting";
+    // Money the ledger has booked shows once the ticket's dot has arrived (a finished scene shows everything)
+    if ((st === "ok" || st === "duplicate" || st === "unapproved") && !finished && !arrived.has(`${lane}:${id}`)) return "in_flight";
+    return st;
   });
   const tally = tallyParts(statuses);
   return (
@@ -194,6 +206,21 @@ function Ledger({
   );
 }
 
+// Which tickets have reached payments' side of the diagram, per this run: first seen there, plus time to arrive.
+function useArrived(flow: Record<LaneId, FlowDot[]>, runKey: number | undefined, now: number): Set<string> {
+  const seen = useRef<{ key: number | undefined; at: Map<string, number> }>({ key: runKey, at: new Map() });
+  if (seen.current.key !== runKey) seen.current = { key: runKey, at: new Map() };
+  for (const lane of ["lane1", "lane2"] as LaneId[])
+    for (const d of flow[lane]) {
+      const k = `${lane}:${d.ticket}`;
+      if (AT_PAYMENTS.has(d.at) && !seen.current.at.has(k)) seen.current.at.set(k, now);
+    }
+  // Arrival is remembered: a ticket a crash pulls back off payments' side has still been there, and the money stays booked.
+  const out = new Set<string>();
+  for (const [k, since] of seen.current.at) if (now - since >= ARRIVE_S) out.add(k);
+  return out;
+}
+
 export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null }) {
   // Only the scene that ran last is on screen: its dots, ledger, fault marks and kill badges all go together. Any other step
   // shows a bare diagram, however recently its own scene ran.
@@ -213,6 +240,8 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
   const humanNow =
     run != null &&
     snap.events.some((e) => e.kind === "human" && e.ts >= run.started_at && snap.now - e.ts < FLASH_S + 1 && (e.scene === scene || e.scene?.startsWith(`${scene}_`)));
+
+  const arrived = useArrived(flow, run?.started_at, snap.now);
 
   const busy = new Set<string>();
   for (const lane of ["lane1", "lane2"] as LaneId[])
@@ -352,8 +381,8 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
 
         {scene != null && (
           <>
-            <Ledger lane="lane1" label="Queue" dots={flow.lane1} tickets={audit("lane1")} wait={wait("lane1")} finished={run?.finished_at != null} />
-            <Ledger lane="lane2" label="Temporal" dots={flow.lane2} tickets={audit("lane2")} wait={wait("lane2")} finished={run?.finished_at != null} />
+            <Ledger lane="lane1" label="Queue" dots={flow.lane1} tickets={audit("lane1")} wait={wait("lane1")} finished={run?.finished_at != null} arrived={arrived} />
+            <Ledger lane="lane2" label="Temporal" dots={flow.lane2} tickets={audit("lane2")} wait={wait("lane2")} finished={run?.finished_at != null} arrived={arrived} />
           </>
         )}
 
