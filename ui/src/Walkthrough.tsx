@@ -190,7 +190,12 @@ export function Walkthrough({ beat, flow }: { beat: string | null; flow?: Record
         {/* The customer talks only to the agent: a short answer per step, never the policy check or the approval. */}
         <Pane who="Customer view" avatar={<RoleIcon role="customer" />} chat>
           {/* The photo rides in the message's own bubble, so it costs the short chat pane almost no height */}
-          {b && <div className="msg customer"><p className="with-photo"><span>{message}</span><BrokenMug /></p></div>}
+          {/* Before the run the customer is typing; "Walk through one ticket" sends the message. */}
+          {b ? (
+            <div className="msg customer"><p className="with-photo"><span>{message}</span><BrokenMug /></p></div>
+          ) : (
+            <div className="msg customer"><p><Typing /></p></div>
+          )}
           {replies.map((r, n) => (
             <div className="msg support" key={n}><p>{r}</p></div>
           ))}

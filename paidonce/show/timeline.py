@@ -3,7 +3,7 @@ attempts a refund made, the payments-quiet window, and when a scene has settled.
 
 from __future__ import annotations
 
-from temporalio.api.enums.v1 import PendingNexusOperationState
+from temporalio.api.enums.v1 import PendingActivityState, PendingNexusOperationState
 
 from paidonce.lane2.payments_side import REFUND_RETRY
 from paidonce.models import TicketOutcome
@@ -21,6 +21,25 @@ LANE1_STAGES = {
     "denied": ("closed", "denied by the agent"),
     "rejected": ("closed", "denied by a human"),
 }
+
+
+# How long a scene's tickets are drawn at their stack's front door (Queue API, Temporal server) before any is drawn at
+# a worker. Both stacks take a ticket in at once, but Lane 1's four worker threads claim jobs a poll apart while
+# Temporal hands every Lane 2 activity out at once: without this the page opens with the tickets already split up.
+ENTRY_HOLD_S = 1.2
+ENTRY = {"lane1": ("lane1_api", "queued for the agent"), "lane2": ("temporal", "queued for the agent")}
+
+
+def hold_at_entry(flow: dict[str, list[dict]], since: float, now: float) -> dict[str, list[dict]]:
+    """The view of `flow` for a scene started at `since`: for its first ENTRY_HOLD_S, a ticket the agent is deciding is
+    drawn where it came in. Display only: the audit, the settle check and the scene waits read the true stages."""
+    if now - since >= ENTRY_HOLD_S:
+        return flow
+    out = {}
+    for lane, dots in flow.items():
+        at, state = ENTRY.get(lane, (None, None))
+        out[lane] = [{**d, "at": at, "state": state} if at and d["state"] == "agent deciding" else d for d in dots]
+    return out
 
 
 # Where a stack leaves a ticket it has given up on: Lane 1's job status, or a closed Lane 2 workflow (lane2_stage).
@@ -48,7 +67,10 @@ def lane2_stage(
             return {"at": "payments_worker", "state": "refund running in payments"}
         return {"at": "endpoint", "state": "Nexus operation starting"}
     if activities:
-        return {"at": "support_worker", "state": "agent deciding"}
+        # An activity no worker has picked up yet is still queued in Temporal, like a Lane 1 job still "new" at the API.
+        if any(a.state != PendingActivityState.PENDING_ACTIVITY_STATE_SCHEDULED for a in activities):
+            return {"at": "support_worker", "state": "agent deciding"}
+        return {"at": "temporal", "state": "queued for the agent"}
     if decision is True:
         # Approved but nothing pending: the signal is in history and the support worker is down or not yet polling.
         return {"at": "temporal", "state": "approved, queued in Temporal for a worker"}

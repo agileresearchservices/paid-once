@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from types import SimpleNamespace
 
-from temporalio.api.enums.v1 import PendingNexusOperationState
+from temporalio.api.enums.v1 import PendingActivityState, PendingNexusOperationState
 
 from paidonce.models import TicketOutcome
 from paidonce.show import catalog
@@ -15,9 +15,11 @@ from paidonce.show.catalog import SCENES, is_demo, ticket_index
 from paidonce.show.engine import Engine
 from paidonce.show.procs import ProcessManager
 from paidonce.show.timeline import (
+    ENTRY_HOLD_S,
     LANE1_STAGES,
     backoff_before,
     finish_attempts,
+    hold_at_entry,
     lane2_stage,
     merge_attempts,
     scene_calls,
@@ -29,6 +31,31 @@ from paidonce.show.timeline import (
 
 def test_unapproved_parked_workflow_waits_for_a_human():
     assert lane2_stage("RUNNING", [], [])["state"] == "waiting in Temporal"
+
+
+def test_new_ticket_is_queued_in_temporal_until_a_worker_starts_the_agent():
+    scheduled = SimpleNamespace(state=PendingActivityState.PENDING_ACTIVITY_STATE_SCHEDULED)
+    started = SimpleNamespace(state=PendingActivityState.PENDING_ACTIVITY_STATE_STARTED)
+    assert lane2_stage("RUNNING", [scheduled], []) == {"at": "temporal", "state": "queued for the agent"}
+    assert lane2_stage("RUNNING", [started], [])["at"] == "support_worker"
+
+
+def test_new_tickets_are_drawn_at_the_front_door_for_the_first_moments_of_a_scene():
+    flow = {
+        "lane1": [
+            {"ticket": "a", "at": "lane1_worker", "state": "agent deciding"},
+            {"ticket": "b", "at": "lane1_api", "state": "queued for the agent"},
+        ],
+        "lane2": [
+            {"ticket": "a", "at": "support_worker", "state": "agent deciding"},
+            {"ticket": "c", "at": "done", "state": "refunded"},
+        ],
+    }
+    held = hold_at_entry(flow, since=100.0, now=100.0 + ENTRY_HOLD_S / 2)
+    assert [d["at"] for d in held["lane1"]] == ["lane1_api", "lane1_api"]
+    assert [d["at"] for d in held["lane2"]] == ["temporal", "done"]
+    assert flow["lane1"][0]["at"] == "lane1_worker"  # a view only: the real stages are untouched
+    assert hold_at_entry(flow, since=100.0, now=100.0 + ENTRY_HOLD_S) is flow
 
 
 def test_approved_parked_workflow_is_not_drawn_as_waiting():
