@@ -22,11 +22,45 @@ design is in [`docs/architecture.md`](docs/architecture.md), the measured result
 
 ## Quick start
 
-You need [uv](https://docs.astral.sh/uv/) (it fetches Python 3.12 itself) and the
-[Temporal CLI](https://docs.temporal.io/cli). The demo UI also needs Node 22 or newer. Nothing else.
+Works on macOS, Linux and Windows. Windows runs it inside WSL2 (a Linux that ships with Windows): the fault injector
+kills processes with POSIX signals, so plain PowerShell is not supported.
+
+You need Python 3.12 (uv fetches it for you), [uv](https://docs.astral.sh/uv/), the
+[Temporal CLI](https://docs.temporal.io/cli), Node 22 or newer (only to build the UI), git and make. The live demo also
+needs your own [Anthropic API key](https://console.anthropic.com/).
+
+### 1. Install the tools
+
+**macOS.** Install [Homebrew](https://brew.sh), then:
 
 ```bash
-brew install temporal uv node   # macOS; on Linux install them from their docs. Node is only for `make ui`
+xcode-select --install       # git and make; skip if `git --version` already works
+brew install temporal uv node
+```
+
+**Windows.** Install WSL2 and open the Ubuntu terminal it creates, then follow the Linux steps in that terminal.
+
+```powershell
+wsl --install -d Ubuntu      # in PowerShell as Administrator; restart when asked, then open "Ubuntu" and pick a username
+```
+
+Keep the project in the Linux home folder (`~`), not under `/mnt/c`. A Windows browser reaches the demo on
+`http://127.0.0.1:8100` as usual.
+
+**Linux (and Ubuntu on WSL).** Homebrew gives the same three packages as on macOS:
+
+```bash
+sudo apt update && sudo apt install -y build-essential procps curl file git
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc && source ~/.bashrc
+brew install temporal uv node
+```
+
+Check with `temporal --version && uv --version && node -v` (Node must be 22 or newer).
+
+### 2. Get the code and check it works (no API key)
+
+```bash
 git clone https://github.com/agileresearchservices/paid-once.git && cd paid-once
 make install                 # Python 3.12 environment from uv.lock
 make test                    # fast suite, no Temporal server needed
@@ -36,16 +70,16 @@ make scenario                # the headless run: no API key, about four minutes
 `make scenario` starts every service (and a Temporal dev server, if none is listening), runs the walkthrough, the happy
 path, three chaos scenes and the Nexus gauntlet against both lanes with a **stub model**, prints a ledger scoreboard for each, and
 exits non-zero if Lane 2 breaks an invariant. The invariants are decided by the ledger, not by the model's wording, so
-the stub does not change the result.
+the stub does not change the result. It needs ports 8100-8102 and 7233 free.
 
-## Run the live demo
+### 3. Run the live demo
 
-The demo uses a real Anthropic model (`claude-sonnet-5-5`; `PAIDONCE_MODEL` changes it).
+The demo calls a real Anthropic model (`claude-sonnet-5-5`; `PAIDONCE_MODEL` changes it), so it needs your API key.
 
 ```bash
-echo 'ANTHROPIC_API_KEY=...' > .env     # gitignored; or export it in your shell
-make ui                                 # builds the UI into ui/dist
-make demo                               # http://127.0.0.1:8100
+echo 'ANTHROPIC_API_KEY=your-key-here' > .env    # gitignored; or `export ANTHROPIC_API_KEY=...` in your shell
+make ui                                          # builds the UI into ui/dist
+make demo                                        # then open http://127.0.0.1:8100 in a browser; Ctrl-C stops it
 ```
 
 The page is a nine-step stepper for a laptop browser in full screen. Arrow keys or `1`-`9` move between steps, and the
