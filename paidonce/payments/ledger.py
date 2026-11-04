@@ -27,6 +27,7 @@ CREATE INDEX IF NOT EXISTS refunds_ticket ON refunds (ticket_id);
 
 
 def init() -> None:
+    """Create the refunds table. Every function here calls it first, so a new or deleted ledger file gets rebuilt."""
     ensure_schema(config.LEDGER_DB, SCHEMA)
 
 
@@ -59,6 +60,10 @@ def record_refund(ticket_id: str, amount_cents: int, idem_key: str, lane: str) -
 
 
 def all_refunds(lane: str | None = None) -> list[dict]:
+    """Every refund, oldest first, or only one lane's.
+
+    The audit scores each lane from this, and the tests count refunds with it.
+    """
     init()
     with connect(config.LEDGER_DB) as conn:
         where, args = ("WHERE lane = ?", (lane,)) if lane else ("", ())
@@ -66,6 +71,7 @@ def all_refunds(lane: str | None = None) -> list[dict]:
 
 
 def reset() -> None:
+    """Delete every refund, so the show's reset (through `/admin/reset`) starts each run from an empty ledger."""
     init()
     with connect(config.LEDGER_DB) as conn:
         conn.execute("DELETE FROM refunds")

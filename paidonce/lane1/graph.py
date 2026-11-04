@@ -23,14 +23,17 @@ from paidonce.lane1 import store
 from paidonce.models import Proposal, Ticket
 
 ATTEMPTS = 3
-BACKOFF_S = 1.0  # attempt n waits n x this before the next try
+BACKOFF_S = 1.0  # attempt n sleeps n x this after it fails, the last attempt included
 
 
 class State(TypedDict, total=False):
-    ticket: Ticket
-    proposal: Proposal
-    approved: bool
-    refund_id: str
+    """The LangGraph state for one ticket. Each node returns only the keys it sets, and the checkpointer keeps the
+    whole state under the ticket id. A key is absent until a node sets it."""
+
+    ticket: Ticket  # the row as the worker read it; the decide job passes it in as the input
+    proposal: Proposal  # from `_decide`: `action` is "refund" or "deny"; `amount_cents` is the refund amount
+    approved: bool  # from the resume value at `_await_approval`; the worker only ever resumes with True
+    refund_id: str  # from `_execute`, once payments has answered
 
 
 def call_payments(ticket_id: str, amount_cents: int) -> str:
@@ -56,7 +59,7 @@ def call_payments(ticket_id: str, amount_cents: int) -> str:
                 verify=tls.client_verify(),
             )
             if resp.status_code < 500:
-                resp.raise_for_status()  # a 4xx is a refusal, not a blip: it ends the job instead of retrying
+                resp.raise_for_status()  # a 4xx is a refusal, not a blip: no more attempts here; the worker logs it
                 return resp.json()["refund_id"]
             last = RuntimeError(f"payments returned {resp.status_code}")
         except (httpx.TimeoutException, httpx.TransportError) as exc:
@@ -66,6 +69,12 @@ def call_payments(ticket_id: str, amount_cents: int) -> str:
 
 
 def execute_refund(ticket_id: str, amount_cents: int) -> str:
+    """Mark the ticket `executing`, call payments, then mark it `done` with the refund id.
+
+    The window between the two writes is where a crash does damage. The row stays at `executing`. If payments had
+    already committed, the recovery path in `Worker.handle_execute` calls it again; with a fresh idempotency key,
+    payments takes that for a new refund (architecture.md, Lane 1 realism).
+    """
     store.set_status(ticket_id, "executing")
     refund_id = call_payments(ticket_id, amount_cents)
     store.set_status(ticket_id, "done", refund_id=refund_id)
@@ -73,10 +82,15 @@ def execute_refund(ticket_id: str, amount_cents: int) -> str:
 
 
 def _decide(state: State) -> State:
+    """The agent's decision: the policy rules first, then the model (`agent.decide`). A policy denial makes no model
+    call."""
     return {"proposal": agent.decide(state["ticket"])}
 
 
 def _await_approval(state: State) -> State:
+    """Pause for a human. `interrupt` checkpoints the graph and hands control back to the worker. On resume this node
+    runs again from the top and `interrupt` returns the resume value, so nothing before the call may have side effects.
+    A proposal that is not a refund skips the pause."""
     proposal = state["proposal"]
     if proposal.action != "refund":
         return {"approved": False}  # nothing to approve: the ticket ends here
@@ -85,6 +99,7 @@ def _await_approval(state: State) -> State:
 
 
 def _execute(state: State) -> State:
+    """Refund the approved amount through `execute_refund`. Only an approved ticket reaches this node."""
     ticket, proposal = state["ticket"], state["proposal"]
     return {"refund_id": execute_refund(ticket.ticket_id, proposal.amount_cents)}
 
@@ -96,6 +111,11 @@ def _after_approval(state: State) -> str:
 
 
 def build_graph() -> CompiledStateGraph:
+    """Compile decide, then await_approval (the interrupt), then execute, which runs only after an approval.
+
+    The MemorySaver checkpointer keeps each paused ticket in this process's memory. That is what makes the approval
+    wait live in the worker, and it is why a restarted worker has nothing to resume (architecture.md, Lane 1 realism).
+    """
     graph = StateGraph(State)
     graph.add_node("decide", _decide)
     graph.add_node("await_approval", _await_approval)

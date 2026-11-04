@@ -19,13 +19,25 @@ from paidonce.show.catalog import LANE_NAMES, MESSAGES, ticket_id
 
 
 class HarnessMixin:
+    """Ticket intake and the approver bot, mixed into `Engine`, which owns the state these methods read and write.
+    Scenes file tickets with `submit_cohort` (or `submit_ticket` for one), play the human with `approve_scene`, and use
+    the `wait_for_*` helpers to hold a scene until the stacks catch up."""
+
     def _make_ticket(
         self, scene: str, i: int, lane: str, amount: int, message: str, age: int = DEFAULT_ORDER_AGE_DAYS
     ) -> Ticket:
+        """The ticket for cohort index `i` on one lane. Its ID comes from `catalog.ticket_id`, which packs in the run,
+        the scene, the run number, the index and the lane. The order ID carries the run and run number, so a re-run
+        never reuses an order. The customer ID is `cust-NN` in every run; nothing keys on it, and both lanes get the
+        same customer and order for index `i`."""
         tid = ticket_id(self.run_id, scene, self.run_no, i, lane)
         return Ticket(tid, f"cust-{i:02d}", f"ord-{self.run_id}-r{self.run_no}-{i:02d}", amount, message, age)
 
     async def submit_ticket(self, lane: str, scene: str, ticket: Ticket, expect: str = "refund") -> None:
+        """Records the ticket with the audit first, so a ticket a lane loses still counts. Then the lane's own intake:
+        on Lane 1, a POST to the API that retries until it answers, as a helpdesk webhook does (60 tries at most,
+        then it gives up without raising); on Lane 2, one workflow start, not retried here, with the ID from
+        `ticket_workflow_id` (`ticket-<ticket_id>`)."""
         audit.record_ticket(lane, ticket.ticket_id, scene, ticket.amount_cents, expect)
         self.plan[ticket.ticket_id] = expect
         self.scene_tickets.setdefault(scene, []).append((lane, ticket.ticket_id))

@@ -13,6 +13,16 @@ from paidonce import config
 from paidonce.db import connect, ensure_schema, transaction
 from paidonce.models import DEFAULT_ORDER_AGE_DAYS
 
+# Ticket status lifecycle, as the code moves it:
+#   new -> deciding -> awaiting_approval -> approved -> executing -> done
+# The API creates `new`, and sets `approved` or `rejected` when a human answers. The decide job sets `deciding`, then
+# `awaiting_approval` or `denied`. The execute job sets `executing`, then `done`. Three states end a ticket with no
+# refund:
+#   denied    the policy check or the model said no (`Worker.handle_decide`); the reason is in `detail`
+#   rejected  a human said no: `reject` closes the row at the API and queues no job
+#   failed    approved, but the graph state was lost when the worker restarted (`Worker.handle_execute`)
+# There are two job kinds, `decide` and `execute`. A finished job is deleted from `jobs` and recorded in `job_log`,
+# so `redeliver` can replay recent ones.
 # Statuses from which a ticket has been approved: the human's "yes" is in, whether or not the refund has landed.
 APPROVED_STATES = ("approved", "executing", "done")
 
@@ -34,6 +44,8 @@ CREATE TABLE IF NOT EXISTS job_log (
 
 
 def init() -> None:
+    """Create the tables if they are missing. Most functions here call this first, so a fresh database needs no setup
+    step. `db.ensure_schema` runs the SQL once per process, and again if the file has been deleted."""
     ensure_schema(config.LANE1_DB, SCHEMA)
 
 
@@ -67,6 +79,8 @@ def create_ticket(ticket: dict) -> bool:
 
 
 def get_ticket(ticket_id: str) -> dict | None:
+    """The ticket's row as a dict, with `proposal` decoded from JSON (None until the agent has decided).
+    None for an unknown ticket."""
     init()
     with connect(config.LANE1_DB) as conn:
         row = conn.execute("SELECT * FROM tickets WHERE ticket_id = ?", (ticket_id,)).fetchone()
@@ -78,6 +92,8 @@ def get_ticket(ticket_id: str) -> dict | None:
 
 
 def list_tickets() -> list[dict]:
+    """Every ticket's id, status, refund id and detail, oldest first. The show reads this for Lane 1's own view; the
+    audit never reads it."""
     init()
     with connect(config.LANE1_DB) as conn:
         rows = conn.execute("SELECT ticket_id, status, refund_id, detail FROM tickets ORDER BY created_at").fetchall()
@@ -92,6 +108,11 @@ def set_status(
     refund_id: str | None = None,
     detail: str | None = None,
 ) -> None:
+    """Set a ticket's status and move `updated_at`.
+
+    The keyword arguments are optional. Each one updates only its own column, and only when it is not None:
+    `proposal` is stored as JSON, `refund_id` and `detail` as given. Other columns are left alone.
+    """
     sets, args = ["status = ?", "updated_at = ?"], [status, time.time()]
     if proposal is not None:
         sets.append("proposal = ?")
@@ -182,6 +203,8 @@ def extend_lease(job_id: int) -> None:
 
 
 def complete_job(job: dict) -> None:
+    """Acknowledge a finished job. It leaves `jobs`, so the queue never hands it out again, and goes to `job_log`,
+    where `redeliver` can find it."""
     with connect(config.LANE1_DB) as conn:
         conn.execute("DELETE FROM jobs WHERE job_id = ?", (job["job_id"],))
         conn.execute(
@@ -198,7 +221,9 @@ def pending_jobs() -> int:
 
 
 def redeliver(n: int) -> int:
-    """Chaos: the broker delivers some recent execute jobs a second time (at-least-once)."""
+    """Chaos: the broker delivers up to `n` execute jobs a second time (at-least-once). The candidates are the execute
+    jobs still queued or in flight plus the last `n` the log saw; the UNION has no ORDER BY, so which `n` of those are
+    picked is SQLite's order, not the most recent."""
     init()
     now = time.time()
     with transaction(config.LANE1_DB) as conn:
@@ -218,6 +243,8 @@ def redeliver(n: int) -> int:
 
 
 def reset() -> None:
+    """Empty the Lane 1 tables for the show's reset. Worker checkpoints live in worker memory and are not cleared
+    here; ticket ids carry a reset id, so a new run never reuses an old one."""
     init()
     with connect(config.LANE1_DB) as conn:
         for table in ("tickets", "jobs", "job_log"):

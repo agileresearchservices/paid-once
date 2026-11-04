@@ -35,6 +35,9 @@ from paidonce.show.timeline import (
 
 
 class ViewsMixin:
+    """Background readers that fill in what the page shows about each stack. Mixed into `Engine`; the server's refresh
+    loop (server.py) calls `refresh_views` about once a second."""
+
     async def refresh_views(self) -> None:
         """Background: what each lane believes, and the live Nexus operations (Lane 2)."""
         pairs = self.scene_pairs(self.current) if self.current else []
@@ -181,6 +184,8 @@ class ViewsMixin:
 
     @staticmethod
     async def _describe(client: Client, workflow_id: str):
+        """Describe a workflow, or None when the server or the workflow is unavailable. The caller then drops that
+        ticket from this refresh's diagram; its last status and Nexus row stay as they were."""
         try:
             return await client.get_workflow_handle(workflow_id).describe()
         except Exception:
@@ -188,6 +193,8 @@ class ViewsMixin:
 
     @staticmethod
     async def _outcome(client: Client, workflow_id: str) -> TicketOutcome | None:
+        """The result of a completed workflow, read with a 2 s cap so a slow call delays the refresh by 2 s at most.
+        None on any failure."""
         try:
             handle = client.get_workflow_handle(workflow_id, result_type=TicketOutcome)
             return await asyncio.wait_for(handle.result(), timeout=2.0)

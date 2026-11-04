@@ -2,20 +2,21 @@
 export const OUTCOME_GLYPH = {
   ok: "✓",
   duplicate: "×2",
-  missing: "∅",
-  unapproved: "!",
+  missing: "∅", // approved, never refunded, past the settle window: counted lost
+  unapproved: "!", // refunded with no approval on record: an invariant violation
   denied: "—", // owed nothing, paid nothing: a human said no, or the ticket broke the refund policy
 } as const;
 
-// A ticket approved this long ago with no refund is waiting on something, not just in transit: say so on screen.
+// An approved ticket whose stack has given up, with no refund for this long, is waiting on the audit's verdict, not in
+// transit: `auditWait` says so on screen.
 const UNPAID_AFTER_S = 5;
 
 // Where a stack leaves a ticket it has given up on (STOPPED_STATES in paidonce/show/timeline.py).
 const STOPPED_STATES = new Set(["failed", "terminated", "canceled", "timed out", "continued as new"]);
 
-// The approved tickets whose stack has given up and that the audit is still giving time to show up in the ledger, and how
-// long until it counts them lost. A ticket its stack is still working on (Temporal, queued for a worker after a restart)
-// is not on this list: it is not about to be lost. Null while nothing qualifies.
+// The approved tickets whose stack has given up and that the audit is still giving time to show up in the ledger, and
+// how long until it counts them lost. A ticket its stack is still working on (Temporal, queued for a worker after a
+// restart) is not on this list: it is not about to be lost. Null while nothing qualifies.
 export function auditWait(
   pending: Record<string, { since: number; verdict_at: number }> | undefined,
   dots: { ticket: string; state: string }[],

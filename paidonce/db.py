@@ -16,6 +16,10 @@ _schemas_made: set[tuple[Path, str]] = set()
 
 @contextmanager
 def connect(path: Path) -> Iterator[sqlite3.Connection]:
+    """Open `path` in autocommit mode, in WAL so readers do not block the one writer. Rows are `sqlite3.Row`.
+
+    The `with` block closes the connection, so the caller closes nothing. The data directory is created first.
+    """
     config.ensure_data_dir()
     conn = sqlite3.connect(path, timeout=BUSY_TIMEOUT_S, isolation_level=None)
     conn.row_factory = sqlite3.Row

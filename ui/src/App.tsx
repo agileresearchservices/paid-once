@@ -10,19 +10,33 @@ import { STEPS } from "./steps";
 import { post, useSnapshot } from "./useSnapshot";
 import { Walkthrough } from "./Walkthrough";
 
+// The deck: nine steps from `STEPS` (steps.ts). Each page is drawn from one `Snapshot` from `useSnapshot`, which the
+// show server streams. The page keeps little state of its own: the step, in the URL hash (`#1`..`#9`) so a refresh
+// stays put; the reset confirmation; and the last control error. Arrow keys step and `1`-`9` jump (Cmd, Ctrl and Alt
+// combinations are ignored). Scenes start from their Run button only.
+// `problem`, `scoreboard` and `exactly_once` are slides: no scene and no story panel, just their own headline.
+// Every other step is a scene step: a story panel with a Run button, then the diagram and both lane scoreboards.
+// Two exceptions: `architecture` leads with the walkthrough and has no lane scoreboards, and `nexus_kill` shows the
+// Nexus panel instead of the diagram and the lanes.
+
+// The two stacks in on-screen order. `name` and `subtitle` are display text. `id` is the key the snapshot uses for a
+// lane (`audit`, `flow`, `payments_calls` and the rest), so it has to be a `LaneId` from types.ts.
 const LANES = [
   { id: "lane1" as const, name: "Queue + LangGraph", subtitle: "What most teams run today" },
   { id: "lane2" as const, name: "Temporal + Nexus", subtitle: "Durable workflow, payments over Nexus" },
 ];
 
-// The lane's card takes a glow from the ledger's verdict: red once an invariant is violated, green once money has moved and
-// nothing is wrong or still settling. Neutral before any money has moved.
+// The lane's card takes a glow from the ledger's verdict: red once an invariant is violated, green once money has
+// moved and nothing is wrong or still settling. Neutral before any money has moved.
 function verdictClass(a: LaneAudit): string {
   if (a.duplicates + a.missing + a.unapproved > 0) return "verdict-bad";
   if (a.refunded_once > 0 && a.in_flight === 0) return "verdict-good";
   return "";
 }
 
+// Draws one pill per status of the stack's own counts: Lane 1's job table statuses (`lane1_view_all`) or Lane 2's
+// Temporal statuses (`lane2_view_all`). That is the stack's claim, shown beside the ledger and never scored. `empty`
+// is the text shown when there are none.
 function Chips({ counts, empty }: { counts: Record<string, number>; empty: string }) {
   const entries = Object.entries(counts);
   if (!entries.length) return <span className="muted">{empty}</span>;
@@ -59,7 +73,7 @@ function stepFromHash(): number {
   return Number.isInteger(n) && n >= 1 && n <= STEPS.length ? n - 1 : 0;
 }
 
-// The bottom row on the slides that have no header bar: back, next, and on the scoreboard the reset.
+// The bottom row on the slides, which have no story panel or controls: back, next, and on the scoreboard the reset.
 function SlideNav({
   index,
   last,
@@ -84,6 +98,8 @@ function SlideNav({
   );
 }
 
+// The whole page. It reads `snap`, derives which scene is on screen (`onScreen`), and renders the header, story,
+// panels and scoreboards for the current step.
 export function App() {
   const { snap, connected } = useSnapshot();
   const [index, setIndex] = useState(stepFromHash);
@@ -91,7 +107,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const resetTimer = useRef<number | undefined>(undefined);
   const step = STEPS[index];
-  // The opening, scoreboard and closing pages are slides: no header bar, their own headline.
+  // The opening, scoreboard and closing pages are slides: no story panel or controls, their own headline.
   const slide = !!(step.problem || step.conclusion || step.id === "scoreboard");
   const running = snap?.running ?? true;
   const locked = snap?.locked ?? null; // `make scenario` owns this server: look, don't touch
@@ -122,7 +138,8 @@ export function App() {
   const beat = snap?.beat && snap.beat.scene === step.scene ? snap.beat.id : null;
 
   // Pressing Run on a scene step: scroll down so the diagram and the scoreboards below it are on screen together, and
-  // stop at the diagram's top (the explanation above may scroll away). The architecture step does its own scrolling (Walkthrough).
+  // stop at the diagram's top (the explanation above may scroll away). The architecture step does its own scrolling
+  // (Walkthrough).
   const sceneRunning = !!snap && snap.running && step.scene != null && snap.current === step.scene;
   const wasRunning = useRef(false);
   useEffect(() => {
@@ -216,7 +233,8 @@ export function App() {
           <h2>{step.title}</h2>
           <p>{step.story}</p>
           {step.watch && <p className="watch"><b>Watch:</b> {step.watch}</p>}
-          {/* Shown from the start, next to "Watch", so the viewer knows the outcome while the scene plays and why it happens */}
+          {/* Shown from the start, next to "Watch", so the viewer knows the outcome while the scene plays and why
+              it happens */}
           {step.result && (
             <p className="result">
               <b>Result:</b> {step.result}
@@ -257,7 +275,7 @@ export function App() {
         />
       )}
 
-      {/* The architecture step leads with the walkthrough (customer, agent, human), then the architecture it runs on. */}
+      {/* The architecture step: the walkthrough (customer, agent, human) first, then the architecture it runs on. */}
       {step.arch && <Walkthrough beat={beat} flow={onScreen ? snap.flow : undefined} />}
 
       {(step.arch || (step.scene && !step.nexus)) && <Diagram snap={snap} scene={step.scene} />}

@@ -53,6 +53,12 @@ def _fresh(service: str) -> bool:
 
 
 def _generate(service: str) -> None:
+    """Write a new key and certificate for `service` to `server_pem` and `cert_path`.
+
+    The certificate is self-signed and valid for a year (`VALID_DAYS`). Its subject alternative names are localhost,
+    127.0.0.1 and ::1, so the hostname check passes for loopback. It is marked as a CA, so it is its own trust anchor:
+    a caller that loads it as its only anchor accepts the server presenting it.
+    """
     key = ec.generate_private_key(ec.SECP256R1())
     name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, f"paid-once {service} (self-signed)")])
     now = datetime.datetime.now(datetime.UTC)
@@ -121,7 +127,7 @@ def ensure_certs() -> None:
         return
     try:
         import fcntl
-    except ImportError:  # no flock (Windows): the show server generates them before it starts anything else
+    except ImportError:  # no flock (Windows): the show server generates them before it starts the services
         make_stale()
         return
     with open(config.TLS_DIR / ".lock", "w") as lock:
@@ -130,10 +136,12 @@ def ensure_certs() -> None:
 
 
 def _enabled(service: str) -> bool:
+    """Whether `service` serves HTTPS, from its PAIDONCE_PAYMENTS_TLS or PAIDONCE_LANE1_TLS switch."""
     return config.PAYMENTS_TLS if service == "payments" else config.LANE1_TLS
 
 
 def _url(service: str) -> str:
+    """The base URL callers use for `service`. For an https:// URL, `client_verify` trusts only its certificate."""
     return config.PAYMENTS_URL if service == "payments" else config.LANE1_URL
 
 
@@ -147,6 +155,7 @@ def server_ssl_kwargs(service: str) -> dict:
 
 @lru_cache(maxsize=4)
 def _trust(services: tuple[str, ...]) -> ssl.SSLContext:
+    """An SSL context that trusts exactly the certificates of `services`. Cached, so each set is built once."""
     certs = [cert_path(service) for service in services]
     for cert in certs:
         if not cert.is_file():

@@ -1,11 +1,15 @@
-// The ticket status icons: one badge per status, so a status reads by shape as well as colour. Drawn centred on (0, 0) with
-// a radius of 8.5; the diagram places them (Dots) and the legend repeats them (LegendIcon), so the two can't drift apart.
-// The glyphs echo the rest of the page: the person is the human in the diagram, the dash is the ledger's "denied" box.
+// The ticket status icons: one badge per status, so a status reads by shape as well as colour. Drawn centred on (0, 0)
+// with a radius of 8.5; the diagram places them (Dots), the legend repeats them (LegendIcon) and the Nexus page's team
+// boxes reuse them (NexusTeams.tsx), so none can drift apart. The glyphs echo the rest of the page: the person is the
+// human in the diagram, the dash is the ledger's "denied" box.
 
 export type TicketKind = "active" | "waiting" | "paying" | "failed" | "closed" | "done";
 
 export const TICKET_ICON_R = 8.5;
 
+// One status badge centred on (0, 0). `kind` picks the shape, and the `ti-*` classes in styles.css give the colour. It
+// reads nothing from the snapshot: the caller decides the kind. Used by `Dots` (Diagram.tsx), `LegendIcon` and
+// NexusTeams.tsx.
 export function TicketGlyph({ kind }: { kind: TicketKind }) {
   switch (kind) {
     case "active": // a quarter-ring that turns slowly
@@ -54,6 +58,8 @@ export function TicketGlyph({ kind }: { kind: TicketKind }) {
   }
 }
 
+// The same glyph in its own svg, for the legend and for the walkthrough's panes. `.lg-icon` in styles.css sizes it. It
+// is hidden from screen readers: the words beside it say what it means.
 export function LegendIcon({ kind }: { kind: TicketKind }) {
   return (
     <svg className="lg-icon" viewBox="-10 -10 20 20" aria-hidden="true">

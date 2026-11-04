@@ -10,7 +10,9 @@ ticket IDs carry a per-run prefix, so reruns never collide with earlier tickets.
 the human or the policy said no to was not closed unpaid, if a ticket is still waiting at the end,
 or if the nexus_kill scene never showed the payments-side retry it exists to show, or one of its failures
 landed on nothing in flight. Its Temporal-server kill needs a server the show started itself: don't pre-start one.
-Lane 1 is printed for contrast but never gates the result.
+Lane 1 is printed for contrast: its chaos results never gate the run. Two checks do cover both lanes, as checks on the
+harness rather than on Lane 1: no ticket may still be in flight when a scene ends, and the walkthrough (no faults) must
+refund its one ticket exactly once in each lane.
 """
 
 import json
@@ -31,6 +33,8 @@ from paidonce.show.server import SCENARIO_HEADER
 PORT = config.SHOW_PORT
 BASE = f"http://127.0.0.1:{PORT}"
 MUST_HAVE = [s.id for s in SCENES if s.id != "free_roam"]  # the walkthrough and the five scenes
+# The audit counters `line` diffs against the previous scene's totals. `line` prints every one but `waiting`, which the
+# final audit shows as a total.
 FIELDS = (
     "submitted",
     "approved",
@@ -45,11 +49,15 @@ FIELDS = (
 )
 # Each cohort carries one ticket outside the refund policy and one the human denies (HarnessMixin.submit_cohort).
 NO_PER_COHORT = 2
+# How many cohorts a scene submits, for the denied-ticket check. A scene not listed submits one; free_roam runs four
+# rounds of one cohort each.
 # The walkthrough is one approved ticket: no denials.
 COHORTS = {"free_roam": 4, "walkthrough": 0}
 
 
 def wait_api(proc, timeout=90):
+    """Poll `/api/state` until the show server answers. Exits if the server process dies first, or if nothing answers
+    within `timeout` seconds."""
     end = time.time() + timeout
     while time.time() < end:
         if proc.poll() is not None:
@@ -76,6 +84,8 @@ def scored(snap):
 
 
 def line(lane, a, prev):
+    """One lane's line for a scene: each FIELDS counter against the previous scene's totals, formatted for the console.
+    The duplicate dollar figure is the running total, not a delta."""
     d = {k: a[k] - prev.get(k, 0) for k in FIELDS}
     return (
         f"  {lane}: submitted={d['submitted']} approved={d['approved']} ok={d['refunded_once']} "
@@ -86,7 +96,9 @@ def line(lane, a, prev):
 
 
 def handler_attempts(snap):
-    """Highest payments-side activity attempt among the scene's Nexus rows; caller rows must stay at attempt 1."""
+    """The highest payments-side activity attempt among the scene's Nexus rows, and the highest caller-side operation
+    attempt. In `nexus_kill` the first must reach 2 (checked); the second is expected to stay at 1 (printed, not
+    checked): the handler's retries never reach the caller."""
     rows = snap["nexus"]
     return (
         max((r.get("handler", {}).get("peak_activity_attempt", 0) for r in rows), default=0),
@@ -95,6 +107,12 @@ def handler_attempts(snap):
 
 
 def main(scenes, check):
+    """Start the show server, reset it, run each scene to completion, then print and check the results.
+
+    The server gets a random scenario token, so a browser open on the show's port cannot reset or run scenes. Each scene
+    is checked as it ends, and the cumulative Lane 2 ledger is checked after the last one. Failures are printed, and the
+    exit status is 1, only with `check`. The server is always stopped, even after a failed scene or an exception.
+    """
     # Checked here too: until our server exits, wait_api could get its answer from the one already running.
     if port_open(PORT):
         raise SystemExit(f"Port {PORT} is busy: stop `make demo` (or the other show server) first.")

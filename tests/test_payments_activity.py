@@ -10,6 +10,8 @@ from paidonce.models import RefundRequest
 
 
 def _payments_answers(monkeypatch, status: int, body: dict | None = None) -> None:
+    """Make every payments call answer `status` with `body`, through a mock transport in place of the real client.
+    The URL is plain http, so no certificate has to be trusted."""
     monkeypatch.setattr(config, "PAYMENTS_URL", "http://payments.test")  # plain http: no certificate to trust
     transport = httpx.MockTransport(lambda request: httpx.Response(status, json=body or {}))
     real = httpx.AsyncClient

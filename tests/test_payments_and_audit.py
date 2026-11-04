@@ -1,3 +1,6 @@
+"""The ledger's idempotency, through the payments service, and the audit's three invariants, scored from the ledger
+and the decision log."""
+
 import time
 
 import pytest
@@ -9,6 +12,7 @@ from paidonce.payments.service import app
 
 
 def post(client, key, ticket="t1", amount=1500, lane="lane1"):
+    """One refund request to the payments service, sent for `lane` with the caller's own idempotency `key`."""
     return client.post(
         "/refunds",
         json={"ticket_id": ticket, "amount_cents": amount},

@@ -1,4 +1,7 @@
-"""Ports, paths and names shared by every process in the demo."""
+"""Ports, paths and names shared by every process in the demo.
+
+Most values can be overridden by an environment variable. A local `.env` is read first, and variables already set win.
+"""
 
 from __future__ import annotations
 
@@ -45,7 +48,7 @@ PAYMENTS_NAMESPACE = os.environ.get("PAIDONCE_PAYMENTS_NS", "payments")
 SUPPORT_TASK_QUEUE = "support-agent"
 PAYMENTS_TASK_QUEUE = "payments-nexus"
 
-# The model is a real Anthropic model by default. Tests set PAIDONCE_STUB_LLM=1.
+# The model is a real Anthropic model by default. Tests and `make scenario` set PAIDONCE_STUB_LLM=1.
 MODEL = os.environ.get("PAIDONCE_MODEL", "claude-sonnet-5-5")
 STUB_LLM = os.environ.get("PAIDONCE_STUB_LLM", "") == "1"
 
@@ -65,4 +68,5 @@ AUDIT_DB = DATA_DIR / "audit.db"
 
 
 def ensure_data_dir() -> None:
+    """Create `DATA_DIR` if missing. `db.connect` calls it before every open, so nobody creates `data/` by hand."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)

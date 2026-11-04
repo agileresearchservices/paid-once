@@ -26,6 +26,8 @@ const HAZARDS = [
   { x: XS[3], label: "replies get lost" },
 ];
 
+// One icon per node, by index: 0 the customer's chat bubble, 1 the agent's robot, 2 the human, and the default, the
+// coin, for payments (3). The cases follow NODES' order.
 // Icons are drawn in a -10..10 box, like the ticket icons (TicketIcon.tsx).
 function Icon({ i }: { i: number }) {
   switch (i) {
@@ -62,6 +64,8 @@ function Icon({ i }: { i: number }) {
   }
 }
 
+// The animated picture: four nodes on one route, the three hazards (HAZARDS), and the coin that travels the route from
+// the customer to payments (an `animateMotion` along `#pb-route`). Under reduced motion the coin sits on the customer.
 function Path() {
   const still = useStill();
   return (
@@ -130,12 +134,16 @@ function Path() {
   );
 }
 
+// The three tiles under the picture: the two ways a refund goes wrong (the ledger marks ×2 and ∅ in the diagram, see
+// OUTCOME_GLYPH in outcomes.ts) and the one right answer (✓). `cls` picks the colours.
 const OUTCOMES = [
   { cls: "bad", mark: "✕", title: "Paid twice", sub: "Money out the door, twice" },
   { cls: "bad", mark: "✕", title: "Never paid", sub: "A customer left waiting" },
   { cls: "good", mark: "✓", title: "Paid once", sub: "The only right answer" },
 ];
 
+// The opening slide (step 1): the hero, the Path picture, the three outcomes, and the button that starts step 2.
+// It reads no snapshot field; `onStart` moves the deck on.
 export function Problem({ onStart }: { onStart: () => void }) {
   return (
     <section className="pb-page" aria-label="The problem">

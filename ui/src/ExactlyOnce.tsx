@@ -1,10 +1,11 @@
 import { useStill } from "./useStill";
 
-// The closing slide, in the opening slide's style (Problem.tsx): at-least-once delivery, exactly-once effect. One duplicate
-// delivery goes to both builds. What decides the outcome is the idempotency key each attempt carries, so the picture draws
-// the payments ledger and the key on every attempt, with a packet travelling each attempt's wire. Then the keys side by
-// side, and the call to action. Key formats come from the code (lane1/graph.py, lane2/payments_activities.py). The
-// viewBox is about one unit per CSS px at a 1512 px window; the packets stand still for reduced motion.
+// The closing slide, in the opening slide's style (Problem.tsx): at-least-once delivery, exactly-once effect. One
+// duplicate delivery goes to both builds. What decides the outcome is the idempotency key each attempt carries, so the
+// picture draws the payments ledger and the key on every attempt, with a packet travelling each attempt's wire. Then
+// the keys side by side, and the call to action. Key formats come from the code (lane1/graph.py,
+// lane2/payments_activities.py). The viewBox is about one unit per CSS px at a 1512 px window; the packets stand still
+// for reduced motion.
 
 const CARD_W = 700;
 const H = 222;
@@ -13,9 +14,11 @@ const ROW_Y = [98, 144]; // the two attempts' wires
 const WIRE_X1 = 150;
 const WIRE_X2 = 357;
 
+// One card's content: its title, the Idempotency-Key each attempt sent (`keys`), the rows the payments ledger holds
+// afterwards (`rows`), and its caption. The picture draws two of these, one per build.
 interface Lane {
-  x: number;
-  good: boolean;
+  x: number; // the card's left edge in the picture
+  good: boolean; // the green card: Temporal + Nexus
   title: string;
   keys: [string, string]; // the Idempotency-Key of attempt 1 and attempt 2
   rows: string[]; // what the ledger holds afterwards
@@ -41,6 +44,8 @@ const LANES: Lane[] = [
   },
 ];
 
+// Draws one card: a worker box for the duplicate delivery, one wire per attempt with its key, a packet on each wire
+// (none with reduced motion), the payments ledger with its rows, and the caption. `good` picks green or red styling.
 function LaneCard({ lane, still }: { lane: Lane; still: boolean }) {
   const { x, good } = lane;
   const k = good ? "good" : "bad";
@@ -94,6 +99,8 @@ function LaneCard({ lane, still }: { lane: Lane; still: boolean }) {
   );
 }
 
+// The picture on the slide: the two cards side by side (the queue build on the left, Temporal on the right), with the
+// gradients and arrow markers they use. Reads no snapshot field; `still` (reduced motion) is passed to each card.
 function Picture() {
   const still = useStill();
   return (
@@ -144,6 +151,8 @@ const NEXT: { do: string; why: string }[] = [
   { do: "Rerun these drills against yours", why: "Kill the workers, redeliver every message, make the receiver go quiet." },
 ];
 
+// The closing slide (step 9): the picture, the table of where each build gets its key (`ROWS`), the half-fix note and
+// the next steps (`NEXT`). Reads no snapshot field; it is static.
 export function ExactlyOnce() {
   return (
     <section className="eo-page" aria-label="At least once delivery, exactly once effect">

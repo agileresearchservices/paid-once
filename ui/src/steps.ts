@@ -1,29 +1,32 @@
-// The deck: the problem, then one step per scene in order, then the scoreboard, the Nexus page on its own (the scoreboard doesn't
-// count it). `scene` is the show-server scene id.
+// The deck: the problem, then one step per scene in order, then the scoreboard, the Nexus page on its own (the
+// scoreboard doesn't count it). `scene` is the show-server scene id.
 
 export interface Step {
-  id: string;
-  scene: string | null;
+  id: string; // the step's key, and App.tsx finds the scoreboard slide by the id "scoreboard"
+  scene: string | null; // the show-server scene id; null on the slides (no Run button, no story panel)
   title: string;
   short: string; // label on the step button
   story: string; // what happens: one or two short sentences (this is read from a projector)
   watch?: string; // what to look at, without giving the outcome away (the scoreboard page has none)
   result?: string; // what the scene shows and why; on screen from the start, beside "watch"
   nexus?: boolean; // show the Nexus panel
-  problem?: boolean; // the opening page: what goes wrong on a refund's path and how the demo tests it; no scene, no scoreboards
+  // the opening page: what goes wrong on a refund's path and how the demo tests it; no scene, no scoreboards
+  problem?: boolean;
   conclusion?: boolean; // the closing page: at-least-once vs exactly-once, and the next steps; no scene, no scoreboards
   arch?: boolean; // the architecture page: the diagram and the walkthrough, no lane scoreboards
   runLabel?: string; // the run button, when "Run this scene" doesn't say what it does
 }
 
 // The walkthrough on step 2 plays these in order, each on screen for a few seconds. `id` is the engine's beat id
-// (Engine.scene_walkthrough). Every line says what this repo's code does (paidonce/lane1/, paidonce/lane2/).
+// (Engine.scene_walkthrough). Each title must describe what this repo's code does (paidonce/lane1/, paidonce/lane2/),
+// never a feature it lacks.
 export interface Beat {
   id: string;
   title: string; // the walkthrough's three panes (Walkthrough.tsx) tell the story; this is its headline
 }
 
-// The ticket the walkthrough sends. Mirrors WALKTHROUGH_MESSAGE and WALKTHROUGH_AMOUNT_CENTS in paidonce/show/catalog.py.
+// The ticket the walkthrough sends. Mirrors WALKTHROUGH_MESSAGE and WALKTHROUGH_AMOUNT_CENTS in
+// paidonce/show/catalog.py.
 export const WALKTHROUGH_TICKET = { message: "The mug arrived in pieces. Please refund me.", amount: "$42.00" };
 
 export const BEATS: Beat[] = [
@@ -45,7 +48,7 @@ export const STEPS: Step[] = [
   },
   {
     id: "architecture",
-    scene: "walkthrough",
+    scene: "walkthrough", // scored apart as demo_audit (with nexus_kill), so it stays off the scoreboard
     runLabel: "Walk through one ticket",
     short: "Architectures",
     title: "Two ways to build the same refund",
@@ -105,7 +108,7 @@ export const STEPS: Step[] = [
     story: "Support and payments each own a namespace. Nexus is the one call between them; four failures hit it mid-flight.",
     watch: "Support never sees an error. Payments does the retrying.",
     result: "Support saw no errors. Payments retried with the same key. Each refund paid once.",
-    nexus: true,
+    nexus: true, // the Nexus panel takes the place of the diagram and the lane scoreboards
   },
   {
     id: "exactly_once",

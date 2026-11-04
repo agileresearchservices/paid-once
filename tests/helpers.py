@@ -12,12 +12,18 @@ import uvicorn
 
 
 def free_port() -> int:
+    """A loopback port that is free right now. Another process can take it before the caller binds it, and then the
+    server fails to start."""
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         return s.getsockname()[1]
 
 
 class Server:
+    """Uvicorn on a free port, on a daemon thread. `__enter__` waits for `/healthz` before the test uses the server.
+    Keyword arguments go to `uvicorn.Config`, so `ssl_certfile` and `ssl_keyfile` serve HTTPS. `verify` is not passed
+    on: it is how the readiness probe trusts a self-signed certificate."""
+
     def __init__(self, app, **ssl_kwargs) -> None:
         self.port = free_port()
         self.scheme = "https" if ssl_kwargs else "http"
@@ -29,9 +35,11 @@ class Server:
 
     @property
     def url(self) -> str:
+        """The base URL: https when TLS options were given, else http."""
         return f"{self.scheme}://127.0.0.1:{self.port}"
 
     def __enter__(self):
+        """Start the thread, then poll `/healthz` for about 5 s. Raise if the server never answers."""
         self.thread.start()
         for _ in range(100):
             try:
@@ -42,6 +50,7 @@ class Server:
         raise RuntimeError("server did not start")
 
     def __exit__(self, *exc):
+        """Ask uvicorn to stop, then wait up to 5 s for its thread to finish."""
         self.server.should_exit = True
         self.thread.join(timeout=5)
 

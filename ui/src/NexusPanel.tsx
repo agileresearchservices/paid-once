@@ -3,9 +3,17 @@ import { NexusTeams, retriesOf } from "./NexusTeams";
 import { NexusWhy } from "./NexusWhy";
 import type { NexusRow, ProcStatus, SceneRun, Topology } from "./types";
 
-// Step 7: why Nexus (two static pictures), the contract in one strip, then the run as two teams and the one door between them, then the receipts
-// from the ledger. The receipts read the audit, never the lane's own state.
+// Step 8: why Nexus (two static pictures), the contract in one strip, then the run as two teams and the one door
+// between them, then the receipts from the ledger. The receipts read the audit, never the lane's own state.
 
+// Draws the whole Nexus page: the two pictures (NexusWhy), the contract strip (NexusContract), the run (NexusTeams),
+// and the receipts from the ledger. App.tsx reads the snapshot and passes these props:
+//   rows: the scene's Nexus operations (snap.nexus). Empty unless `ran`.
+//   ran: this step's scene is the one the engine last ran (snap.current). Without it nothing scene-scoped is drawn.
+//   topology, processes, now: snap.topology, snap.processes, snap.now.
+//   run, finished: this scene's run (snap.scene_runs) and whether it is over. `run` is read only when `ran`.
+//   ledgerTickets: the lane 2 verdict per ticket. Nexus tickets are scored in demo_audit, so App merges that in.
+//   calls: this scene's payments counters for lane 2 (snap.payments_calls). Read only when `ran`.
 export function NexusPanel({
   rows,
   ran,
@@ -18,13 +26,13 @@ export function NexusPanel({
   calls,
 }: {
   rows: NexusRow[];
-  ran: boolean; // this scene is the one the engine last ran; otherwise rows is empty because nothing ran yet
+  ran: boolean; // this scene is the one the engine last ran; otherwise App passes rows empty
   topology: Topology;
   processes: Record<string, ProcStatus>;
   run?: SceneRun;
   finished: boolean;
   now: number;
-  ledgerTickets: Record<string, string>; // the ledger's verdict per ticket (audit), every scene since reset
+  ledgerTickets: Record<string, string>; // the ledger's verdict per ticket, audit plus demo_audit, since the reset
   calls?: { calls: number; booked: number; replays: number }; // this scene's calls to payments, counted by payments
 }) {
   const faults = ran ? (run?.faults ?? []) : [];
@@ -95,6 +103,7 @@ export function NexusPanel({
 }
 
 // The ledger keys of the latest nexus_kill run: <run>-nexus_kill-r<n>-<i>-lane2, highest n since the last reset.
+// Returns [key, verdict] pairs in key order, so the receipts count this run's refunds and no older run's.
 function sceneTickets(tickets: Record<string, string>): [string, string][] {
   const all = Object.entries(tickets).filter(([k]) => k.includes("-nexus_kill-r"));
   const runNo = (k: string) => Number(k.match(/-nexus_kill-r(\d+)-/)?.[1] ?? 0);

@@ -11,6 +11,8 @@ const MEANING: Record<string, string> = {
   refund_id: "the payments ledger's ID for the refund",
 };
 
+// One side of the contract (`names`, from the topology) as code pills. Each pill's hover is its gloss from MEANING,
+// or the bare name when MEANING has none.
 function Fields({ names }: { names: string[] }) {
   return (
     <span className="ct-fields">
@@ -23,6 +25,8 @@ function Fields({ names }: { names: string[] }) {
   );
 }
 
+// Draws the contract strip: the fields support sends, the operation, and the fields payments answers with. Reads
+// only `t` (`snap.topology`); `sends` and `returns` are the dataclass fields, so the strip cannot drift from the code.
 export function NexusContract({ t }: { t: Topology }) {
   return (
     <section

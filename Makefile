@@ -1,3 +1,5 @@
+# The developer's entry points. `make` alone lists them; the README's "Make targets" table says more about each.
+# The Python targets run through uv, so nothing here needs an activated virtualenv.
 .DEFAULT_GOAL := help
 .PHONY: help install test test-temporal setup scenario ui demo down lint fmt
 

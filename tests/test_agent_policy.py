@@ -1,3 +1,5 @@
+"""The agent's policy rules, which run before the model, and the clamping of the model's reply."""
+
 import sys
 from types import SimpleNamespace
 
@@ -9,6 +11,7 @@ from paidonce.models import Ticket
 
 
 def ticket(amount=2500, age=3):
+    """A ticket that passes every policy rule, unless a test sets an amount or an age that breaks one."""
     return Ticket("t1", "c", "o", amount, "arrived broken", age)
 
 

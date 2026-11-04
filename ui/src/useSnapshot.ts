@@ -21,6 +21,8 @@ export function useSnapshot(): { snap: Snapshot | null; connected: boolean } {
   return { snap, connected };
 }
 
+// Fires a control POST (a scene run or a reset). A non-OK answer throws, except 409: that means a scene is already
+// running, which is not an error for the caller, because the button state already shows it.
 export async function post(path: string): Promise<void> {
   const r = await fetch(path, { method: "POST" });
   if (!r.ok && r.status !== 409) throw new Error(`${path}: ${r.status}`);
