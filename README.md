@@ -84,7 +84,8 @@ The demo calls a real Anthropic model (`claude-sonnet-5-5`; `PAIDONCE_MODEL` cha
 ```bash
 echo 'ANTHROPIC_API_KEY=your-key-here' > .env    # gitignored; or `export ANTHROPIC_API_KEY=...` in your shell
 make ui                                          # builds the UI into ui/dist
-make demo                                        # then open http://127.0.0.1:8100 in a browser; Ctrl-C stops it
+make demo                                        # then open http://127.0.0.1:8100 in a browser
+make down                                        # when you're done, from another terminal (or Ctrl-C in this one)
 ```
 
 The page is a nine-step stepper for a laptop browser in full screen. Arrow keys or `1`-`9` move between steps, and the
@@ -112,7 +113,7 @@ trademarks, used here only to identify Temporal.
 
 On a fresh clone the whole path is `make install`, `make test`, `make scenario` (no key), then the `.env` line,
 `make ui` and `make demo`. Run `make scenario` once first: it proves the Temporal CLI, the ports and the audit work on
-that machine before you present. It needs port 8100 free, so stop any `make demo` first.
+that machine before you present. It needs port 8100 free, so run `make down` first if a demo is up.
 
 ## Make targets
 
@@ -125,6 +126,7 @@ that machine before you present. It needs port 8100 free, so stop any `make demo
 | `make scenario` | The headless run described above. Needs port 8100 free |
 | `make ui` | Build the UI into `ui/dist`; the show server serves it |
 | `make demo` | Start everything and serve the show on :8100 |
+| `make down` | Stop everything `make demo` or `make scenario` started, from any terminal. A Temporal server you started yourself stays up, and it says so |
 | `make lint` / `make fmt` | `ruff check` and `ruff format --check` / apply the formatter |
 
 ## Configuration
@@ -163,7 +165,7 @@ flight; workflow versioning; approval waits longer than seconds; and the quality
 ## Troubleshooting
 
 - **Port 8100 is busy.** Another `make demo` or `make scenario` is running. The show server refuses to start a second
-  instance. Stop the first one.
+  instance. Stop the first one with `make down`.
 - **A Temporal server is already running on `TEMPORAL_ADDRESS`.** The show reuses it and creates its two namespaces and
   the Nexus endpoint there. It cannot kill a server it did not start, so the Nexus scene skips that failure. To keep
   the demo separate, run `temporal server start-dev --port 7299` and `TEMPORAL_ADDRESS=127.0.0.1:7299 make demo`, or
