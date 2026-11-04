@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install test test-temporal setup scenario ui demo lint fmt
+.PHONY: help install test test-temporal setup scenario ui demo down lint fmt
 
 help:            ## list the targets
 	@awk -F':.*## ' '/^[a-z-]+:.*## /{printf "  %-14s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -24,6 +24,9 @@ ui:              ## build the Vite UI into ui/dist (needs Node 22+); the show se
 
 demo:            ## start everything and serve the show on http://127.0.0.1:8100 (needs ANTHROPIC_API_KEY)
 	uv run python -m paidonce.show
+
+down:            ## stop everything make demo or make scenario started, from any terminal
+	scripts/down.sh
 
 lint:            ## ruff check and format check
 	uv run ruff check . && uv run ruff format --check .
