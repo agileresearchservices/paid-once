@@ -15,6 +15,8 @@ interface Part {
   className: string;
 }
 
+// The bar's segments, left to right in this order. A part with a zero count is left out of the bar but keeps its place
+// here. Each segment grows by its count (`flexGrow`), and its `className` is its colour in styles.css.
 function parts(a: LaneAudit): Part[] {
   return [
     { key: "ok", label: "Refunded once", short: "once", value: a.refunded_once, className: "good" },
@@ -26,12 +28,16 @@ function parts(a: LaneAudit): Part[] {
   ];
 }
 
+// Cents to a US dollar string, for the "refunded twice" figure. The audit counts money in cents (`duplicate_cents`).
 const dollars = (cents: number) =>
   (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
 
-// "untested" before the lane has a ticket: an invariant over nothing would otherwise read "Holds".
+// "untested" while no ticket has reached a bar segment (one still waiting for a human is in none): an invariant over
+// nothing would otherwise read "Holds".
 type Verdict = "holds" | "violated" | "settling" | "untested";
 
+// One row of the invariants list: the icon, the rule in words, the verdict as a pill, and the counts it was judged on.
+// The caller works out the verdict; this only draws it.
 function Invariant({ text, verdict, detail }: { text: string; verdict: Verdict; detail: string }) {
   const icon = { holds: "✓", violated: "✕", settling: "…", untested: "–" }[verdict];
   const word = { holds: "Holds", violated: "Violated", settling: "Settling", untested: "Not tested yet" }[verdict];
@@ -45,6 +51,14 @@ function Invariant({ text, verdict, detail }: { text: string; verdict: Verdict; 
   );
 }
 
+// One lane's scoreboard: the refunded-once count against the approved, the bar of outcomes, and the three invariants.
+// The numbers come from `audit.compute_all` (audit.py), which reads the payments ledger, never from a lane's own
+// records. The verdicts: "Every approved ticket refunded once" is violated by a duplicate or a missing ticket, and
+// settles while one is in flight; "No refund without an approval" is violated by an unapproved refund; "No ticket lost
+// or stuck" is violated by a missing ticket, and settles while one is in flight. All three read "Not tested yet" while
+// no ticket is in a bar segment: an empty lane, or one whose tickets all still wait for a human. `compact` is the
+// scene-step layout (App.tsx): smaller type and bar, and the "refunded twice" figure beside the number, so the diagram
+// and both scoreboards fit one screen.
 // believedDone: what the lane's own records claim, set only where the ledger's answer sits next to it (the scoreboard
 // step). The verdicts never read it.
 export function Scoreboard({

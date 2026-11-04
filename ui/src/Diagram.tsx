@@ -24,6 +24,8 @@ interface Box {
   proc?: string; // process name in snap.processes, if a process backs this node
 }
 
+// The boxes, in the 1464 x 298 drawing. The keys and the wire ids are the names that a ticket's stage (`at`, in
+// timeline.py) and a fault's `target` (in scenes.py) use, so a rename has to follow them there.
 const NODES: Record<string, Box> = {
   helpdesk: { x: 2, y: ROW.lane1, w: 116, h: ROW.lane2 + NODE_H - ROW.lane1, title: "Helpdesk", sub: "support tickets" },
   lane1_api: { x: 158, y: ROW.lane1, w: 180, h: NODE_H, title: "Queue API", sub: "jobs table (SQLite)", proc: "lane1_api" },
@@ -35,13 +37,15 @@ const NODES: Record<string, Box> = {
   payments: { x: 1170, y: ROW.lane1, w: 284, h: ROW.lane2 + NODE_H - ROW.lane1, title: "Payments service + ledger", sub: "the audit reads this ledger", proc: "payments" },
 };
 
+// The height of a lane's wires: the middle of its node row. Badges on a wire line up along it.
 const mid = (lane: LaneId) => ROW[lane] + NODE_H / 2;
 
 // The human reviews proposals where approvals actually land: the Queue API and the Temporal server.
 const HUMAN = { x: 234, y: 138, w: 28, h: 28 }; // a round badge with a person in it
 const HUMAN_X = HUMAN.x + HUMAN.w / 2;
 
-// Wires: [from x, to x, row, id]. A wire is "busy" while a ticket is on it or in the node it feeds.
+// Wires, by id: the x span, the lane row and an optional label. A wire is "busy" while a ticket is on it; a ticket at
+// `payments_worker` also lights its wire to payments, and one at `endpoint` the wire from the support worker.
 const WIRES: { id: string; x1: number; x2: number; lane: LaneId; label?: string }[] = [
   { id: "helpdesk>lane1_api", x1: 118, x2: 158, lane: "lane1" },
   { id: "lane1_api>lane1_worker", x1: 338, x2: 378, lane: "lane1" },
@@ -53,14 +57,20 @@ const WIRES: { id: string; x1: number; x2: number; lane: LaneId; label?: string 
   { id: "payments_worker>payments", x1: 1070, x2: 1170, lane: "lane2" },
 ];
 
+// How long a fault or a human decision stays lit, in seconds. The duplicate packets and the human badge stay lit a
+// second longer.
 const FLASH_S = 2.5;
-// The ledger is read from payments itself, so it knows a refund the moment it is booked, while the ticket's dot is still on
-// its way. A slot fills only once its ticket has reached payments' side (on the wire in, at the payments worker, or done) and
-// had time to glide in: the dot's move takes 1.8 s (.tdot in styles.css).
+// The ledger is read from payments itself, so it knows a refund the moment it is booked, while the ticket's dot is
+// still on its way. A slot fills only once its ticket has reached payments' side (on the wire in, at the payments
+// worker, or done) and had time to glide in: the dot's move takes 1.8 s (.tdot in styles.css).
 const AT_PAYMENTS = new Set(["lane1_worker>payments", "payments_worker", "done"]);
 const ARRIVE_S = 2.0;
 const PITCH = 20; // between ticket badges (each is 17 px across)
 
+// Where a ticket's badge is drawn, from its stage (`at`) and its place among the tickets there (`i`). A node's badges
+// stack up from its bottom edge, eight to a row; a wire's badges run along it; "closed" stacks in the helpdesk, five to
+// a row. `gone` hides a badge: a finished ticket ("done") glides to payments' edge and fades out, and so does a stage
+// the page has no place for.
 function dotPos(at: string, i: number, lane: LaneId): { x: number; y: number; gone?: boolean } {
   if (at === "done") return { x: NODES.payments.x + 12, y: mid(lane), gone: true };
   // Closed with no refund: back in the helpdesk, in its lane's half.
@@ -68,11 +78,16 @@ function dotPos(at: string, i: number, lane: LaneId): { x: number; y: number; go
   const box = NODES[at];
   if (box) return { x: box.x + 22 + (i % 8) * PITCH, y: box.y + box.h - 16 - Math.floor(i / 8) * PITCH };
   const wire = WIRES.find((w) => w.id === at);
-  // A wire into payments holds its dots at the payments end, so a ticket visibly travels there; the ledger fills on arrival.
+  // A wire into payments holds its dots at the payments end, so a ticket visibly travels there; the ledger fills on
+  // arrival.
   if (wire) return { x: wire.id.endsWith(">payments") ? wire.x2 - 30 - i * (PITCH + 2) : wire.x1 + 40 + i * (PITCH + 2), y: mid(lane) };
   return { x: 0, y: mid(lane), gone: true };
 }
 
+// The badge's shape, from where the ticket is and what state it is in. Done and closed follow the stage alone. A state
+// of exactly "failed" is the cross, a state starting with "waiting" is the person, and anything on a wire, or at the
+// payments worker or the Nexus endpoint, is money on its way (the arrow). Everything else is in progress (the ring).
+// The legend in `Diagram` names every kind but done.
 function ticketKind(d: FlowDot): TicketKind {
   if (d.at === "done") return "done";
   if (d.at === "closed") return "closed";
@@ -82,8 +97,13 @@ function ticketKind(d: FlowDot): TicketKind {
   return "active";
 }
 
+// The label a fault leaves on the node it hit, on its top border. Kills are not here: they are counted from the run's
+// `kills`, since the snapshot's event list only keeps the last 60 events.
 const EFFECT_MARK: Record<string, string> = { duplicate: "⚡ delivered twice", stall: "⚡ goes quiet" };
 
+// One badge per ticket in `dots`. Sorted by ticket id, so the badges at a place come in the same order, whatever order
+// the server sends them in. Keyed by ticket, so each badge stays the same element from one poll to the next, and the
+// transition in styles.css glides it rather than drawing it again.
 function Dots({ lane, dots }: { lane: LaneId; dots: FlowDot[] }) {
   const slot: Record<string, number> = {};
   return (
@@ -117,8 +137,8 @@ const LEDGER_Y: Record<LaneId, { label: number; slots: number; tally: number }> 
 const SLOT_W = 24;
 const SLOT_PITCH = 28;
 
-// The result in words, so the outcome reads without decoding the boxes. Each part takes its box's colour (the slot classes
-// in styles.css). Problems come first; with none, "all N paid once".
+// The result in words, so the outcome reads without decoding the boxes. Each part takes its box's colour (the slot
+// classes in styles.css). Problems come first; with none, "all N paid once".
 interface TallyPart {
   text: string;
   cls: "ok" | "bad" | "missing";
@@ -156,9 +176,9 @@ function Ledger({
   const ids = dots.map((d) => d.ticket).sort();
   const x0 = NODES.payments.x + 16;
   const at = LEDGER_Y[lane];
-  // The audit knows a ticket is owed nothing (the harness wrote it to break the policy, or a human said no) from the
-  // moment it exists, long before any money moves. Like the other marks, "owed nothing" is a verdict: the slot shows it
-  // once the scene has finished, so the ledger doesn't open with a denial in it.
+  // The audit knows a ticket is owed nothing early: at submission when the harness wrote it to break the policy, at the
+  // decision when a human says no, either way long before any money would move. Like the other marks, "owed nothing"
+  // is a verdict: the slot shows it once the scene has finished, so the ledger doesn't open with a denial in it.
   const statuses = ids.map((id) => {
     const st = tickets[id] ?? "waiting";
     if ((st === "declined" || st === "rejected") && !finished) return "waiting";
@@ -215,15 +235,24 @@ function useArrived(flow: Record<LaneId, FlowDot[]>, runKey: number | undefined,
       const k = `${lane}:${d.ticket}`;
       if (AT_PAYMENTS.has(d.at) && !seen.current.at.has(k)) seen.current.at.set(k, now);
     }
-  // Arrival is remembered: a ticket a crash pulls back off payments' side has still been there, and the money stays booked.
+  // Arrival is remembered: a ticket a crash pulls back off payments' side was there, and its money stays booked.
   const out = new Set<string>();
   for (const [k, since] of seen.current.at) if (now - since >= ARRIVE_S) out.add(k);
   return out;
 }
 
+// The architecture diagram for `scene` (the architecture step passes "walkthrough"). The nodes, wires and human are
+// always drawn. The scene's badges and marks, and so its ledger slots, appear only while it is the scene on screen
+// (`snap.current`). It reads `flow` (the badges of both stacks, with the entry hold already applied by the engine),
+// `events` (this run's faults, for the ⚡ marks and flashes, and the human's decisions), `scene_runs` (the run's start,
+// its kills, and whether it has finished: until then the ledger holds back denials and bookings whose dot has not
+// arrived), `processes` (a node is DOWN while its process is not alive), `faults` (latency, drawn just left of
+// payments), and `audit` with `demo_audit` (each ticket's ledger state, for the slots; `audit`'s `pending` for the
+// wait line). `now` times the flashes and the arrivals.
 export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null }) {
-  // Only the scene that ran last is on screen: its dots, ledger, fault marks and kill badges all go together. Any other step
-  // shows a bare diagram, however recently its own scene ran.
+  // Only the scene that ran last is on screen: its dots, ledger, fault marks and kill badges all go together. Any other
+  // step shows the diagram empty (no dots, marks or badges, ledgers with nothing in them), however recently its own
+  // scene ran.
   const onScreen = scene != null && snap.current === scene;
   const run = onScreen && scene ? snap.scene_runs[scene] : undefined;
   const flow: Record<LaneId, FlowDot[]> = onScreen && snap.flow ? snap.flow : { lane1: [], lane2: [] };
@@ -265,7 +294,8 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
           </span>
         ) : (
           <span className="legend">
-            {/* The dots are where each stack thinks a ticket is. The ledger boxes are explained by the result line under each lane. */}
+            {/* The dots are where each stack thinks a ticket is. The ledger boxes are explained by the result line
+                under each lane. */}
             <span className="lg-group">
               <b>Ticket</b>
               <span><LegendIcon kind="active" /> in progress</span>
@@ -350,7 +380,7 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
           const p = b.proc ? snap.processes[b.proc] : undefined;
           const down = p ? !p.alive : false;
           const cls = ["node", down && "down", hitNow.has(id) && "hit", id === "endpoint" && "door"].filter(Boolean).join(" ");
-          // Payments' bottom strip holds the Temporal ledger, so its badge sits in the gap between the two ledgers instead.
+          // Payments' bottom strip holds the Temporal ledger, so its badge sits in the gap between the ledgers instead.
           const badgeY = id === "payments" ? b.y + 128 : b.y + b.h - 27;
           return (
             <g key={id} className={cls}>
@@ -359,7 +389,7 @@ export function Diagram({ snap, scene }: { snap: Snapshot; scene: string | null 
               <text className="n-sub" x={b.x + 14} y={b.y + 40}>{b.sub}</text>
               {b.note && !down && <text className="n-sub" x={b.x + 14} y={b.y + 60}>{b.note}</text>}
               {/* Health dot: green while the process is up, red while it is down (the node and its DOWN badge agree).
-                  No dot for a Temporal server the show did not start: it cannot be killed, so it has no status here. */}
+                  No dot for a Temporal server the show did not start: it cannot be killed, so it has no status. */}
               {p && <circle className={down ? "n-dot bad" : "n-dot"} cx={b.x + b.w - 14} cy={b.y + 17} r={3.5} />}
               {/* Down gets its own solid badge on the node's bottom strip: on the title line it ran into the title */}
               {down && (

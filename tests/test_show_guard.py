@@ -13,6 +13,7 @@ from paidonce.show import server
 
 @pytest.fixture(autouse=True)
 def locked(monkeypatch):
+    """Lock the show server as `make scenario` does, for every test here: the controls need the token `tok`."""
     monkeypatch.setattr(config, "SCENARIO_TOKEN", "tok")
 
 
@@ -55,6 +56,7 @@ def test_second_server_refuses_to_start(monkeypatch):
 
 @pytest.fixture
 def ui_dist(tmp_path):
+    """A fake build folder, `ui/`, with a file outside it (`secret.txt`) for the path-traversal tests."""
     (tmp_path / "ui").mkdir()
     (tmp_path / "ui" / "index.html").write_text("<html>app</html>")
     (tmp_path / "ui" / "logo.svg").write_text("<svg/>")

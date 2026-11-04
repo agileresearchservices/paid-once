@@ -7,11 +7,18 @@ from temporalio.exceptions import ApplicationError
 from paidonce import config, tls
 from paidonce.models import RefundRequest, RefundResult
 
-RETRYABLE_4XX = frozenset({408, 429})
+RETRYABLE_4XX = frozenset({408, 429})  # "try later" responses: retried like a 5xx
 
 
 @activity.defn
 async def post_refund(req: RefundRequest) -> RefundResult:
+    """Send one refund to the payments service and return the refund that payments stored.
+
+    The key is `refund-<ticket_id>`, derived from the ticket, so every retry is the same request to the ledger. A
+    replayed answer looks like a first answer, because the contract carries the refund only. A 4xx other than 408 and
+    429 means payments refused the request, so it raises a non-retryable `ApplicationError`. Everything else, a timeout,
+    a 408, a 429 or a 5xx, raises an ordinary error that Temporal retries under the workflow's `REFUND_RETRY`.
+    """
     # Same client timeout as Lane 1, so the comparison is fair. The difference is the key: it is
     # derived from the ticket, so every retry of this activity (or of the whole workflow) is the
     # same request as far as the ledger is concerned.

@@ -20,6 +20,10 @@ SCENE_QUIET_S = 3.0
 # How the show names each lane on screen; the code, ledger and ticket IDs keep lane1/lane2.
 LANE_NAMES = {"lane1": "Queue + LangGraph", "lane2": "Temporal + Nexus"}
 
+# The two processes the agent-crash scenes kill: Lane 1's worker and the Lane 2 support worker (worker_crash, and
+# free roam's agent round). procs.py starts them under these names, and scenes.py, timeline.py and the ui/src files
+# that draw them use the same names, so a rename touches all of them. Payments is never listed: no scene kills the
+# payments service, and the payments worker is killed only by the Nexus scene and free roam.
 AGENT_WORKERS = ["lane1_worker", "support_worker"]
 
 # The worker-crash scene (step 4): the first few approved refunds are in flight at payments when the workers die;
@@ -59,10 +63,15 @@ MESSAGES = [
 
 @dataclass
 class SceneInfo:
+    """A scene the show can run. `id` is the engine's `scene_<id>` method and the scene's URL and API name
+    (`POST /api/scenes/<id>/run`). `title` is what the event log shows when the scene finishes."""
+
     id: str
     title: str
 
 
+# The deck's order comes from `ui/src/steps.ts`, which maps each step to a scene id; the order here does not set it.
+# `free_roam` is not in the deck: `scripts/smoke.py` runs it only when it is named, and `make scenario` skips it.
 SCENES = [
     SceneInfo("walkthrough", "Walkthrough: one ticket"),
     SceneInfo("intro", "Happy path"),

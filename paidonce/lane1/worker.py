@@ -20,15 +20,26 @@ POLL_INTERVAL_S = 0.3  # how long an idle thread waits before it asks the queue 
 
 
 class Worker:
+    """Runs Lane 1's jobs. One compiled graph is shared by all the worker threads, and its checkpoints live in this
+    process's memory, so a restart loses every ticket paused for approval (architecture.md, Lane 1 realism)."""
+
     def __init__(self) -> None:
         # In-process checkpoints. They disappear when this process does.
         self.graph = build_graph()
 
     @staticmethod
     def _cfg(ticket_id: str) -> dict:
+        """The LangGraph config for a ticket. The thread id is the ticket id, so the resume in a later execute job finds
+        the checkpoint that the decide job saved."""
         return {"configurable": {"thread_id": ticket_id}}
 
     def handle_decide(self, row: dict) -> None:
+        """Run the graph for a new ticket until it pauses for approval or ends on a denial.
+
+        The row goes to `deciding`, then to `awaiting_approval` with the proposal, or to `denied` with the reason in
+        `detail`. A ticket already past `deciding` is skipped, so a redelivered decide job does nothing. If the model
+        call raises, the ticket stays at `deciding` and the job comes back from the queue.
+        """
         ticket = store.get_ticket(row["ticket_id"])
         if ticket is None or ticket["status"] not in ("new", "deciding"):
             return
@@ -49,7 +60,7 @@ class Worker:
         )
         state = self.graph.get_state(cfg).values
         proposal = state["proposal"]
-        if "__interrupt__" in result:
+        if "__interrupt__" in result:  # LangGraph's marker for "paused at the approval interrupt"
             store.set_status(ticket["ticket_id"], "awaiting_approval", proposal=asdict(proposal))
         else:
             store.set_status(
@@ -60,16 +71,24 @@ class Worker:
             )
 
     def handle_execute(self, row: dict) -> None:
+        """Carry out an approved ticket. A `done` ticket is skipped: that is the dedupe check.
+
+        What is left decides the path. A graph still paused at the approval interrupt is resumed, and the resume runs
+        `execute`. A row at `executing` with no checkpoint goes through the recovery path, which drives the payments
+        call again (the double refund described in `execute_refund`). A row at `approved` with no checkpoint is marked
+        `failed`, because there is nothing left to resume.
+        """
         ticket_id = row["ticket_id"]
         ticket = store.get_ticket(ticket_id)
         if ticket is None or ticket["status"] == "done":
             return  # a careful dedupe check: finished tickets are not run again
         cfg = self._cfg(ticket_id)
-        if self.graph.get_state(cfg).next:
+        if self.graph.get_state(cfg).next:  # a paused graph still has a node to run: await_approval
             self.graph.invoke(Command(resume={"approved": True}), cfg)
         elif ticket["status"] == "executing" and ticket["proposal"]:
-            # Recovery path: the checkpoint is gone but the row says we were mid-flight, so drive the
-            # stored proposal again. This is what turns a crash after the payments commit into a second refund.
+            # Recovery path: the checkpoint is gone but the row says we were mid-flight, so drive the stored proposal
+            # again. This is what turns a crash after the payments commit into a second refund: `call_payments` makes a
+            # fresh idempotency key for the new attempt (unless PAIDONCE_L1_STABLE_KEY=1).
             execute_refund(ticket_id, ticket["proposal"]["amount_cents"])
         elif ticket["status"] == "approved":
             store.set_status(
@@ -88,13 +107,18 @@ class Worker:
                 log.exception("lease heartbeat for job %s failed", job["job_id"])
 
     def run_one(self) -> bool:
+        """Claim one job and run it. Returns False when the queue is empty, so the caller can sleep.
+
+        A job that raises is logged and not completed, so it reappears when its lease runs out.
+        """
         job = store.claim_job()
         if job is None:
             return False
         done = threading.Event()
         if job["kind"] == "decide":
             # A decide job waits on an LLM call that can outlast the visibility timeout, and the queue would hand
-            # the same job to a second worker. Execute jobs are short HTTPS calls and keep the plain timeout.
+            # the same job to a second worker. Execute jobs keep the plain timeout: a payments call normally finishes
+            # well inside it, though `call_payments`'s three attempts and backoff can run past it when payments stalls.
             threading.Thread(target=self._heartbeat, args=(job, done), daemon=True).start()
         try:
             if job["kind"] == "decide":
@@ -109,12 +133,18 @@ class Worker:
         return True
 
     def loop(self) -> None:
+        """Run jobs until the process is killed, sleeping `POLL_INTERVAL_S` whenever the queue is empty. Each of the
+        `WORKER_THREADS` threads runs this loop against the same `Worker`, and so the same graph."""
         while True:
             if not self.run_one():
                 time.sleep(POLL_INTERVAL_S)
 
 
 def main() -> None:
+    """Create the tables, build one `Worker`, and run its loop on `WORKER_THREADS` threads.
+
+    The show starts this as `python -m paidonce.lane1.worker` and kills it with `kill -9` in some scenes.
+    """
     logging.basicConfig(level=logging.INFO, format="%(asctime)s lane1.worker %(message)s")
     store.init()
     worker = Worker()

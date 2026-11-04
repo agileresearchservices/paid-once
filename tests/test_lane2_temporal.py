@@ -27,6 +27,7 @@ pytestmark = pytest.mark.temporal
 
 @pytest.fixture(autouse=True)
 def own_temporal_server():
+    """Fail every test here unless `scripts/test-temporal.sh` named the server these tests run against."""
     # scripts/test-temporal.sh names the throwaway server it started. On any other server (the show's, say) another
     # worker may poll these task queues and take the tests' workflows, so refuse rather than fail mysteriously.
     if os.environ.get("PAIDONCE_TEST_TEMPORAL") != config.TEMPORAL_ADDRESS:
@@ -67,6 +68,7 @@ async def stack(payments):
 
 
 def new_ticket():
+    """A ticket that passes policy, under an ID no earlier run has used, so its workflow ID is new."""
     tid = f"it-{uuid.uuid4().hex[:8]}"
     return Ticket(tid, "c", "o", 4200, "my item arrived broken")
 

@@ -1,3 +1,6 @@
+"""The fixtures every test gets: isolated SQLite files under a temp dir, and the stub model. `payments` adds a real
+payments service on a free port, for a test that asks for one."""
+
 import importlib
 
 import pytest
@@ -11,7 +14,7 @@ def isolated_data(tmp_path, monkeypatch):
     from paidonce import config
 
     importlib.reload(config)
-    # Modules that copied config values at import time need the reloaded module.
+    # Reloaded as well, so nothing in them can hold a value copied from config before the env was set.
     for name in ("paidonce.db", "paidonce.audit", "paidonce.payments.ledger"):
         importlib.reload(importlib.import_module(name))
     yield

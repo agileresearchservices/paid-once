@@ -12,6 +12,8 @@ const BOX_Y = 52;
 const BOX_H = 96;
 const MID = BOX_Y + BOX_H / 2;
 
+// A labelled box in either picture, its label centred on it. `cls` adds a class to the group; no caller passes one.
+// The Nexus endpoint is drawn inline in the "with" card instead, since it has a second line of text.
 function Box({ x, w, label, cls = "" }: { x: number; w: number; label: string; cls?: string }) {
   return (
     <g className={`why-box ${cls}`}>
@@ -23,8 +25,12 @@ function Box({ x, w, label, cls = "" }: { x: number; w: number; label: string; c
   );
 }
 
+// The four things support would have to know about payments without Nexus. Each is drawn as a wire across the
+// team line in the "without" card. The contract strip (NexusContract.tsx) says the same four stay out of the call.
 const LEAKS = ["namespace", "task queue", "workflow type", "retries & timeouts"];
 
+// Draws the two static pictures, without Nexus and with it, from the topology `t` (endpoint and operation names).
+// Reads only `t` (`snap.topology`), so nothing here moves with the run.
 export function NexusWhy({ t }: { t: Topology }) {
   const wo = 0; // the "without" card's left edge
   const wi = W - CARD_W; // the "with" card's left edge

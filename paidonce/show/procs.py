@@ -20,6 +20,8 @@ from paidonce import config
 
 
 def port_open(port: int, host: str = "127.0.0.1") -> bool:
+    """True when something accepts a TCP connection on `host:port`, within a short timeout. It does not say which
+    program answered. Readiness checks use it, and so do the Temporal check and the guard against a second show."""
     with socket.socket() as s:
         s.settimeout(0.3)
         return s.connect_ex((host, port)) == 0
@@ -27,16 +29,27 @@ def port_open(port: int, host: str = "127.0.0.1") -> bool:
 
 @dataclass
 class Proc:
-    name: str
+    """One child process the manager runs. `ProcessManager` creates these, and only its methods change `popen` and the
+    restart fields."""
+
+    name: str  # the key in `ProcessManager.procs`; fault events and the page's diagram use the same name
     label: str
     cmd: list[str]
-    popen: subprocess.Popen | None = None
-    restart_at: float | None = None
-    starts: int = 0
+    popen: subprocess.Popen | None = None  # the running child, or None before its first start
+    restart_at: float | None = None  # None = not scheduled; an unplanned exit gets one from the watcher
+    starts: int = 0  # how many times it has been spawned, the first start included
 
 
 class ProcessManager:
+    """Runs the show's services as child processes, and kills and restarts them on request.
+
+    It owns five services (payments, the Lane 1 API and worker, the support and payments workers), plus the Temporal
+    dev server when `ensure_temporal` starts one. Each child runs in its own session, so a kill or a stop reaches
+    everything the child started, not only the child itself. A watcher thread restarts whatever has died."""
+
     def __init__(self, emit=lambda *a, **k: None) -> None:
+        """`emit(kind, msg, **fields)` receives the kill, restart and watcher-error events. The default discards them;
+        `Engine` replaces it, so the page's event log shows them."""
         self.emit = emit
         py = sys.executable
         self.procs: dict[str, Proc] = {
@@ -94,9 +107,13 @@ class ProcessManager:
 
     @property
     def owns_temporal(self) -> bool:
+        """True when this manager started the Temporal server, and so may kill it. Someone else's server is not ours."""
         return "temporal" in self.procs
 
     def _spawn(self, p: Proc) -> None:
+        """Start `p` in its own session, so `os.killpg` reaches its whole group, and discard its output.
+        `PYTHONUNBUFFERED` is set anyway, so a child whose output is sent to a log file while debugging keeps its last
+        lines through a kill -9."""
         env = dict(os.environ, PYTHONUNBUFFERED="1")
         p.popen = subprocess.Popen(
             p.cmd,
@@ -109,12 +126,16 @@ class ProcessManager:
         p.restart_at = None
 
     def start_all(self) -> None:
+        """Start every service that is not running yet, then the watcher thread. A Temporal server that is already up
+        (ours, from `ensure_temporal`) is skipped."""
         for p in self.procs.values():
             if p.popen is None:  # Temporal, if ours, is already up
                 self._spawn(p)
         self._thread.start()
 
     def stop_all(self) -> None:
+        """SIGTERM every child's process group. The stop flag is set first, under the lock, so the watcher starts
+        nothing while they exit. It does not wait for them to exit."""
         with self._lock:  # after this, the watcher can no longer start anything
             self._stop.set()
             for p in self.procs.values():
@@ -122,6 +143,7 @@ class ProcessManager:
 
     @staticmethod
     def _terminate(p: Proc) -> None:
+        """SIGTERM the process group of `p`, if it is still running. A group that has already gone is not an error."""
         if p.popen and p.popen.poll() is None:
             try:
                 os.killpg(p.popen.pid, signal.SIGTERM)
@@ -144,6 +166,8 @@ class ProcessManager:
         return True
 
     def _watch(self) -> None:
+        """The watcher thread's body: restart the dead every 0.25 s until `stop_all` sets the stop flag. An error is
+        reported as an event, and the loop goes on."""
         while not self._stop.is_set():
             try:
                 self._restart_dead(time.time())
@@ -152,6 +176,10 @@ class ProcessManager:
             time.sleep(0.25)
 
     def _restart_dead(self, now: float) -> None:
+        """Restart each dead child whose `restart_at` has passed.
+
+        A planned kill sets `restart_at` itself, with the delay its caller chooses. An unplanned exit gets `now + 2.0`
+        here, the way an orchestrator restarts a crashed pod. Nothing restarts once the stop flag is set."""
         restarted = []
         with self._lock:
             if self._stop.is_set():
@@ -168,6 +196,8 @@ class ProcessManager:
 
     # -- views -------------------------------------------------------------
     def status(self) -> dict:
+        """The label, liveness and start count of each service. The snapshot carries it as `processes`, which the
+        page reads."""
         out = {}
         for name, p in self.procs.items():
             alive = p.popen is not None and p.popen.poll() is None
@@ -179,6 +209,9 @@ class ProcessManager:
         return out
 
     def wait_ready(self, timeout: float = 60.0) -> bool:
+        """Poll until the payments and Lane 1 API ports both accept connections, or `timeout` seconds pass.
+
+        Returns False on timeout. The workers listen on no port, so this does not wait for them."""
         end = time.time() + timeout
         while time.time() < end:
             if port_open(config.PAYMENTS_PORT) and port_open(config.LANE1_PORT):

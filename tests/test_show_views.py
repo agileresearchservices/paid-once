@@ -61,7 +61,7 @@ def test_new_tickets_are_drawn_at_the_front_door_for_the_first_moments_of_a_scen
 def test_approved_parked_workflow_is_not_drawn_as_waiting():
     stage = lane2_stage("RUNNING", [], [], decision=True)
     assert stage["at"] == "temporal"
-    assert not stage["state"].startswith("waiting")  # the UI draws "waiting…" as the waiting-for-a-human ring
+    assert not stage["state"].startswith("waiting")  # the UI draws "waiting…" as the waiting-for-a-human person
 
 
 def test_denied_parked_workflow_is_not_drawn_as_waiting_or_approved():
@@ -145,6 +145,8 @@ def test_tickets_closed_with_no_refund_let_the_scene_settle():
 
 
 def _pending(state, attempt, scheduled_at=None, started_at=None, retry_interval=0.0, failure="", start_to_close=8.0):
+    """One poll of the refund activity, shaped as `_handler_view` reports it under `pending`. The default
+    `start_to_close` is the refund's own 8 s timeout."""
     return {
         "state": state,
         "attempt": attempt,
@@ -241,7 +243,7 @@ def test_ticket_ledger_reads_payments_counter_and_booking_time():
     assert ticket_ledger(calls, {}, "lane2", "t2") == {"calls": 0, "replays": 0, "booked_at": None}
 
 
-# The gauntlet's fault windows (step 7, the Nexus page).
+# The gauntlet's fault windows (step 8, the Nexus page).
 
 STALL = {"mode": "commit_then_stall"}
 
@@ -274,6 +276,7 @@ def test_stall_window_after_the_fault_was_cleared_counts_the_bookings():
 
 
 def _engine_with_window(key: str) -> Engine:
+    """An engine part-way through the `nexus_kill` scene, with one kill window open on the process `key`."""
     run = {"kills": {}, "faults": [{"key": key, "effect": "kill", "start": 1.0, "end": None, "hit": 5}]}
     eng = Engine(ProcessManager())  # built outside an event loop, so process events are recorded where they happen
     eng.scene_runs, eng.running, eng.current = {"nexus_kill": run}, True, "nexus_kill"
@@ -317,6 +320,8 @@ async def test_a_walkthrough_step_stays_on_screen_for_its_dwell_time(monkeypatch
 
 # The worker-crash scene reviews part of a cohort before the fault and the rest after the restart.
 def _reviewer() -> Engine:
+    """An engine whose `decide_ticket` only records, for a cohort of four refunds, one policy ticket and one human no
+    in each lane."""
     eng = Engine(ProcessManager())
     eng.decided = []
     eng.scene_tickets = {"s": []}

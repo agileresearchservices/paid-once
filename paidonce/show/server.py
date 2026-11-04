@@ -20,6 +20,8 @@ from paidonce.show.procs import ProcessManager, port_open
 
 UI_DIST = config.ROOT / "ui" / "dist"
 SCENARIO_HEADER = "x-paidonce-scenario"
+# The one engine and process manager. `lifespan` fills it in at startup; it is module-level because the route
+# handlers reach it from here.
 state: dict = {}
 
 
@@ -30,11 +32,24 @@ def guard(request: Request) -> None:
 
 
 def snapshot() -> dict:
+    """The engine's snapshot, plus `locked`: `make scenario` if the server has a scenario token, else None.
+
+    The page turns Run and Reset off while `locked` is set.
+    """
     return {**state["engine"].snapshot(), "locked": "make scenario" if config.SCENARIO_TOKEN else None}
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    """Start what the show needs, in dependency order, and stop whatever it started.
+
+    It refuses to start without an Anthropic key (or the stub model). Temporal comes first, because the namespaces
+    and the Nexus endpoint live on it. When TLS is on, certificates are made before the services start, so every
+    caller finds its service's certificate. Then the services start, the server waits for payments and Lane 1 to
+    listen, and it pauses 2 s for the workers to register their pollers. The reset comes last, so the scoreboard
+    starts at zero and not from the last session. On shutdown, `stop_all` runs even if startup failed halfway, so a
+    Temporal server the show started is not left behind.
+    """
     if not agent.have_api_key():
         raise RuntimeError("Set ANTHROPIC_API_KEY: both lanes call a real Anthropic model.")
     config.ensure_data_dir()
@@ -85,11 +100,20 @@ app = FastAPI(title="Paid Once", lifespan=lifespan)
 
 @app.get("/api/state")
 def get_state() -> dict:
+    """The snapshot as one JSON object, for a client that does not stream.
+
+    `scripts/smoke.py` reads it to score a run.
+    """
     return snapshot()
 
 
 @app.get("/api/stream")
 async def stream() -> StreamingResponse:
+    """Server-sent events: one snapshot every 0.7 s, for as long as the client stays connected.
+
+    The page reads nothing else from the server (`useSnapshot.ts`); every action it takes is a POST.
+    """
+
     async def gen():
         while True:
             yield f"data: {json.dumps(snapshot())}\n\n"
@@ -100,6 +124,11 @@ async def stream() -> StreamingResponse:
 
 @app.post("/api/scenes/{scene_id}/run")
 async def run_scene(scene_id: str, request: Request) -> dict:
+    """Start a scene in the background, and return as soon as it has started.
+
+    The page's Run buttons and `make scenario` both call it. 404 for an unknown scene, 409 while another scene is
+    running, 423 while `make scenario` holds the controls.
+    """
     guard(request)
     if scene_id not in {s.id for s in SCENES}:
         raise HTTPException(404, "unknown scene")
@@ -111,6 +140,11 @@ async def run_scene(scene_id: str, request: Request) -> dict:
 
 @app.post("/api/reset")
 async def reset(request: Request) -> dict:
+    """Start the show over, as the server does at boot.
+
+    The page's Reset button calls it, and so does `make scenario` before its run. 423 while `make scenario` holds the
+    controls.
+    """
     guard(request)
     await state["engine"].reset()
     return {"ok": True}
@@ -118,6 +152,10 @@ async def reset(request: Request) -> dict:
 
 @app.post("/api/faults/kill/{proc}")
 async def kill(proc: str, request: Request) -> dict:
+    """kill -9 one service, which comes back after 4 s. Returns `killed`: False if that process was not running.
+
+    404 for a name the process manager does not own. Nothing in the page calls this route; an operator or a script does.
+    """
     guard(request)
     procs: ProcessManager = state["procs"]
     if proc not in procs.procs:
@@ -137,7 +175,7 @@ def spa_response(root: Path, path: str) -> FileResponse:
     candidate = (root / path).resolve()
     if path and candidate.is_relative_to(root) and candidate.is_file():
         return FileResponse(candidate)
-    if path.startswith("brand/"):  # the optional, gitignored logo and favicon
+    if path.startswith("brand/"):  # the optional logo and favicon (ui/public/brand/): the header falls back to text
         raise HTTPException(404, "not found")
     return FileResponse(root / "index.html")
 
@@ -147,10 +185,16 @@ if UI_DIST.exists():
 
     @app.get("/{path:path}")
     def spa(path: str) -> FileResponse:
+        """The built UI, for every path the API does not answer. API paths never fall through to `index.html`."""
         return spa_response(UI_DIST, path)
 
 
 def main() -> None:
+    """Run the show server on the loopback address. `python -m paidonce.show`, which `make demo` runs, calls this.
+
+    It refuses to start while the show port answers, and it treats SIGHUP like Ctrl-C, so the services are stopped
+    too. Open streams get 2 s to close.
+    """
     import uvicorn
 
     # A second instance runs its whole startup before the bind fails: it spawns duplicate workers and its

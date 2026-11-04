@@ -7,6 +7,7 @@ from paidonce.show.procs import Proc, ProcessManager
 
 
 def _manager_with_one_process() -> tuple[ProcessManager, Proc, list]:
+    """A manager with one started child, `sleeper`, and the list that collects its (kind, process) events."""
     events: list = []
     manager = ProcessManager(emit=lambda kind, msg, **extra: events.append((kind, extra.get("proc"))))
     proc = Proc("sleeper", "Sleeper", [sys.executable, "-c", "import time; time.sleep(60)"])

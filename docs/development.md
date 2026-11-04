@@ -57,12 +57,15 @@ waits for:
 1. Add `SceneInfo("my_scene", "Title")` to `SCENES` in `show/catalog.py`.
 2. Write `async def scene_my_scene(self)` in `show/scenes.py`. Use `submit_cohort` to send the same tickets to both
    lanes, `approve_scene` to play the human, and the fault primitives (`kill_window`, `set_fault`, `fault`) so the
-   page can draw where each fault landed. Do not end a scene with a fixed sleep: `Engine.settle` holds it until the
-   ledger has decided every ticket, both stacks have stopped, and Lane 1's queue is empty, then clears the faults.
+   page can draw where each fault landed. Do not end a scene with a fixed sleep to wait for its tickets:
+   `Engine.settle` holds it until the ledger has decided every ticket, both stacks have stopped, and Lane 1's queue is
+   empty, then clears the faults. A deliberate on-screen hold (the walkthrough's `WALKTHROUGH_END_HOLD_S`, the crash
+   scene's 20 s for the audit) is a different thing, and a comment says what it is for.
 3. Add a `Step` to `STEPS` in `ui/src/steps.ts` (copy is read from a projector: short, concrete sentences). The deck is
    nine steps; the first (`problem`) and last (`exactly_once`) are slides with no scene, and the scoreboard is a slide too.
    Page numbers appear in `README.md`, `catalog.py` comments and the URL hash (`#1`..`#9`), so renumber them together.
-4. `scripts/smoke.py` runs every scene in `SCENES` and `make scenario` checks it, so there is nothing to register there.
+4. `make scenario` (`scripts/smoke.py`) runs every scene in `SCENES` except free roam and checks each one, so there is
+   nothing to register there, unless the scene submits more or fewer than one cohort: then its count goes in `COHORTS`.
 
 An unknown scene id answers 404; a scene already running answers 409.
 
@@ -72,12 +75,34 @@ An unknown scene id answers 404; a scene already running answers 409.
 |---|---|---|
 | `make test` | Payments service and ledger, the audit, the agent's policy rules, Lane 1, the show server's guards, the engine's views and process manager | nothing (stub model) |
 | `make test-temporal` | Lane 2 and Nexus end to end: a refund through Nexus, duplicate approval signals, commit-then-timeout, an approval sent while no worker runs, a human "no", a policy denial | the `temporal` CLI |
-| `make scenario` | Every scene against both lanes, scored from the ledger | the `temporal` CLI, port 8100 free |
+| `make scenario` | Every scene but free roam against both lanes, scored from the ledger | the `temporal` CLI, port 8100 free |
 
 `make test-temporal` starts its own in-memory Temporal server on port 7299 and refuses to use any other. The tests run
 workers on the same task queues as the show, so on a shared server the show's workers would take the tests' workflows.
 Use `tests/helpers.wait_until` instead of fixed sleeps, and the shared `payments` fixture in `conftest.py` for a
 payments service on a free port.
+
+## Code conventions
+
+The code is written to be read by someone who was not there when it was written.
+
+- **Every module, class and public function has a docstring** that says what it is for and what a caller can rely on:
+  the contract, the invariants, what comes back, when it raises. It does not restate the signature; the type hints do
+  that. There are no `Args:`/`Returns:` sections: the repository uses plain sentences, in the present tense.
+- **Comments say why, not what.** A comment marks a decision that is not obvious from the code, a constraint that comes
+  from somewhere else (it names the file), or a trap. A line that explains itself carries no comment.
+- **Constants carry their reasoning.** A timeout or a count that has to agree with another one says so and names it:
+  `GAUNTLET_STALL_S` is derived from `REFUND_START_TO_CLOSE`, `LLM_TIMEOUT_S` must fit inside `AGENT_START_TO_CLOSE`,
+  and a test checks the second.
+- **Workflow modules say what they may not do.** `lane2/support_side.py` and `lane2/payments_side.py` state that they
+  import no config, no HTTP client and nothing that touches the filesystem, and that activities are called by name.
+- **Formatting and lint are ruff's** (`make lint`, `make fmt`): line length 120, rule sets E, F, I, B, UP, SIM and
+  ASYNC; `pyproject.toml` lists the few rules that are switched off and why.
+- **The UI uses `//` comments above declarations** and a header comment per file saying what the component draws and
+  which snapshot fields it reads; no JSDoc. `ui/src/types.ts` documents the snapshot field by field, and `styles.css`
+  names the component each section styles.
+- **Tests are named for the behaviour they check** (`test_same_key_is_recorded_once`), so a test carries a docstring
+  only when its setup needs explaining. Each test module's docstring says what the file covers and what it needs.
 
 ## Gotchas
 

@@ -26,6 +26,11 @@ NAMESPACE_RETENTION_S = 86400  # a dev server keeps a finished workflow's histor
 
 
 async def connect_temporal(namespace: str) -> Client:
+    """Connect to the Temporal server, bound to one namespace.
+
+    Workers, the show engine and the tests each call this once per namespace they use. `_ensure_setup` connects to
+    `default` first, because the two namespaces may not exist yet.
+    """
     return await Client.connect(config.TEMPORAL_ADDRESS, namespace=namespace)
 
 
@@ -43,6 +48,12 @@ async def _wait_usable(client: Client, namespace: str, timeout_s: float = 15.0) 
 
 
 async def _ensure_setup() -> list[str]:
+    """Register both namespaces, wait until each is usable, then point the Nexus endpoint at payments.
+
+    The endpoint is created if it is missing. One that points somewhere else is retargeted, which is how an older
+    setup is repaired. Returns one line per step, each saying created, already there or retargeted; the show emits
+    them at boot.
+    """
     lines: list[str] = []
     client = await connect_temporal("default")
     for ns in (config.SUPPORT_NAMESPACE, config.PAYMENTS_NAMESPACE):

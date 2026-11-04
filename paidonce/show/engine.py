@@ -35,6 +35,10 @@ from paidonce.show.views import ViewsMixin
 
 
 class Engine(HarnessMixin, SceneMixin, ViewsMixin):
+    """The state of the show and the runner for its scenes: one per show server, built at startup. `reset()` runs at
+    boot, so a demo starts from zero. `run_scene` plays one scene at a time, and `snapshot()` is what the page
+    streams."""
+
     def __init__(self, procs: ProcessManager, seed: int = 7) -> None:
         self.procs = procs
         self.seed = seed
@@ -45,7 +49,8 @@ class Engine(HarnessMixin, SceneMixin, ViewsMixin):
         self.running = False
         self.scene_tickets: dict[str, list[tuple[str, str]]] = {}
         self.run_no = 0  # bumped per scene run, so a re-run never reuses ticket or workflow IDs
-        self.scene_runs: dict[str, dict] = {}  # last run of each scene: started_at, finished_at, ok, kills
+        # The last run of each scene: started_at, finished_at, ok, error, kills, faults (`run_scene` says what each is).
+        self.scene_runs: dict[str, dict] = {}
         self._temporal: Client | None = None
         self._payments_temporal: Client | None = None
         self._http: httpx.AsyncClient | None = None
@@ -84,6 +89,8 @@ class Engine(HarnessMixin, SceneMixin, ViewsMixin):
 
     # -- plumbing ------------------------------------------------------------
     def emit(self, kind: str, msg: str, **extra) -> None:
+        """Appends to the event log the page shows and keeps the last 200; the snapshot sends the last 60. Process
+        events arrive through `emit_from_procs`, which hands them to the loop."""
         self.events.append({"ts": time.time(), "kind": kind, "msg": msg, **extra})
         del self.events[:-200]
 
@@ -97,6 +104,7 @@ class Engine(HarnessMixin, SceneMixin, ViewsMixin):
             self._record_proc_event(kind, msg, extra)
 
     def _record_proc_event(self, kind: str, msg: str, extra: dict) -> None:
+        """On the event loop: files a kill or restart under the running scene's run; between scenes, nothing."""
         # Kills count against the scene that made them, so a step never shows kills from an earlier scene.
         run = self.scene_runs.get(self.current) if self.running and self.current else None
         if kind == "kill" and run is not None:
@@ -111,21 +119,26 @@ class Engine(HarnessMixin, SceneMixin, ViewsMixin):
 
     @property
     def http(self) -> httpx.AsyncClient:
+        """One client for both HTTPS services, payments and the Lane 1 API. It trusts their certificates and nothing
+        else (`tls.client_verify`), so verification is never turned off."""
         if self._http is None:
             self._http = httpx.AsyncClient(timeout=5.0, verify=tls.client_verify("payments", "lane1_api"))
         return self._http
 
     async def temporal(self) -> Client:
+        """The Temporal client for the support namespace, connected on first use and reused after that."""
         if self._temporal is None:
             self._temporal = await connect_temporal(config.SUPPORT_NAMESPACE)
         return self._temporal
 
     async def payments_temporal(self) -> Client:
+        """The Temporal client for the payments namespace, where `RefundWorkflow` runs. Connected on first use, as
+        `temporal()` is."""
         if self._payments_temporal is None:
             self._payments_temporal = await connect_temporal(config.PAYMENTS_NAMESPACE)
         return self._payments_temporal
 
-    # -- scene runner -----------------------------------------------------------------
+    # -- a scene's tickets, and waiting for them to land -------------------------------
     def _scene_keys(self, scene_id: str) -> list[str]:
         """The keys a scene files its tickets under: its own id, and for free roam its rounds (free_roam_0..3)."""
         return [k for k in self.scene_tickets if k == scene_id or k.startswith(f"{scene_id}_")]
@@ -155,6 +168,10 @@ class Engine(HarnessMixin, SceneMixin, ViewsMixin):
 
     # -- scene runner -----------------------------------------------------------------
     async def run_scene(self, scene_id: str) -> bool:
+        """Starts the scene as a background task and returns True, so the request returns at once. Returns False when a
+        scene is already running or `scene_id` has no `scene_<id>` method: nothing starts. `scene_runs[scene_id]` is the
+        scene's last run: when it started and finished, `ok` (with `error` when it failed), the kills the process
+        manager made during it (`kills`), and its fault windows (`faults`)."""
         if self.running:
             return False
         fn = getattr(self, f"scene_{scene_id}", None)
@@ -190,6 +207,9 @@ class Engine(HarnessMixin, SceneMixin, ViewsMixin):
         return True
 
     async def reset(self) -> None:
+        """Stops a running scene and sets the show back to zero. Faults are cleared, the payments service and the Lane 1
+        API are reset, the audit's records are cleared, and a new `run_id` keeps the next run's IDs apart from the last.
+        Lane 2's workflows are not cancelled: Temporal keeps them, and the audit no longer counts them."""
         if self.running and self._task:
             self._task.cancel()
             await asyncio.gather(self._task, return_exceptions=True)  # let its finally block run before we wipe state
@@ -221,13 +241,17 @@ class Engine(HarnessMixin, SceneMixin, ViewsMixin):
         self.nexus_seen = {}
         self.flow = {"lane1": [], "lane2": []}
         self.beat = None
-        self.scene_runs = {}  # a cancelled scene's finally block then updates a run nobody shows
+        self.scene_runs = {}  # safe now: the gather above let a cancelled scene's finally block write its last update
         self.events.clear()
         self.current = None
         self.emit("reset", "Scoreboard reset")
 
     # -- snapshot ------------------------------------------------------------------------
     def snapshot(self) -> dict:
+        """The JSON the page is a pure function of, streamed over SSE (`server.py` adds `locked`). The scoreboard is
+        `audit.compute_all`, which reads the ledger. The stacks' own views (`lane1_view_all`, `lane2_view_all`,
+        `payments_calls_all`) sit beside it and are never scored. `ui/src/types.ts` (`Snapshot`) is the contract, and
+        `tests/test_show_views.py` fails if its keys and these drift apart."""
         # The scoreboard leaves out the walkthrough (a demonstration) and the Nexus scene (a page of its own, Temporal
         # only): the Lane 1 vs Lane 2 scenes are what add up. They are still scored on their own (`demo_audit`) so the
         # headless run and those pages can read them.

@@ -19,18 +19,32 @@ with workflow.unsafe.imports_passed_through():
         TicketOutcome,
     )
 
-# One model call has to finish well inside this (see LLM_TIMEOUT_S in paidonce/agent.py).
+# One model call, the SDK's retry included, has to finish well inside this (LLM_TIMEOUT_S and LLM_MAX_RETRIES in
+# paidonce/agent.py; a test checks the sum fits).
 AGENT_START_TO_CLOSE = timedelta(seconds=60)
 # How long support waits for payments to answer the Nexus operation, retries included.
 NEXUS_SCHEDULE_TO_CLOSE = timedelta(minutes=10)
 
 
 def ticket_workflow_id(ticket_id: str) -> str:
+    """The support workflow's ID is the ticket, so a second start for a ticket is rejected while the first one runs.
+
+    The show and the tests start, signal and query a ticket through this ID.
+    """
     return f"ticket-{ticket_id}"
 
 
 @workflow.defn
 class SupportTicketWorkflow:
+    """A refund ticket on the support side: decide, wait for a human, then ask payments for the refund over Nexus.
+
+    `_state` goes `starting`, then `deciding` while the `run_agent` activity runs. A proposal that is not a refund
+    ends at `denied` without waiting. A refund proposal waits in `awaiting_approval`, then ends at `rejected`, or
+    moves to `refunding` while the Nexus call runs and ends at `done`. The `approve` signal carries the human's
+    decision, and the `status` query reports the state. The show and the tests use both. Nothing here does I/O: the
+    model and payments calls go through an activity and a Nexus operation.
+    """
+
     def __init__(self) -> None:
         self._ticket_id = ""
         self._state = "starting"
@@ -42,6 +56,15 @@ class SupportTicketWorkflow:
 
     @workflow.run
     async def run(self, ticket: Ticket) -> TicketOutcome:
+        """Decide, wait for a human if the agent proposed a refund, then ask payments for it over Nexus.
+
+        The model call runs in the `run_agent` activity. Each attempt may take `AGENT_START_TO_CLOSE`, and an attempt
+        that takes longer is timed out and retried. The retry policy backs off from 1 s up to 10 s with no attempt cap,
+        so a model that keeps failing keeps the ticket in `deciding` until it answers. `NEXUS_SCHEDULE_TO_CLOSE` bounds
+        the Nexus call in total, retries included, and it is the only bound on the wait for payments, because the refund
+        workflow's retries have no attempt cap either. If the time runs out, the call raises. `run` does not catch it,
+        so the workflow fails with `_state` still `refunding`. The outcome is `denied`, `rejected` or `done`.
+        """
         self._ticket_id = ticket.ticket_id
         self._state = "deciding"
         self._proposal = await workflow.execute_activity(
@@ -83,6 +106,7 @@ class SupportTicketWorkflow:
 
     @workflow.signal
     def approve(self, decision: ApprovalDecision) -> None:
+        """The human's decision. The first signal sets it, and a repeat only increments `duplicate_signals`."""
         # Works before run() reaches the wait, and a redelivered signal is counted, not applied twice.
         if self._decision is None:
             self._decision = decision
@@ -91,6 +115,12 @@ class SupportTicketWorkflow:
 
     @workflow.query
     def status(self) -> dict:
+        """The state the show and the tests read: `state`, `proposal`, `refund_id` and `duplicate_signals`.
+
+        A query is answered by a running support worker, so this needs one. The proposal is None until the agent
+        answers. Once the workflow has completed, the show reads its result or `describe()` instead, and neither needs
+        a worker.
+        """
         p = self._proposal
         return {
             "ticket_id": self._ticket_id,

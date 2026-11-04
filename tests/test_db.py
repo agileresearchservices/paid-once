@@ -6,6 +6,7 @@ from paidonce import config, db
 
 
 def _make(conn):
+    """Create the scratch table `t` that the transaction tests write to."""
     conn.execute("CREATE TABLE IF NOT EXISTS t (n INTEGER)")
 
 

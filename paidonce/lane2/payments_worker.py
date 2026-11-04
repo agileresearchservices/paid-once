@@ -11,6 +11,7 @@ from paidonce.lane2.payments_side import PaymentsServiceHandler, RefundWorkflow
 
 
 async def _run() -> None:
+    """Connect to the payments namespace and serve the refund workflow, the HTTP activity and the Nexus handler."""
     client = await connect_temporal(config.PAYMENTS_NAMESPACE)
     worker = Worker(
         client,
@@ -23,6 +24,7 @@ async def _run() -> None:
 
 
 def main() -> None:
+    """Entry point for `python -m paidonce.lane2.payments_worker`. The show starts it as a child process."""
     asyncio.run(_run())
 
 

@@ -34,6 +34,12 @@ from paidonce.show.catalog import (
 
 
 class SceneMixin:
+    """The scenes: one `scene_<id>` coroutine per entry in `SCENES`.
+
+    A scene is built from the primitives in this class and in `harness.py` (`submit_cohort`, `approve_scene`,
+    `wait_for_proposals`). `Engine.run_scene` calls `settle` after each scene. It holds the scene open until every
+    ticket is decided, its stack has stopped and Lane 1's queue is empty, so a scene need not end on a fixed wait."""
+
     def fault(self, scene: str, msg: str, target: list[str], effect: str) -> None:
         """A fault, with where it lands: diagram node ids (process names, or "temporal"), and its effect
         (kill, duplicate or stall)."""
@@ -70,6 +76,11 @@ class SceneMixin:
         delay_s: float = 8.0,
         latency_s: float = 0.0,
     ) -> None:
+        """Set payments' fault state, with the body `/admin/fault` takes.
+
+        `mode` is `none` or `commit_then_stall`: the booking is saved, then its reply is held for `delay_s`, so the
+        caller times out and retries. `count` is per lane, how many fresh bookings stall (a replay does not count).
+        `latency_s` is added before every refund call. `lane` is `all`, `lane1` or `lane2`."""
         await self.http.post(
             f"{config.PAYMENTS_URL}/admin/fault",
             json={
@@ -82,9 +93,13 @@ class SceneMixin:
         )
 
     async def clear_faults(self) -> None:
+        """Turn every lane's fault off. `Engine.run_scene` calls it once a scene has settled, and `Engine.reset`
+        does too."""
         await self.set_fault("all", "none", 0, 0.0, 0.0)
 
     async def redeliver_lane1(self, n: int) -> None:
+        """Ask the Lane 1 API to queue a second execute job for up to `n` recent tickets, as a broker redelivering
+        would. A failure is ignored: the API may be down in the middle of a scene."""
         try:
             await self.http.post(f"{config.LANE1_URL}/admin/redeliver", json={"n": n})
         except httpx.HTTPError:
@@ -137,6 +152,8 @@ class SceneMixin:
             await self.clear_faults()
 
     async def scene_intro(self) -> None:
+        """The happy path, with no fault. Each lane gets seven tickets: five the human approves, one the policy check
+        closes, and one the human denies. Both stacks refund the five once, and the other two get no money."""
         self.emit(
             "scene",
             "Happy path: both stacks handle 7 tickets with nothing going wrong",
@@ -169,10 +186,16 @@ class SceneMixin:
             only=lambda tid: ticket_index(tid) >= WORKER_CRASH_IN_FLIGHT,
             policy_note=False,
         )
+        # The deck's crash step (`ui/src/steps.ts`) gives the audit these 20 s to show which tickets are never paid.
         await asyncio.sleep(20)
         await self.clear_faults()
 
     async def scene_double_delivery(self) -> None:
+        """The broker delivers the same work twice. Every refund call takes 2.5 s longer, so the first refunds are
+        still in flight when the copies arrive, and a copy that lands after its refund has finished is a no-op in
+        Lane 1 (`docs/architecture.md`). Five refunds per lane are approved. A second later Lane 1 is asked to queue up
+        to five execute jobs again, and each Lane 2 decision is replayed three times. The audience sees Queue +
+        LangGraph pay some refunds twice, and Temporal keep the first decision."""
         self.emit("scene", "The broker delivers the same work twice", scene="double_delivery")
         await self.set_fault("all", "none", latency_s=2.5)
         await self.submit_cohort("double_delivery", 5)
@@ -189,6 +212,11 @@ class SceneMixin:
         await self.replay_approvals_lane2("double_delivery", 3)
 
     async def scene_payments_timeout(self) -> None:
+        """Payments books the refunds, then the replies never arrive. The stall is armed before the cohort is
+        submitted: each lane's next five fresh bookings commit, and their replies are held for 9 s. The cohort is
+        approved in both lanes, and the fault marker goes on the diagram once the approvals have gone out. Both stacks
+        time out and retry. Temporal's retry sends the same key, so the ledger answers from its record. Queue +
+        LangGraph sends a new key and is paid again."""
         self.emit(
             "scene",
             "Payments commits the refund, then the response never arrives",
@@ -202,8 +230,8 @@ class SceneMixin:
 
     async def scene_nexus_kill(self) -> None:
         """The Nexus gauntlet: while the refunds are in flight, payments goes quiet after booking, then the support
-        worker, the payments worker and the Temporal server itself are killed. Each fault is timed to land on
-        refunds still open, and records how many it hit."""
+        worker, the payments worker and the Temporal server itself (when the show started it) are killed. Each fault
+        is timed to land on refunds still open, and records how many it hit."""
         scene = "nexus_kill"
         self.emit(
             "scene",
@@ -254,6 +282,8 @@ class SceneMixin:
             await asyncio.sleep(0.25)
 
     async def _wait_for_rows_closed(self, timeout: float) -> None:
+        """Until no Nexus row is still live, or `timeout` passes. A row is live while its operation is open.
+        `scene_nexus_kill` waits here before it clears the faults."""
         end = time.time() + timeout
         while time.time() < end:
             rows = list(self.nexus_seen.values())
@@ -262,6 +292,10 @@ class SceneMixin:
             await asyncio.sleep(0.5)
 
     async def scene_free_roam(self) -> None:
+        """Four rounds, each with a cohort of three refunds per lane and one random fault: the agent workers killed,
+        payments stalled, a redelivery, or the payments worker killed. The picks come from `self.rng`, which `reset`
+        reseeds. Not a step in the deck, and the page has no control for it. `scripts/smoke.py free_roam` runs it by
+        name; `make scenario` leaves it out."""
         self.emit("scene", "Free roam: faults picked at random", scene="free_roam")
         actions: list[Callable[[str], Awaitable[None]]] = [
             self._roam_kill_agents,
@@ -280,19 +314,23 @@ class SceneMixin:
         await self.clear_faults()
 
     async def _roam_kill_agents(self, scene: str) -> None:
+        """Kill -9 both agent workers, back in 3 s."""
         self.fault(scene, "Fault: kill -9 on the agent workers", AGENT_WORKERS, "kill")
         self.procs.kill("lane1_worker", 3.0)
         self.procs.kill("support_worker", 3.0)
 
     async def _roam_stall(self, scene: str) -> None:
+        """Payments commits the next three bookings in each lane, then holds each reply for 8 s."""
         self.fault(scene, "Fault: payments goes quiet after committing", ["payments"], "stall")
         await self.set_fault("all", "commit_then_stall", count=3, delay_s=8.0)
 
     async def _roam_redeliver(self, scene: str) -> None:
+        """Redeliver up to three Lane 1 jobs, and replay each Lane 2 decision twice."""
         self.fault(scene, "Fault: the same work is delivered twice", ["lane1_api", "temporal"], "duplicate")
         await self.redeliver_lane1(3)
         await self.replay_approvals_lane2(scene, 2)
 
     async def _roam_kill_payments_worker(self, scene: str) -> None:
+        """Kill -9 the payments worker, back in 6 s."""
         self.fault(scene, "Fault: kill -9 on the payments worker", ["payments_worker"], "kill")
         self.procs.kill("payments_worker", 6.0)

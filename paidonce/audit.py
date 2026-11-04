@@ -1,4 +1,5 @@
-"""The scoreboard. Reads the payments ledger and the human-decision log, never a lane's own state.
+"""The scoreboard. Reads the payments ledger and the two records the harness writes (what it planned for each ticket,
+and each human decision), never a lane's own state.
 
 Three invariants per lane:
   1. Every approved ticket is refunded exactly once.   (duplicates, missing)
@@ -37,6 +38,10 @@ SETTLE_S = 20.0
 
 
 def init() -> None:
+    """Create the two tables in `AUDIT_DB` if they are missing.
+
+    The show server calls it at startup, and each function here calls it before it touches the tables.
+    """
     ensure_schema(config.AUDIT_DB, SCHEMA)
 
 
@@ -62,6 +67,10 @@ def record_decision(lane: str, ticket_id: str, approved: bool) -> None:
 
 
 def reset() -> None:
+    """Empty both tables, so the scoreboard starts from nothing.
+
+    The show's reset calls it after it resets the payments ledger and Lane 1. It clears only the audit tables.
+    """
     init()
     with connect(config.AUDIT_DB) as conn:
         conn.execute("DELETE FROM tickets")
@@ -94,6 +103,8 @@ def compute(
     for row in ledger.all_refunds(lane):
         refunds_by_ticket.setdefault(row["ticket_id"], []).append(row)
 
+    # Each ticket is in one state, listed in `tickets`: ok, duplicate, unapproved, rejected, declined, waiting,
+    # in_flight or missing. `refunded_once` counts ok, and `violations` is duplicates + missing + unapproved.
     out = {
         "lane": lane,
         "submitted": len(tickets),
@@ -149,4 +160,5 @@ def compute(
 
 
 def compute_all(settle_s: float = SETTLE_S, **scenes) -> dict:
+    """One `compute` result per lane, keyed by lane id. Keyword arguments such as `exclude_scenes` go to each lane."""
     return {lane: compute(lane, settle_s, **scenes) for lane in LANES}

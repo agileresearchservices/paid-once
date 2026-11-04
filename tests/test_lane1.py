@@ -1,3 +1,7 @@
+"""Lane 1 end to end in one process, with a real payments service: the happy path, the human's no, and the three
+failures that make it refund twice or lose a ticket. The worker is driven by hand with `drain`; two tests run a job on
+a thread instead, and the crash test abandons its thread, the way `kill -9` abandons a process."""
+
 import threading
 import time
 
@@ -12,6 +16,8 @@ from tests.helpers import drain, wait_until
 
 
 def submit(tid="t1", amount=2500):
+    """Create the ticket straight in Lane 1's store, skipping the API, and record it with the audit as the show's
+    harness does."""
     store.create_ticket(
         {
             "ticket_id": tid,

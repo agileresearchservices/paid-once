@@ -6,6 +6,7 @@ import "@fontsource-variable/inter";
 import "@fontsource/noto-sans-mono";
 import "./styles.css";
 
+// Mounts the app. StrictMode runs effects twice in dev, and the SSE hook's cleanup closes the first stream.
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App />

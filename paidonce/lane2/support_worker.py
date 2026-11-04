@@ -11,6 +11,7 @@ from paidonce.lane2.support_side import SupportTicketWorkflow
 
 
 async def _run() -> None:
+    """Connect to the support namespace and serve the workflow and the agent activity until the process stops."""
     client = await connect_temporal(config.SUPPORT_NAMESPACE)
     worker = Worker(
         client,
@@ -22,6 +23,7 @@ async def _run() -> None:
 
 
 def main() -> None:
+    """Entry point for `python -m paidonce.lane2.support_worker`. The show starts it as a child process."""
     asyncio.run(_run())
 
 

@@ -3,11 +3,13 @@ import { BEATS, WALKTHROUGH_TICKET } from "./steps";
 import { LegendIcon, type TicketKind } from "./TicketIcon";
 import type { FlowDot, LaneId } from "./types";
 
-// The walkthrough's panel, above the diagram on step 2: the refund as three role panes that fill in as the scene plays on its
-// own. Each step stays up for a few seconds (the engine's WALKTHROUGH_DWELL_S), so the diagram below shows what the panes
-// say. Before the scene runs the three panes are already there, empty, so the roles are on screen and nothing jumps. This page outlines the flow
-// in general; it does not compare the two stacks.
+// The walkthrough's panel, above the diagram on step 2: the refund as three role panes that fill in as the scene plays
+// on its own. Each step stays up for a few seconds (the engine's WALKTHROUGH_DWELL_S), so the diagram below shows what
+// the panes say. Before the scene runs the three panes are already there, empty, so the roles are on screen and nothing
+// jumps. This page outlines the flow in general; it does not compare the two stacks.
 
+// The three-dot typing indicator (`.typing` in styles.css). It shows where a message or a decision is still coming: the
+// customer's pane before the run, and the agent's pane while its policy check runs.
 function Typing() {
   return (
     <span className="typing" aria-label="typing">
@@ -25,7 +27,7 @@ function Row({ kind, children }: { kind: TicketKind; children: ReactNode }) {
   );
 }
 
-// The panes' role icons, drawn like the ticket icons (TicketIcon.tsx): a chat bubble for the customer, a robot for the agent.
+// The pane icons, drawn like the ticket icons (TicketIcon.tsx): a chat bubble for the customer, a robot for the agent.
 function RoleIcon({ role }: { role: "customer" | "agent" }) {
   return (
     <svg className="lg-icon role-icon" viewBox="-10 -10 20 20" aria-hidden="true">
@@ -46,11 +48,11 @@ function RoleIcon({ role }: { role: "customer" | "agent" }) {
   );
 }
 
-// The customer's photo of the damaged mug, sent with their message: one mug whose handle has snapped off, the handle lying
-// on the table beside it. There is no image file: this is a drawn "photo" that reads as one at this size, with a soft-focus
-// tabletop and wall, a glazed red mug with cylinder shading and specular highlights, pale bare ceramic where the handle
-// broke, soft contact shadows and a vignette. Fixed colours, so it looks the same on either theme. Gradient ids carry a
-// useId() prefix because the photo appears twice on the page (customer and human panes).
+// The customer's photo of the damaged mug, sent with their message: one mug whose handle has snapped off, the handle
+// lying on the table beside it. There is no image file: this is a drawn "photo" that reads as one at this size, with a
+// soft-focus tabletop and wall, a glazed red mug with cylinder shading and specular highlights, pale bare ceramic where
+// the handle broke, soft contact shadows and a vignette. Fixed colours, so it looks the same on either theme. Gradient
+// ids carry a useId() prefix because the photo appears twice on the page (customer and human panes).
 function BrokenMug() {
   const id = useId().replace(/:/g, "");
   const u = (n: string) => `url(#${id}${n})`;
@@ -143,6 +145,11 @@ function refunded(flow: Record<LaneId, FlowDot[]> | undefined): boolean {
   return dots.length >= 2 && dots.every((d) => d.state === "refunded");
 }
 
+// The panel for the architecture step. `beat` is the walkthrough step on screen (the engine's `beat.id`), or null, and
+// `flow` is the dots of both stacks, passed only while this scene is on screen. Both stacks showing the ticket waiting
+// for a human means the agent has decided (`decided`); both showing it refunded means the refund is done (`refunded`).
+// The step index is kept in a ref, so the chat stays on the last step after the scene ends (`beat` goes null). It goes
+// back to the hint only when `flow` is gone: another scene, or a reset, is on screen.
 export function Walkthrough({ beat, flow }: { beat: string | null; flow?: Record<LaneId, FlowDot[]> }) {
   // Once the scene has finished the chat stays as it was, so the panel never flashes a message or jumps.
   const last = useRef(-1);
@@ -154,9 +161,9 @@ export function Walkthrough({ beat, flow }: { beat: string | null; flow?: Record
   const shown = at >= 0; // a step is up
 
   // When a step opens, bring all three panes into view. The header above may scroll away; the panel's own top must not
-  // (the scroll stops there). The diagram sits below the panel. The target is an absolute page position, not a scrollBy:
-  // a smooth scrollBy issued while the last step's scroll is still moving adds to that scroll's destination, so steps
-  // a few seconds apart stacked up and pushed the step title off the top.
+  // (the scroll stops there). The diagram sits below the panel. The target is an absolute page position, not a
+  // scrollBy: a smooth scrollBy issued while the last step's scroll is still moving adds to that scroll's destination,
+  // so steps a few seconds apart stacked up and pushed the step title off the top.
   useEffect(() => {
     if (!shown) return;
     const panel = document.querySelector(".beat");
@@ -215,7 +222,8 @@ export function Walkthrough({ beat, flow }: { beat: string | null; flow?: Record
             <div className="review">
               <div className="review-ask">{`Refund ${amount}?`}</div>
               <div className="review-quote"><span>“{message}”</span><BrokenMug /></div>
-              {/* The agent hands the proposal over with its policy check result, so the human knows why it was proposed */}
+              {/* The agent hands the proposal over with its policy check result, so the human knows why it was
+                  proposed */}
               <div className="review-note"><b>Agent:</b> Policy check passed.</div>
               <div className="review-actions">
                 <span className={i >= 3 ? "act approve on" : "act approve"}>{i >= 3 ? "✓ Approved" : "Approve"}</span>

@@ -20,6 +20,7 @@ SERVICES = ["payments", "lane1_api"]
 
 @pytest.fixture(autouse=True)
 def fresh_trust():
+    """Clear the cached trust stores before and after each test: `tls._trust` is cached per process."""
     tls._trust.cache_clear()
     yield
     tls._trust.cache_clear()
@@ -38,6 +39,7 @@ def https_server(app, service):
 
 @pytest.fixture
 def https_payments(monkeypatch):
+    """The payments service over HTTPS on a free port, with `PAYMENTS_URL` pointed at it."""
     with https_server(payments_app, "payments") as srv:
         monkeypatch.setattr(config, "PAYMENTS_URL", srv.url)
         yield srv
@@ -45,6 +47,7 @@ def https_payments(monkeypatch):
 
 @pytest.fixture
 def https_lane1(monkeypatch):
+    """The Lane 1 API over HTTPS on a free port, with `LANE1_URL` pointed at it."""
     with https_server(lane1_api.app, "lane1_api") as srv:
         monkeypatch.setattr(config, "LANE1_URL", srv.url)
         yield srv
