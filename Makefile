@@ -1,5 +1,7 @@
 # The developer's entry points. `make` alone lists them; the README's "Make targets" table says more about each.
 # The Python targets run through uv, so nothing here needs an activated virtualenv.
+# A stale VIRTUAL_ENV in the caller's shell (e.g. from before the repo moved) makes uv warn; uv uses ./.venv regardless.
+unexport VIRTUAL_ENV
 .DEFAULT_GOAL := help
 .PHONY: help install test test-temporal setup scenario ui demo down lint fmt
 
